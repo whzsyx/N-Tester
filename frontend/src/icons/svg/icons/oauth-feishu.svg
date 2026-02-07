@@ -1,0 +1,29 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="feishu-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3370FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2B5FE6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="feishu-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00D6B9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00C4A7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="feishu-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1F4788;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A3D75;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆 -->
+  <circle cx="24" cy="24" r="24" fill="#FFFFFF"/>
+  
+  <!-- 飞书 Logo - 三个飞翔的形状 -->
+  <!-- 青色部分（右上） -->
+  <path d="M 28 10 L 38 14 L 34 24 L 28 22 Q 26 20 28 18 Z" fill="url(#feishu-cyan)"/>
+  
+  <!-- 蓝色部分（左下） -->
+  <path d="M 10 20 L 20 16 L 24 26 L 18 28 Q 14 28 12 26 Z" fill="url(#feishu-blue)"/>
+  
+  <!-- 深蓝色部分（中间） -->
+  <path d="M 20 24 L 30 20 L 34 30 L 24 34 Q 20 32 20 28 Z" fill="url(#feishu-dark)"/>
+</svg>
