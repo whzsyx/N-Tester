@@ -75,11 +75,11 @@
         </div>
         <div class="navbar-right">
           <div class="connection-status">
-            <el-icon :class="['status-icon', wsConnection ? 'connected' : 'disconnected']">
-              <Connection v-if="wsConnection" />
+            <el-icon :class="['status-icon', isWsConnected ? 'connected' : 'disconnected']">
+              <Connection v-if="isWsConnected" />
               <Warning v-else />
             </el-icon>
-            <span class="status-text">{{ wsConnection ? '已连接' : '未连接' }}</span>
+            <span class="status-text">{{ isWsConnected ? '已连接' : '未连接' }}</span>
           </div>
           <el-tag v-if="messages.length > 0" size="small" type="info">
             {{ messages.length }} 条消息
@@ -440,6 +440,7 @@ const currentPage = ref(1)
 const pageSize = 20
 const streamingMessage = ref<MessageData | null>(null)  // 正在流式接收的消息
 const wsConnection = ref<{ ws: WebSocket; send: (content: string) => void; close: () => void } | null>(null)  // WebSocket 连接
+const isWsConnected = ref(false)  // WebSocket 真实连接状态
 
 // 性能优化：限制渲染的消息数量
 const maxRenderedMessages = 100 // 最多渲染100条消息
@@ -693,16 +694,24 @@ const connectToWebSocket = (conversationId: number) => {
       // onError 回调
       (error) => {
         console.error('WebSocket 连接错误:', error)
-        ElMessage.error('WebSocket 连接失败，请刷新页面重试')
+        isWsConnected.value = false
       },
       // onClose 回调
       () => {
         console.log('WebSocket 连接已关闭')
+        isWsConnected.value = false
         wsConnection.value = null
+      },
+      // onOpen 回调
+      () => {
+        console.log('WebSocket 连接成功')
+        isWsConnected.value = true
+        ElMessage.success('连接成功')
       }
     )
   } catch (error: any) {
     console.error('WebSocket 连接失败:', error)
+    isWsConnected.value = false
     ElMessage.error(error.message || 'WebSocket 连接失败')
   }
 }
@@ -783,6 +792,12 @@ const handleSendMessage = async () => {
   
   if (!wsConnection.value) {
     ElMessage.error('WebSocket 未连接，请刷新页面重试')
+    return
+  }
+  
+  // 检查连接状态
+  if (!isWsConnected.value) {
+    ElMessage.warning('正在连接中，请稍候...')
     return
   }
   

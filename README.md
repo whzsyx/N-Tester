@@ -14,6 +14,9 @@
 </div>
 
 ---
+## 线上体验地址
+http://106.54.166.76
+用户：admin  密码：123456
 
 ## 🌈 项目介绍
 
@@ -557,8 +560,8 @@ cp .env.example .env
 ##### 4. 安装依赖
 
 ```bash
-# 使用国内镜像源加速
-pip install -r requirements -i https://mirrors.aliyun.com/pypi/simple
+# 安装依赖
+pip install -r requirements
 ```
 
 ##### 5. 初始化数据库
@@ -1064,6 +1067,9 @@ A:
 
 ### QQ 群
 <img src="static/img/qq.png" width="200" alt="QQ群" />
+
+### 打赏作者，可以请作者喝杯咖啡，你的鼓励将是更新最大的动力
+<img src="static/img/wx.png" width="200" alt="wx" />
 
 欢迎加入交流群，一起学习进步！
 

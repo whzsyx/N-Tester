@@ -45,9 +45,11 @@
 			:title="selectedTool?.display_name || '工具执行'"
 			width="800px"
 			:close-on-click-modal="false"
+			@closed="handleDialogClosed"
 		>
 			<ToolExecutor
-				v-if="selectedTool"
+				v-if="selectedTool && toolDialogVisible"
+				:key="selectedTool.name"
 				:tool="selectedTool"
 				:category="category"
 				@execute="handleExecute"
@@ -149,6 +151,12 @@ const handleExecute = (result: any) => {
 const handleBatchGenerate = (result: any) => {
 	emit('batchGenerate', result);
 	toolDialogVisible.value = false;
+};
+
+// 处理对话框关闭
+const handleDialogClosed = () => {
+	// 对话框关闭动画完成后清空选中的工具
+	selectedTool.value = null;
 };
 </script>
 

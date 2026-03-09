@@ -298,27 +298,39 @@ export const useConversationApi = () => {
   }
 
   /**
-   * 发送消息（WebSocket 流式响应）
+   * 发送消息（WebSocket 流式响应）- 简化版本
    * @param conversationId 对话 ID
    * @param onMessage 消息回调
    * @param onError 错误回调
    * @param onClose 关闭回调
+   * @param onOpen 连接成功回调
    * @returns WebSocket 实例和发送函数
    */
   const connectWebSocket = (
     conversationId: number,
     onMessage: (event: SSEMessageEvent) => void,
     onError?: (error: Event) => void,
-    onClose?: () => void
+    onClose?: () => void,
+    onOpen?: () => void
   ): { ws: WebSocket; send: (content: string) => void; close: () => void } => {
-    const baseURL = import.meta.env.VITE_API_BASE_URL || ''
     const token = Session.get('token') || ''
     
     // 构建 WebSocket URL
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    // 从 baseURL 中提取 host（例如：http://127.0.0.1:8100 -> 127.0.0.1:8100）
-    const wsHost = baseURL.replace(/^https?:\/\//, '').replace(/\/api$/, '').replace(/\/$/, '')
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
+    let wsUrl: string
+    const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+    const isDev = import.meta.env.DEV  // Vite 提供的开发环境标识
+    
+    if (isDev && baseURL) {
+      // 开发环境：使用环境变量中的地址（因为前后端端口不同）
+      const protocol = baseURL.startsWith('https') ? 'wss:' : 'ws:'
+      const host = baseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+      wsUrl = `${protocol}//${host}/api/v1/ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
+    } else {
+      // 生产环境：使用当前页面的 host（前后端同域，通过 Nginx 代理）
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const host = window.location.host
+      wsUrl = `${protocol}//${host}/api/v1/ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
+    }
     
     console.log('Connecting to WebSocket:', wsUrl)
     
@@ -328,6 +340,7 @@ export const useConversationApi = () => {
     // 连接打开
     ws.onopen = () => {
       console.log('WebSocket connected')
+      onOpen?.()
     }
     
     // 接收消息
@@ -343,17 +356,13 @@ export const useConversationApi = () => {
     // 连接错误
     ws.onerror = (error) => {
       console.error('WebSocket error:', error)
-      if (onError) {
-        onError(error)
-      }
+      onError?.(error)
     }
     
     // 连接关闭
-    ws.onclose = () => {
-      console.log('WebSocket closed')
-      if (onClose) {
-        onClose()
-      }
+    ws.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason)
+      onClose?.()
     }
     
     // 发送消息函数
@@ -365,7 +374,7 @@ export const useConversationApi = () => {
         }
         ws.send(JSON.stringify(message))
       } else {
-        console.error('WebSocket is not open')
+        console.error('WebSocket is not open, current state:', ws.readyState)
         throw new Error('WebSocket 连接未就绪')
       }
     }

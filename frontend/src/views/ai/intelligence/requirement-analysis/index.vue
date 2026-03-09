@@ -200,40 +200,42 @@
 
         <!-- 需求列表 -->
         <el-tab-pane label="需求列表" name="requirements">
-          <el-table 
-            :data="requirementList" 
-            border
-            stripe
-            style="width: 100%"
-          >
-            <el-table-column prop="requirement_id" label="需求编号" width="120" align="center" />
-            <el-table-column prop="requirement_name" label="需求名称" min-width="200" show-overflow-tooltip />
-            <el-table-column prop="requirement_type" label="类型" width="120" align="center">
-              <template #default="{ row }">
-                <el-tag>{{ row.requirement_type }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="module" label="模块" width="150" show-overflow-tooltip />
-            <el-table-column prop="requirement_level" label="级别" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag :type="getLevelType(row.requirement_level)">
-                  {{ row.requirement_level }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="描述" min-width="250" show-overflow-tooltip />
-            <el-table-column label="操作" width="100" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button 
-                  type="primary" 
-                  size="small"
-                  @click="handleViewRequirementDetail(row)"
-                >
-                  详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="requirements-list-container">
+            <el-table 
+              :data="requirementList" 
+              border
+              stripe
+              style="width: 100%"
+            >
+              <el-table-column prop="requirement_id" label="需求编号" width="120" align="center" />
+              <el-table-column prop="requirement_name" label="需求名称" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="requirement_type" label="类型" width="120" align="center">
+                <template #default="{ row }">
+                  <el-tag>{{ row.requirement_type }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="module" label="模块" width="150" show-overflow-tooltip />
+              <el-table-column prop="requirement_level" label="级别" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="getLevelType(row.requirement_level)">
+                    {{ row.requirement_level }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="description" label="描述" min-width="250" show-overflow-tooltip />
+              <el-table-column label="操作" width="100" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button 
+                    type="primary" 
+                    size="small"
+                    @click="handleViewRequirementDetail(row)"
+                  >
+                    详情
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-dialog>
@@ -697,6 +699,55 @@ onMounted(async () => {
   word-break: break-word;
   max-height: 300px;
   overflow-y: auto;
+}
+
+// 需求列表滚动容器样式
+.requirements-list-container {
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  // 自定义滚动条样式 (Webkit浏览器)
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: var(--el-fill-color-lighter);
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: var(--el-color-info-light-5);
+    border-radius: 4px;
+    
+    &:hover {
+      background: var(--el-color-info-light-3);
+    }
+  }
+  
+  // Firefox滚动条样式
+  scrollbar-width: thin;
+  scrollbar-color: var(--el-color-info-light-5) var(--el-fill-color-lighter);
+}
+
+// 暗黑模式适配
+.dark {
+  .requirements-list-container {
+    &::-webkit-scrollbar-track {
+      background: var(--el-fill-color-dark);
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: var(--el-color-info-dark-2);
+      
+      &:hover {
+        background: var(--el-color-info);
+      }
+    }
+    
+    scrollbar-color: var(--el-color-info-dark-2) var(--el-fill-color-dark);
+  }
 }
 
 :deep(.el-table) {

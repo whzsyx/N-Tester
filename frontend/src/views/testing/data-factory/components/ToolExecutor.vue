@@ -89,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, defineProps, defineEmits } from 'vue';
+import { ref, reactive, computed, onMounted, watch, defineProps, defineEmits } from 'vue';
 import { ElMessage } from 'element-plus';
 import { User, Edit, Document, Grid, Setting, Lock, Clock } from '@element-plus/icons-vue';
 import { executeTool as executeToolAPI, batchGenerate, getTagList, type Tool, type ToolCategory } from '/@/api/v1/data_factory';
@@ -118,7 +118,7 @@ const emit = defineEmits<{
 }>();
 
 // 响应式数据
-const formData = ref<Record<string, any>>(props.initialData || {});
+const formData = ref<Record<string, any>>({});
 const options = reactive({
 	is_saved: true,
 	batch_count: 1,
@@ -230,9 +230,20 @@ const loadTags = async () => {
 
 // 初始化表单数据
 const initFormData = () => {
-	formData.value = {};
+	formData.value = props.initialData ? { ...props.initialData } : {};
 	executeResult.value = null;
+	options.batch_count = 1;
+	options.tags = [];
 };
+
+// 监听工具变化，重置表单数据
+watch(() => props.tool, (newTool, oldTool) => {
+	// 当工具切换时（不同的工具名称），重置表单数据
+	if (newTool && oldTool && newTool.name !== oldTool.name) {
+		console.log('工具切换，重置表单数据:', oldTool.name, '->', newTool.name);
+		initFormData();
+	}
+}, { immediate: false });
 
 // 组件挂载时初始化
 onMounted(() => {

@@ -445,8 +445,8 @@ class NotificationService:
             text = f"*{request.title}*\n\n{request.content}"
         elif parse_mode == "MarkdownV2":
             # MarkdownV2需要转义特殊字符
-            title = request.title.replace(".", "\.").replace("-", "\-").replace("(", "\(").replace(")", "\)")
-            content = request.content.replace(".", "\.").replace("-", "\-").replace("(", "\(").replace(")", "\)")
+            title = request.title.replace(".", r"\.").replace("-", r"\-").replace("(", r"\(").replace(")", r"\)")
+            content = request.content.replace(".", r"\.").replace("-", r"\-").replace("(", r"\(").replace(")", r"\)")
             text = f"*{title}*\n\n{content}"
         
         # Telegram Bot API URL
