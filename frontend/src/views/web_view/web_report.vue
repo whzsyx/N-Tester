@@ -155,10 +155,10 @@ import { useRoute } from 'vue-router'
 import { get_web_result_report, get_web_result_detail } from '/@/api/v1/web_management'
 import { getBaseApiUrl } from '/@/utils/config'
 
-// 媒体文件：后端挂载了 /media 路由，直接拼接后端地址
+
 const mediaUrl = (path: string) => path ? `${getBaseApiUrl()}${path}` : ''
 
-// 时间格式化：2026-03-14T21:35:24 → 2026-03-14 21:35:24
+
 const formatTime = (t: string) => t ? t.replace('T', ' ') : ''
 
 const loading = ref(false)
@@ -194,7 +194,7 @@ const get_result_report = async () => {
     const route = useRoute()
     result_id.value = String((route.query.result_id || route.query.resultId || '') as any)
 
-    // 没有 result_id 时直接结束，避免一直 loading
+
     if (!result_id.value) {
       res_form.value = {}
       script_list.value = []
@@ -217,7 +217,6 @@ const get_result_report = async () => {
     const data = res?.data || {}
     res_form.value = data
 
-    // 后端找不到报告时会返回 {}，这里兜底避免脚本/浏览器索引报错导致页面卡住
     const scripts = Array.isArray(data.script_list) ? data.script_list : []
     const browsers = Array.isArray(data.browser_list) ? data.browser_list : []
     script_list.value = scripts
@@ -303,7 +302,7 @@ onMounted(() => { get_result_report() })
 </script>
 
 <style scoped lang="scss">
-/* 统计卡片 — 渐变色，深色模式下同样好看 */
+
 .stat-card {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
@@ -316,7 +315,7 @@ onMounted(() => { get_result_report() })
 .stat-card--teal  { background: linear-gradient(135deg, #13c2c2, #08979c) }
 .stat-card--red   { background: linear-gradient(135deg, #ff4d4f, #cf1322) }
 
-/* 执行信息栏 — 用 el CSS 变量自动适配深色 */
+
 .info-bar {
   display: flex; flex-wrap: wrap; gap: 6px 16px;
   align-items: center; padding: 10px 12px;
@@ -327,7 +326,7 @@ onMounted(() => { get_result_report() })
 .info-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 13px; color: var(--el-text-color-primary) }
 .info-label { color: var(--el-text-color-secondary); font-size: 12px; margin-right: 2px }
 
-/* 步骤卡片 — 用 el CSS 变量自动适配深色 */
+
 .step-card {
   border-radius: 6px; padding: 8px 10px; border-left: 3px solid;
   background: var(--el-bg-color);
@@ -339,24 +338,24 @@ onMounted(() => { get_result_report() })
 .step-log  { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 6px; word-break: break-all }
 .step-actions { display: flex; flex-wrap: wrap; gap: 4px }
 
-/* 操作按钮 */
+
 .action-btn { border-radius: 4px !important }
 .action-btn--blue   { color: #1677ff !important; border-color: #1677ff !important }
 .action-btn--orange { color: #fa8c16 !important; border-color: #fa8c16 !important }
 .action-btn--purple { color: #722ed1 !important; border-color: #722ed1 !important }
 
-/* 面板容器 — 用 el CSS 变量自动适配深色 */
+
 .panel-box {
   border: 1px solid var(--el-border-color);
   border-radius: 6px; padding: 10px;
   background: var(--el-bg-color);
 }
 
-/* 脚本列表项 */
+
 .script-item { border: 1px solid var(--el-border-color); padding: 4px 6px; border-radius: 6px }
 .script-btn  { padding: 0 !important; width: 100%; justify-content: flex-start; white-space: normal; height: auto; line-height: 1.4 }
 
-/* 日志行 */
+
 .log-line { font-size: 12px; line-height: 1.8; padding: 1px 0; color: var(--el-text-color-primary) }
 
 .highlight { background-color: rgba(182, 230, 239, 0.25) }

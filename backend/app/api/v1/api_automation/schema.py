@@ -1,5 +1,5 @@
 """
-接口自动化模块 - 数据验证模式
+接口自动化模块
 """
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field

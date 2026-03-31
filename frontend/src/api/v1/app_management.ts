@@ -1,10 +1,5 @@
-/**
- * APP 自动化模块接口
- * 对应后端 /api/v1/app_management/*
- * 迁移自 l-vue-ui/src/api/api_app/app.ts
- */
-import request from '/@/utils/request';
 
+import request from '/@/utils/request';
 export const app_menu = (data: any) => request.post('/v1/app_management/app_menu', data);
 export const get_app_script = (data: any) => request.post('/v1/app_management/get_app_script', data);
 export const save_app_script = (data: any) => request.post('/v1/app_management/save_app_script', data);
@@ -17,8 +12,6 @@ export const pid_status = (data: any) => request.post('/v1/app_management/pid_st
 export const stop_process = (data: any) => request.post('/v1/app_management/stop_process', data);
 export const get_app_result = (data: any) => request.post('/v1/app_management/get_app_result', data);
 export const app_result_list = (data: any) => request.post('/v1/app_management/app_result_list', data);
-
-// 以下为旧版 app_view/app.vue 依赖接口（将由后端按旧协议补齐）
 export const get_script_list = (data: any) => request.post('/v1/app_management/menu_script_list', data);
 export const run_scripts = (data: any) => request.post('/v1/app_management/run_script_list', data);
 export const app_result = (data: any) => request.post('/v1/app_management/get_app_result', data);

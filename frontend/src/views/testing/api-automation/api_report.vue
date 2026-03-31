@@ -1,169 +1,3 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
-import { CircleCheck, CircleClose, View } from '@element-plus/icons-vue';
-import {
-	get_api_script_report_log,
-	get_api_script_result_detail,
-	get_api_script_result_detail_list,
-	get_api_script_result_report_list,
-	api_env,
-	api_db_list,
-	api_tree_list,
-} from '/@/api/v1/api_automation';
-import ApiDetail from './api_detail.vue';
-
-const route = useRoute();
-const result_id = ref<any>('');
-const result_form = ref<any>({
-	result: { percent: 0, pass: 0, fail: 0 },
-});
-const loading = ref(false);
-const script_active = ref('all');
-const script_list = ref<any[]>([]);
-const menu_id = ref<any>('');
-const selectedIndex = ref(0);
-const script_result_list = ref<any[]>([]);
-const res_script_result = ref<any[]>([]);
-const env_list = ref<any[]>([]);
-const tree_list = ref<any[]>([]);
-const run_result_list = ref<any[]>([]);
-const run_count = ref(0);
-const run_fail = ref(0);
-const start_time = ref('');
-const end_time = ref('');
-const run_env = ref('');
-const name = ref('');
-const run_result_log = ref<any[]>([]);
-const detail_drawer = ref(false);
-const detail = ref<any>({});
-const local_db_list = ref<any[]>([]);
-
-const buildDetailApiData = (d: any) => {
-	// ApiDetail 组件依赖 api_id/id 触发初始化；这里给一个稳定的兜底值即可
-	const stableId = d?.api_id ?? d?.id ?? d?.uuid ?? d?.menu_id ?? `${result_id.value ?? ''}-${d?.name ?? ''}`;
-	return {
-		api_id: stableId,
-		api_info: {
-			id: stableId,
-			name: d?.name,
-			req: d?.req ?? d?.request ?? d?.req_info,
-			res: d?.res ?? d?.response ?? d?.res_info,
-		},
-	};
-};
-
-const get_script_result = async () => {
-	loading.value = true;
-	result_id.value = route.query.result_id as string;
-	try {
-		const res: any = await get_api_script_result_detail({ result_id: Number(result_id.value) });
-		const data = res?.data || res;
-		result_form.value = data;
-		const script0 = data.script?.[0];
-		if (script0) {
-			menu_id.value = script0.uuid ?? script0.menu_id ?? script0.id;
-			name.value = script0.name ?? '';
-		}
-		script_list.value = data.script ?? [];
-		res_script_result.value = data.script ?? [];
-		run_env.value = env_list.value.find((e: any) => e.id === data.config?.env_id)?.name ?? '';
-		await get_script_result_detail_list();
-		await get_script_result_report_list();
-		await get_script_log();
-	} finally {
-		loading.value = false;
-	}
-};
-
-const get_env_list = async () => {
-	const res: any = await api_env({});
-	env_list.value = Array.isArray(res?.data) ? res.data : res?.data?.content ?? [];
-};
-
-const get_script_result_detail_list = async () => {
-	if (!menu_id.value || !result_id.value) return;
-	const res: any = await get_api_script_result_detail_list({
-		menu_id: String(menu_id.value),
-		result_id: Number(result_id.value),
-	});
-	script_result_list.value = res?.data ?? [];
-};
-
-const get_api_tree_list = async () => {
-	const res: any = await api_tree_list({});
-	tree_list.value = res?.data ?? [];
-};
-
-const handleTabClick = (tab: any) => {
-	const name = tab?.props?.name;
-	if (name === 'all') script_list.value = [...res_script_result.value];
-	else if (name === 'pass') script_list.value = res_script_result.value.filter((i: any) => i.status === 1);
-	else if (name === 'fail') script_list.value = res_script_result.value.filter((i: any) => i.status === 0);
-};
-
-const script_click = async (script: any, index: number) => {
-	selectedIndex.value = index;
-	menu_id.value = script.uuid ?? script.menu_id ?? script.id;
-	name.value = script.name ?? '';
-	await get_script_result_detail_list();
-	await get_script_result_report_list();
-	await get_script_log();
-};
-
-const get_script_result_report_list = async () => {
-	if (!result_id.value || !menu_id.value) return;
-	const res: any = await get_api_script_result_report_list({
-		result_id: Number(result_id.value),
-		menu_id: String(menu_id.value),
-	});
-	const data = res?.data ?? [];
-	run_result_list.value = data;
-	run_count.value = data.length;
-	run_fail.value = data.filter((i: any) => i.status === 0).length;
-	if (data.length > 0) {
-		start_time.value = data[data.length - 1].create_time ?? '';
-		end_time.value = data[0].create_time ?? '';
-	}
-};
-
-const get_script_log = async () => {
-	if (!result_id.value || !menu_id.value) return;
-	const res: any = await get_api_script_report_log({
-		result_id: String(result_id.value),
-		menu_id: String(menu_id.value),
-	});
-	run_result_log.value = res?.data ?? [];
-};
-
-const get_db_list = async () => {
-	const res: any = await api_db_list({});
-	const raw = res?.data;
-	local_db_list.value = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
-};
-
-const view_result = async (api: any) => {
-	await get_db_list();
-	detail.value = api;
-	detail_drawer.value = true;
-};
-
-const getIcon = (status: number) => (status === 1 ? CircleCheck : CircleClose);
-const colors = (status: number) => (status === 1 ? '#0bbd87' : '#d70e0e');
-const get_card_style = (status: number) =>
-	status === 0
-		? 'border-radius: 10px; border-color: #f3050d; text-align: left;'
-		: 'border-radius: 10px; border-color: #67c23ae0; text-align: left;';
-const get_colors = (status: number) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e');
-const get_log_style = (msg: string) => (msg && msg.includes('失败') ? 'color: #d70e0e' : '');
-
-onMounted(() => {
-	get_env_list();
-	get_api_tree_list();
-	get_script_result();
-});
-</script>
-
 <template>
 	<div class="api-report-page" v-loading="loading" element-loading-text="加载中...">
 		<el-card shadow="hover" class="report-card">
@@ -340,6 +174,173 @@ onMounted(() => {
 		</el-drawer>
 	</div>
 </template>
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { CircleCheck, CircleClose, View } from '@element-plus/icons-vue';
+import {
+	get_api_script_report_log,
+	get_api_script_result_detail,
+	get_api_script_result_detail_list,
+	get_api_script_result_report_list,
+	api_env,
+	api_db_list,
+	api_tree_list,
+} from '/@/api/v1/api_automation';
+import ApiDetail from './api_detail.vue';
+
+const route = useRoute();
+const result_id = ref<any>('');
+const result_form = ref<any>({
+	result: { percent: 0, pass: 0, fail: 0 },
+});
+const loading = ref(false);
+const script_active = ref('all');
+const script_list = ref<any[]>([]);
+const menu_id = ref<any>('');
+const selectedIndex = ref(0);
+const script_result_list = ref<any[]>([]);
+const res_script_result = ref<any[]>([]);
+const env_list = ref<any[]>([]);
+const tree_list = ref<any[]>([]);
+const run_result_list = ref<any[]>([]);
+const run_count = ref(0);
+const run_fail = ref(0);
+const start_time = ref('');
+const end_time = ref('');
+const run_env = ref('');
+const name = ref('');
+const run_result_log = ref<any[]>([]);
+const detail_drawer = ref(false);
+const detail = ref<any>({});
+const local_db_list = ref<any[]>([]);
+
+const buildDetailApiData = (d: any) => {
+
+	const stableId = d?.api_id ?? d?.id ?? d?.uuid ?? d?.menu_id ?? `${result_id.value ?? ''}-${d?.name ?? ''}`;
+	return {
+		api_id: stableId,
+		api_info: {
+			id: stableId,
+			name: d?.name,
+			req: d?.req ?? d?.request ?? d?.req_info,
+			res: d?.res ?? d?.response ?? d?.res_info,
+		},
+	};
+};
+
+const get_script_result = async () => {
+	loading.value = true;
+	result_id.value = route.query.result_id as string;
+	try {
+		const res: any = await get_api_script_result_detail({ result_id: Number(result_id.value) });
+		const data = res?.data || res;
+		result_form.value = data;
+		const script0 = data.script?.[0];
+		if (script0) {
+			menu_id.value = script0.uuid ?? script0.menu_id ?? script0.id;
+			name.value = script0.name ?? '';
+		}
+		script_list.value = data.script ?? [];
+		res_script_result.value = data.script ?? [];
+		run_env.value = env_list.value.find((e: any) => e.id === data.config?.env_id)?.name ?? '';
+		await get_script_result_detail_list();
+		await get_script_result_report_list();
+		await get_script_log();
+	} finally {
+		loading.value = false;
+	}
+};
+
+const get_env_list = async () => {
+	const res: any = await api_env({});
+	env_list.value = Array.isArray(res?.data) ? res.data : res?.data?.content ?? [];
+};
+
+const get_script_result_detail_list = async () => {
+	if (!menu_id.value || !result_id.value) return;
+	const res: any = await get_api_script_result_detail_list({
+		menu_id: String(menu_id.value),
+		result_id: Number(result_id.value),
+	});
+	script_result_list.value = res?.data ?? [];
+};
+
+const get_api_tree_list = async () => {
+	const res: any = await api_tree_list({});
+	tree_list.value = res?.data ?? [];
+};
+
+const handleTabClick = (tab: any) => {
+	const name = tab?.props?.name;
+	if (name === 'all') script_list.value = [...res_script_result.value];
+	else if (name === 'pass') script_list.value = res_script_result.value.filter((i: any) => i.status === 1);
+	else if (name === 'fail') script_list.value = res_script_result.value.filter((i: any) => i.status === 0);
+};
+
+const script_click = async (script: any, index: number) => {
+	selectedIndex.value = index;
+	menu_id.value = script.uuid ?? script.menu_id ?? script.id;
+	name.value = script.name ?? '';
+	await get_script_result_detail_list();
+	await get_script_result_report_list();
+	await get_script_log();
+};
+
+const get_script_result_report_list = async () => {
+	if (!result_id.value || !menu_id.value) return;
+	const res: any = await get_api_script_result_report_list({
+		result_id: Number(result_id.value),
+		menu_id: String(menu_id.value),
+	});
+	const data = res?.data ?? [];
+	run_result_list.value = data;
+	run_count.value = data.length;
+	run_fail.value = data.filter((i: any) => i.status === 0).length;
+	if (data.length > 0) {
+		start_time.value = data[data.length - 1].create_time ?? '';
+		end_time.value = data[0].create_time ?? '';
+	}
+};
+
+const get_script_log = async () => {
+	if (!result_id.value || !menu_id.value) return;
+	const res: any = await get_api_script_report_log({
+		result_id: String(result_id.value),
+		menu_id: String(menu_id.value),
+	});
+	run_result_log.value = res?.data ?? [];
+};
+
+const get_db_list = async () => {
+	const res: any = await api_db_list({});
+	const raw = res?.data;
+	local_db_list.value = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
+};
+
+const view_result = async (api: any) => {
+	await get_db_list();
+	detail.value = api;
+	detail_drawer.value = true;
+};
+
+const getIcon = (status: number) => (status === 1 ? CircleCheck : CircleClose);
+const colors = (status: number) => (status === 1 ? '#0bbd87' : '#d70e0e');
+const get_card_style = (status: number) =>
+	status === 0
+		? 'border-radius: 10px; border-color: #f3050d; text-align: left;'
+		: 'border-radius: 10px; border-color: #67c23ae0; text-align: left;';
+const get_colors = (status: number) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e');
+const get_log_style = (msg: string) => (msg && msg.includes('失败') ? 'color: #d70e0e' : '');
+
+onMounted(() => {
+	get_env_list();
+	get_api_tree_list();
+	get_script_result();
+});
+</script>
+
+
 
 <style scoped lang="scss">
 .api-report-page {

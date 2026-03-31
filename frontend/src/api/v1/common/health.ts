@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 健康检查API - 新架构
+ * 健康检查API
  */
 export function useHealthApi() {
   return {

@@ -5,9 +5,7 @@ import request from '/@/utils/request'
  */
 export function useLLMConfigApi() {
   return {
-    /**
-     * 获取配置列表
-     */
+
     getList: (params?: {
       provider?: string
       is_active?: boolean
@@ -19,9 +17,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 获取默认配置
-     */
+
     getDefault: () => {
       return request({
         url: '/v1/ai/llm-config/default',
@@ -29,9 +25,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 获取配置详情
-     */
+
     getDetail: (id: number) => {
       return request({
         url: `/v1/ai/llm-config/${id}`,
@@ -39,9 +33,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 创建配置
-     */
+
     create: (data: LLMConfigCreateData) => {
       return request({
         url: '/v1/ai/llm-config',
@@ -50,9 +42,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 更新配置
-     */
+
     update: (id: number, data: LLMConfigUpdateData) => {
       return request({
         url: `/v1/ai/llm-config/${id}`,
@@ -61,9 +51,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 删除配置
-     */
+
     delete: (id: number) => {
       return request({
         url: `/v1/ai/llm-config/${id}`,
@@ -71,9 +59,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 设置为默认配置
-     */
+
     setDefault: (id: number) => {
       return request({
         url: `/v1/ai/llm-config/${id}/set-default`,
@@ -81,9 +67,7 @@ export function useLLMConfigApi() {
       })
     },
 
-    /**
-     * 测试配置
-     */
+
     test: (data: LLMConfigTestData) => {
       return request({
         url: '/v1/ai/llm-config/test',
@@ -94,14 +78,10 @@ export function useLLMConfigApi() {
   }
 }
 
-/**
- * LLM 提供商类型
- */
+
 export type LLMProvider = 'openai' | 'azure_openai' | 'anthropic' | 'ollama' | 'custom'
 
-/**
- * LLM 配置数据
- */
+
 export interface LLMConfigData {
   id: number
   config_name: string
@@ -123,9 +103,7 @@ export interface LLMConfigData {
   updated_by?: number
 }
 
-/**
- * 创建配置数据
- */
+
 export interface LLMConfigCreateData {
   config_name: string
   name: string
@@ -142,9 +120,7 @@ export interface LLMConfigCreateData {
   is_active?: boolean
 }
 
-/**
- * 更新配置数据
- */
+
 export interface LLMConfigUpdateData {
   config_name?: string
   name?: string
@@ -161,9 +137,7 @@ export interface LLMConfigUpdateData {
   is_active?: boolean
 }
 
-/**
- * 测试配置数据
- */
+
 export interface LLMConfigTestData {
   config_id?: number
   config_name?: string
@@ -174,9 +148,7 @@ export interface LLMConfigTestData {
   test_message?: string
 }
 
-/**
- * 测试响应数据
- */
+
 export interface LLMConfigTestResponse {
   success: boolean
   message: string

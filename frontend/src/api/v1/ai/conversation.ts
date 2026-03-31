@@ -184,9 +184,7 @@ export const useConversationApi = () => {
     })
   }
 
-  /**
-   * 发送消息
-   */
+
   const sendMessage = (conversationId: number, data: SendMessageRequest) => {
     return request<SendMessageResponse>({
       url: `/v1/ai/conversation/${conversationId}/messages`,
@@ -214,10 +212,10 @@ export const useConversationApi = () => {
     const baseURL = import.meta.env.VITE_API_BASE_URL || ''
     const token = Session.get('token') || ''
     
-    // 构建 URL（包含 token）
+ 
     const url = `${baseURL}/api/v1/ai/conversation/${conversationId}/messages/stream`
     
-    // 使用 fetch 实现 SSE（因为 EventSource 不支持 POST 和自定义 headers）
+
     let aborted = false
     
     const fetchSSE = async () => {

@@ -1,15 +1,9 @@
 """
-Web管理模块 - 业务逻辑服务
-
-说明：
-- 这里按 L-Tester 旧架构的 web 元素管理模块一比一迁移，只复用新架构的基础设施（SQLAlchemy / AsyncSession）
-- 与其他 UI 自动化模块解耦，作为独立的 Web UI 自动化子系统
+Web管理模块业务逻辑服务
 """
 
 from __future__ import annotations
-
 from typing import List, Optional, Dict, Any, Tuple
-
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -17,7 +11,6 @@ import json
 import subprocess
 import signal
 import multiprocessing
-
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +33,7 @@ from .web_worker import run_web_task_in_process
 
 
 async def _get_username_map(db: AsyncSession, user_ids: List[int]) -> Dict[int, str]:
-    """根据用户ID列表查询 sys_user 得到 id -> username（或 nickname）映射，供列表展示"""
+
     if not user_ids:
         return {}
     try:
@@ -55,9 +48,7 @@ async def _get_username_map(db: AsyncSession, user_ids: List[int]) -> Dict[int, 
 
 
 def _build_tree(items: List[Dict[str, Any]], pid_key: str = "pid", id_key: str = "id") -> List[Dict[str, Any]]:
-    """
-    简单树构建工具，与 ApiAutomationService._build_tree 行为保持一致。
-    """
+
     by_id: Dict[Any, Dict[str, Any]] = {}
     roots: List[Dict[str, Any]] = []
     for it in items:
@@ -78,18 +69,11 @@ def _build_tree(items: List[Dict[str, Any]], pid_key: str = "pid", id_key: str =
 
 
 class WebManagementService:
-    """Web管理服务（L-Tester WebUI 自动化迁移实现）"""
 
-    # -------------------- 元素菜单 & 元素管理（迁移自 l-tester/views/web/element_view.py） --------------------
 
     @staticmethod
     async def get_element_tree(db: AsyncSession, *, only_menu: bool = True) -> List[Dict[str, Any]]:
-        """
-        获取元素菜单树。
 
-        - only_menu=True 时，对齐旧接口 element_tree：剔除 type=2 的叶子节点，只保留目录节点。
-        - only_menu=False 时，对齐旧接口 get_element_select：返回包含元素叶子的完整树。
-        """
         result = await db.execute(
             select(
                 WebElementMenuModel.id,
@@ -167,11 +151,7 @@ class WebManagementService:
         page_size: int,
         user_id: int,
     ) -> Dict[str, Any]:
-        """
-        对齐旧接口 get_element_list：
-        - 默认按 id 倒序
-        - 返回 {"content": [...], "totalElements": xxx, "page": page, "pageSize": page_size}
-        """
+
         if page <= 0:
             page = 1
         if page_size <= 0:
@@ -291,11 +271,10 @@ class WebManagementService:
         if menu:
             menu.enabled_flag = 0
 
-    # -------------------- 下面这些方法预留给后续 Web 脚本 / 执行 / 结果迁移 --------------------
 
     @staticmethod
     async def get_web_menu(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """获取Web脚本菜单树，对齐旧接口 /web_menu"""
+
         result = await db.execute(
             select(
                 WebMenuModel.id,
@@ -324,11 +303,7 @@ class WebManagementService:
         type: int,
         user_id: int,
     ) -> Dict[str, Any]:
-        """
-        新增 Web 脚本菜单（对齐旧 /api/web/add_menu）.
 
-        - 当 type=2（脚本节点）时，同时创建一条默认脚本记录，包含“打开”步骤。
-        """
         menu = WebMenuModel(
             name=name,
             pid=pid,
@@ -338,7 +313,7 @@ class WebManagementService:
         db.add(menu)
         await db.flush()
 
-        # 对齐旧逻辑：如果是脚本节点，自动生成一条默认脚本
+
         if type == 2:
             default_script = [
                 {
@@ -386,7 +361,7 @@ class WebManagementService:
 
     @staticmethod
     async def get_menu_script_list(db: AsyncSession, *, pid: int) -> List[Dict[str, Any]]:
-        """根据菜单ID获取子脚本列表，对齐旧接口 menu_script_list"""
+
         result = await db.execute(
             select(WebMenuModel).where(
                 WebMenuModel.pid == pid,
@@ -403,14 +378,7 @@ class WebManagementService:
         menu_id: int,
         type: int,
     ) -> Tuple[bool, str]:
-        """
-        删除 Web 脚本菜单（对齐旧 /api/web/del_menu）.
 
-        规则：
-        - 如果是目录(type=0/1) 且仍有子菜单，则不允许删除。
-        - 删除脚本节点时，同时逻辑删除对应的 WebScript 记录。
-        """
-        # 如果是目录类型，先检查是否有子节点
         if type in (0, 1):
             child_res = await db.execute(
                 select(WebMenuModel).where(
@@ -433,7 +401,7 @@ class WebManagementService:
 
         menu.enabled_flag = 0
 
-        # 同步逻辑删除脚本记录（如果有）
+
         script_res = await db.execute(
             select(WebScriptModel).where(
                 WebScriptModel.menu_id == menu_id,
@@ -454,9 +422,6 @@ class WebManagementService:
         name: str,
         user_id: int,
     ) -> None:
-        """
-        重命名 Web 脚本菜单（对齐旧 /api/web/rename_menu）.
-        """
         res = await db.execute(
             select(WebMenuModel).where(
                 WebMenuModel.id == menu_id,
@@ -471,7 +436,7 @@ class WebManagementService:
 
     @staticmethod
     async def get_web_script(db: AsyncSession, menu_id: int, user_id: int) -> Optional[Dict[str, Any]]:
-        """获取Web脚本内容"""
+
         result = await db.execute(
             select(WebScriptModel).where(
                 WebScriptModel.menu_id == menu_id,
@@ -490,7 +455,7 @@ class WebManagementService:
 
     @staticmethod
     async def save_web_script(db: AsyncSession, script_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """保存Web脚本"""
+
         menu_id = int(script_data["id"])
         script = script_data["script"]
 
@@ -522,7 +487,6 @@ class WebManagementService:
         user_id: int,
     ) -> Dict[str, Any]:
         """执行Web脚本"""
-        # 对齐旧逻辑：同一时间只允许一个执行任务
         running = await db.execute(
             select(WebResultListModel).where(WebResultListModel.enabled_flag == 1, WebResultListModel.status == 0)
         )
@@ -551,7 +515,7 @@ class WebManagementService:
 
         pid_list: List[int] = []
         if status:
-            # 对齐旧版：后台进程执行（队列/进程式模型）
+
             ctx = multiprocessing.get_context("spawn")
             for item in script_list:
                 p = ctx.Process(target=run_web_task_in_process, args=(item, browser_type), daemon=True)
@@ -570,7 +534,6 @@ class WebManagementService:
         # 最终状态由执行引擎在每个 browser 完成后更新
         return {"status": status, "message": msg, "result_id": result_id, "pid_list": pid_list}
 
-    # -------------------- 文件导入（迁移自 l-tester/views/web/web_view.py input_element + web_commom.analysis_element） --------------------
 
     @staticmethod
     def _safe_join(base: Path, *parts: str) -> Path:
@@ -589,10 +552,7 @@ class WebManagementService:
 
     @staticmethod
     async def _analysis_element(file_name: str, user_id: int, pid: int, data: List[Dict[str, Any]]) -> Tuple[bool, str, List[Dict[str, Any]]]:
-        """
-        迁移自旧 web_commom.analysis_element：解析导入文件生成脚本 steps。
-        返回 (ok, msg, script_steps)
-        """
+        
         try:
             script: List[Dict[str, Any]] = []
             for i in data:
@@ -638,7 +598,7 @@ class WebManagementService:
                     if click_type == "single_click_left":
                         step_type = 1
                     elif click_type == "double_click":
-                        # 对齐旧版：这里旧代码实际写的是 type=1（即使含义为双击）
+           
                         step_type = 1
                     elif click_type == "single_click_right":
                         step_type = 16
@@ -732,12 +692,7 @@ class WebManagementService:
         pid: int,
         user_id: int,
     ) -> Dict[str, Any]:
-        """
-        对齐旧接口 /input_element：
-        - 读取 json 文件
-        - 解析脚本
-        - 创建 Web_menu(type=2) + Web_script
-        """
+       
         base = Path(app_config.BASEDIR)
         file_path = WebManagementService._safe_join(base, file_url, file_name)
         if not file_path.exists():
@@ -768,15 +723,11 @@ class WebManagementService:
         await db.flush()
         return {"message": msg, "menu_id": menu.id}
 
-    # -------------------- 停止执行（迁移自 l-tester/views/web/web_view.py stop_web_script） --------------------
+ 
 
     @staticmethod
     async def stop_web_script(pid: int) -> Dict[str, Any]:
-        """
-        对齐旧 stop_web_script：按 pid 停止进程。
-        Windows: taskkill /T /F
-        其他: SIGTERM -> SIGKILL 兜底
-        """
+       
         if pid <= 0:
             raise ValueError("pid 非法")
         try:
@@ -797,10 +748,7 @@ class WebManagementService:
 
     @staticmethod
     async def analysis_web_script(db: AsyncSession, data: Dict[str, Any]) -> Tuple[bool, str, List[Dict[str, Any]], int]:
-        """
-        解析 Web 执行请求，生成每个浏览器的执行参数列表。
-        迁移自旧 views/web/web_commom.analysis_web_script
-        """
+        
         try:
             script: List[Dict[str, Any]] = []
             for i in data.get("script") or []:
@@ -835,10 +783,7 @@ class WebManagementService:
     async def analysis_web_script_detail(
         db: AsyncSession, script: List[Dict[str, Any]], menu_id: int
     ) -> Tuple[bool, str, List[Dict[str, Any]]]:
-        """
-        解析脚本步骤：把 element_id / target_id 指向的元素转换成实际 locator 信息。
-        迁移自旧 views/web/web_commom.analysis_web_script_detail
-        """
+        
         try:
             result: List[Dict[str, Any]] = []
             for step in script:
@@ -903,13 +848,8 @@ class WebManagementService:
 
     @staticmethod
     async def import_elements(db: AsyncSession, elements: List[Dict[str, Any]], user_id: int) -> Dict[str, Any]:
-        """
-        导入页面元素（补齐旧逻辑缺口）。
 
-        说明：
-        - 本接口在旧版中用于批量写入元素库；新架构中也保留该能力。
-        - element 结构不强约束，直接作为 JSON 存入 WebElementModel.element。
-        """
+    
         created = 0
         updated = 0
         skipped = 0
@@ -1060,15 +1000,11 @@ class WebManagementService:
             "pageSize": page_size,
         }
 
-    # -------------------- 聚合报告 & 详情（迁移自 l-tester/views/web/web_view.py） --------------------
+   
 
     @staticmethod
     async def get_web_result_report(db: AsyncSession, *, result_id: str, user_id: int) -> Dict[str, Any]:
-        """
-        对齐旧接口 /get_web_result_report：
-        - 汇总 percent/total/total_fail
-        - 为 script_list 每个脚本标记 status（该脚本在任意浏览器下存在失败步骤则 status=0）
-        """
+      
         res = await db.execute(
             select(WebResultListModel).where(
                 WebResultListModel.enabled_flag == 1,
@@ -1163,10 +1099,7 @@ class WebManagementService:
         menu_id: int,
         user_id: int,
     ) -> Dict[str, Any]:
-        """
-        对齐旧接口 /get_web_result_detail：
-        - 返回指定脚本(menu_id)在指定浏览器下的执行详情 + 过滤后的日志 + video/trace
-        """
+       
         # media（执行结束记录上挂 video/trace）
         media_res = await db.execute(
             select(WebResultDetailModel).where(
@@ -1225,7 +1158,7 @@ class WebManagementService:
 
     @staticmethod
     async def get_web_groups(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """获取Web脚本集列表（与前端表格字段对齐：create_time/update_time/username）"""
+
         result = await db.execute(
             select(WebGroupModel).where(
                 WebGroupModel.enabled_flag == 1,
@@ -1277,7 +1210,7 @@ class WebManagementService:
 
     @staticmethod
     async def edit_web_group(db: AsyncSession, group_data: Dict[str, Any], user_id: int) -> None:
-        """编辑Web脚本集，对齐旧接口 edit_web_group"""
+
         result = await db.execute(
             select(WebGroupModel).where(
                 WebGroupModel.id == int(group_data["id"]),
@@ -1294,7 +1227,7 @@ class WebManagementService:
 
     @staticmethod
     async def delete_web_group(db: AsyncSession, group_id: int) -> None:
-        """删除Web脚本集，对齐旧接口 del_web_group（逻辑删除）"""
+
         result = await db.execute(
             select(WebGroupModel).where(
                 WebGroupModel.id == group_id,
@@ -1307,7 +1240,7 @@ class WebManagementService:
 
     @staticmethod
     async def get_web_group_all(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """获取全部Web脚本集，对齐旧接口 web_group_select"""
+
         result = await db.execute(
             select(WebGroupModel).where(
                 WebGroupModel.enabled_flag == 1,
@@ -1327,7 +1260,7 @@ class WebManagementService:
 
     @staticmethod
     async def get_script_list(db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取所有脚本菜单列表，对齐旧接口 get_script_list"""
+
         result = await db.execute(
             select(WebMenuModel).where(
                 WebMenuModel.enabled_flag == 1,
@@ -1347,7 +1280,7 @@ class WebManagementService:
 
     @staticmethod
     async def group_add_script(db: AsyncSession, web_list: List[List[int]]) -> List[Dict[str, Any]]:
-        """根据脚本树选择返回脚本菜单列表，对齐旧接口 group_add_script"""
+
         result: List[Dict[str, Any]] = []
         for path in web_list:
             if not path:
@@ -1371,7 +1304,7 @@ class WebManagementService:
                 )
         return result
 
-    # -------------------- 下面这些方法预留给后续 Web 执行 / 结果迁移 --------------------
+
 
     @staticmethod
     async def capture_screenshots(page, step_name: str) -> str:
@@ -1434,7 +1367,7 @@ class WebManagementService:
                 expected = str(item.get("element") or "")
 
                 if t in (1, 2):
-                    # 元素存在/不存在（按旧逻辑：is_visible）
+          
                     locator = expected
                     el = page.locator(locator)
                     exists = await el.is_visible()
@@ -1474,7 +1407,7 @@ class WebManagementService:
                     result_msg = "断言成功"
 
                 else:
-                    # 其他类型：保持兼容，标记为跳过但不失败
+
                     status = 1
                     result_msg = "断言跳过(未知类型)"
 

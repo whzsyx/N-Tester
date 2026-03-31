@@ -14,7 +14,6 @@ def get_str_uuid():
 async def body_to_json(request: Request) -> Dict[str, Any]:
     """
     处理请求体，将其转换为JSON格式
-    迁移自 l-tester/common/request_to_json.py
     
     Args:
         request: FastAPI请求对象

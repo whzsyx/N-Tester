@@ -229,7 +229,7 @@ class RoleService:
             # 刷新role对象，确保获取最新的关联数据
             await db.refresh(role, ['menus'])
             
-            # 清空旧的菜单关联
+
             role.menus.clear()
             await db.flush()
             
@@ -249,7 +249,7 @@ class RoleService:
             # 刷新role对象，确保获取最新的关联数据
             await db.refresh(role, ['depts'])
             
-            # 清空旧的部门关联
+
             role.depts.clear()
             await db.flush()
             

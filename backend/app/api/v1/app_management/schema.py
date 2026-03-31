@@ -1,5 +1,5 @@
 """
-APP管理模块 - 数据验证模式
+APP管理模块数据验证模式
 """
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field

@@ -1,6 +1,5 @@
 """
-APP管理模块 - 控制器
-处理APP自动化测试、脚本管理、执行监控等相关API请求
+APP管理模块控制器，处理APP自动化测试、脚本管理、执行监控等相关API请求
 """
 from typing import Optional
 
@@ -13,6 +12,7 @@ from app.core.dependencies import get_current_user_id
 from app.common.response import success_response, error_response
 from app.utils.common import body_to_json
 from app.api.v1.system.file.service import FileService
+from app.corelibs.logger import logger
 
 from .service import AppManagementService
 from .model import AppResultModel
@@ -32,6 +32,19 @@ async def get_app_menu(
         return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(str(e))
+@router.post("/recover_root_menu")
+async def recover_root_menu(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """恢复被软删除的根目录"""
+    try:
+        result = await AppManagementService.recover_root_menu(db, current_user_id)
+        return success_response(result, message=result["message"])
+    except Exception as e:
+        logger.error(f"恢复根目录失败: {e}")
+        return error_response(message="恢复根目录失败")
 
 
 @router.post("/get_app_script")
@@ -123,7 +136,7 @@ async def menu_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：获取 pid 下脚本列表"""
+    """获取 pid 下脚本列表"""
     try:
         body = await body_to_json(request)
         data = await AppManagementService.menu_script_list(db, int(body["id"]), current_user_id)
@@ -138,7 +151,7 @@ async def get_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：获取所有 type=2 的脚本菜单"""
+    """获取所有 type=2 的脚本菜单"""
     try:
         data = await AppManagementService.get_script_list(db, current_user_id)
         return success_response(data, message="请求成功")
@@ -152,7 +165,7 @@ async def view_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：查看脚本内容"""
+    """查看脚本内容"""
     try:
         body = await body_to_json(request)
         data = await AppManagementService.view_script_list(db, int(body["menu_id"]), current_user_id)
@@ -167,7 +180,7 @@ async def app_correction(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：错误修正"""
+    """错误修正"""
     try:
         body = await body_to_json(request)
         await AppManagementService.app_correction(db, str(body["result_id"]), str(body["device"]), current_user_id)
@@ -182,7 +195,7 @@ async def app_menu_select(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：菜单选择器（type=1）"""
+    """菜单选择器（type=1）"""
     try:
         data = await AppManagementService.app_menu_select(db, current_user_id)
         return success_response(data, message="请求成功")
@@ -196,7 +209,7 @@ async def get_process(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：检查进程状态"""
+    """检查进程状态"""
     try:
         body = await body_to_json(request)
         data = await AppManagementService.get_process(db, body.get("device_list") or [])
@@ -211,7 +224,7 @@ async def get_app_result_detail(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：获取结果汇总详情"""
+    """获取结果汇总详情"""
     try:
         body = await body_to_json(request)
         data = await AppManagementService.get_app_result_detail(db, str(body["result_id"]), current_user_id)
@@ -226,7 +239,7 @@ async def get_result_detail(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：单设备执行汇总（script_total/script_pass/...）"""
+    """单设备执行汇总（script_total/script_pass/...）"""
     try:
         body = await body_to_json(request)
         data = await AppManagementService.get_result_detail(
@@ -243,10 +256,10 @@ async def get_result_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：获取单设备执行详情列表"""
+    """获取单设备执行详情列表"""
     try:
         body = await body_to_json(request)
-        # 兼容旧前端：有时仅传 result_id/device，不传 menu_id
+        # 有时仅传 result_id/device，不传 menu_id
         if body.get("menu_id") is None:
             result = await db.execute(
                 select(AppResultModel)
@@ -296,7 +309,7 @@ async def img_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：图像库列表"""
+    """图像库列表"""
     try:
         body = await body_to_json(request)
         page = int((body or {}).get("currentPage") or 1)
@@ -314,7 +327,7 @@ async def img_select(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：图像级联选择"""
+    """图像级联选择"""
     try:
         data = await AppManagementService.img_select(db, current_user_id)
         return success_response(data, message="请求成功")
@@ -366,7 +379,7 @@ async def delete_img(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：删除图片"""
+    """删除图片"""
     try:
         body = await body_to_json(request)
         await AppManagementService.delete_img(db, int(body["id"]), current_user_id)
@@ -381,7 +394,7 @@ async def edit_img(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：编辑图片"""
+    """编辑图片"""
     try:
         body = await body_to_json(request)
         await AppManagementService.edit_img(
@@ -416,12 +429,23 @@ async def delete_app_menu(
     """删除APP菜单"""
     try:
         body = await body_to_json(request)
-        ok = await AppManagementService.delete_app_menu(db, int(body["id"]), current_user_id)
+        menu_id = int(body["id"])
+        logger.info(f"尝试删除菜单 ID: {menu_id}, 用户ID: {current_user_id}")
+        
+        ok = await AppManagementService.delete_app_menu(db, menu_id, current_user_id)
+        
         if ok:
+            logger.info(f"菜单 {menu_id} 删除成功")
             return success_response({}, message="删除成功")
-        return error_response("目录下存在子节点，无法删除")
-    except Exception as e:
+        else:
+            logger.warning(f"菜单 {menu_id} 删除失败 - 可能不存在或有其他问题")
+            return error_response("删除失败")
+    except ValueError as e:
+        logger.error(f"删除菜单失败 - 值错误: {e}")
         return error_response(str(e))
+    except Exception as e:
+        logger.error(f"删除菜单失败 - 未知错误: {e}")
+        return error_response(f"删除失败: {str(e)}")
 
 
 @router.post("/rename_menu")
@@ -445,7 +469,7 @@ async def get_app_result(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """获取APP执行结果：传 device 时对齐旧版返回步骤列表，否则返回任务汇总对象"""
+    """获取APP执行结果：传 device 时对齐返回步骤列表，否则返回任务汇总对象"""
     try:
         body = await body_to_json(request)
         if body.get("device") is not None:
@@ -466,7 +490,7 @@ async def send_app_warn_api(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：单独触发失败告警（轮询场景）；平时由 get_app_result 带 device 时自动调用"""
+    """单独触发失败告警（轮询场景）；平时由 get_app_result 带 device 时自动调用"""
     try:
         body = await body_to_json(request)
         await AppManagementService.send_app_warn(db, str(body["result_id"]), current_user_id)
@@ -509,7 +533,7 @@ async def pause_app_process(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：暂停子进程（仅 POSIX 有效）"""
+    """暂停子进程（仅 POSIX 有效）"""
     try:
         body = await body_to_json(request)
         pid = int(body.get("pid") or 0)
@@ -526,7 +550,7 @@ async def resume_app_process(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """对齐旧：恢复子进程（仅 POSIX 有效）"""
+    """恢复子进程（仅 POSIX 有效）"""
     try:
         body = await body_to_json(request)
         pid = int(body.get("pid") or 0)
@@ -546,7 +570,7 @@ async def stop_app_process(
     """停止APP执行"""
     try:
         body = await body_to_json(request)
-        # 对齐旧：如果传 pid/deviceid/result_id，则以旧协议处理（目前仅释放设备并返回执行结束）
+        # 如果传 pid/deviceid/result_id
         if body.get("pid") is not None and body.get("deviceid") is not None:
             ok = await AppManagementService.stop_app_process(
                 db,
@@ -576,7 +600,7 @@ async def get_process_status(
     """查询APP进程状态"""
     try:
         body = await body_to_json(request)
-        # 对齐旧：前端只依赖 res.message（"正在执行"/"执行结束"）
+        # 前端只依赖 res.message（"正在执行"/"执行结束"）
         if body.get("pid") is not None:
             pid = int(body.get("pid"))
             try:
@@ -585,7 +609,7 @@ async def get_process_status(
             except Exception:
                 # ignore psutil errors
                 pass
-            # 进程已结束：释放设备（对齐旧架构：执行结束自动置空闲）
+            # 进程已结束：释放设备
             try:
                 mapping = (AppManagementService._pid_index or {}).get(pid)
                 if mapping and mapping.get("result_id"):

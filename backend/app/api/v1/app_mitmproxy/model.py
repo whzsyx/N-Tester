@@ -1,5 +1,5 @@
 """
-APP 抓包 - 数据模型
+APP 抓包数据模型
 """
 
 from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, BigInteger

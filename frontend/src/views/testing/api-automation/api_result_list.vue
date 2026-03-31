@@ -1,46 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { get_api_script_result_list } from '/@/api/v1/api_automation';
-
-const table_data = ref<any>([]);
-const searchParams = ref({
-	currentPage: 1,
-	pageSize: 10,
-	search: {
-		name: '',
-	},
-});
-const customColors = ref<any>([
-	{ color: '#ea2e2e', percentage: 99.99 },
-	{ color: '#81d36f', percentage: 100 },
-]);
-const total = ref(0);
-
-const get_script_result_list = async () => {
-	const res: any = await get_api_script_result_list(searchParams.value as any);
-	const raw = res?.data;
-	const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
-	table_data.value = list;
-	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
-};
-
-const reset_search = () => {
-	searchParams.value.currentPage = 1;
-	searchParams.value.pageSize = 10;
-	searchParams.value.search.name = '';
-	get_script_result_list();
-};
-
-const view_report = async (result_id: any) => {
-	// 新架构：使用站内路由页（后续会迁移完整 report UI）
-	window.open(`/api-automation/report?result_id=${result_id}`, '_blank');
-};
-
-onMounted(() => {
-	get_script_result_list();
-});
-</script>
-
 <template>
 	<div>
 		<el-card class="box-card">
@@ -126,6 +83,50 @@ onMounted(() => {
 		</el-card>
 	</div>
 </template>
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+import { get_api_script_result_list } from '/@/api/v1/api_automation';
+
+const table_data = ref<any>([]);
+const searchParams = ref({
+	currentPage: 1,
+	pageSize: 10,
+	search: {
+		name: '',
+	},
+});
+const customColors = ref<any>([
+	{ color: '#ea2e2e', percentage: 99.99 },
+	{ color: '#81d36f', percentage: 100 },
+]);
+const total = ref(0);
+
+const get_script_result_list = async () => {
+	const res: any = await get_api_script_result_list(searchParams.value as any);
+	const raw = res?.data;
+	const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+	table_data.value = list;
+	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
+};
+
+const reset_search = () => {
+	searchParams.value.currentPage = 1;
+	searchParams.value.pageSize = 10;
+	searchParams.value.search.name = '';
+	get_script_result_list();
+};
+
+const view_report = async (result_id: any) => {
+
+	window.open(`/api-automation/report?result_id=${result_id}`, '_blank');
+};
+
+onMounted(() => {
+	get_script_result_list();
+});
+</script>
+
+
 
 <style scoped>
 /* 通用样式 */

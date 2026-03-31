@@ -307,9 +307,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-// 导入旧的执行记录API
+
 import { aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
-// 导入项目API
+
 import { getProjectList } from '/@/api/v1/project'
 
 const loading = ref(false)
@@ -349,7 +349,7 @@ const getList = async () => {
   try {
     console.log('开始获取执行记录列表...', queryForm)
     
-    // 使用旧的执行记录API
+
     const params: any = {
       page: queryForm.page,
       page_size: queryForm.page_size

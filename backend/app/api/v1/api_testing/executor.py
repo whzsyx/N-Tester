@@ -1,5 +1,5 @@
 """
-API测试模块 - 请求执行引擎
+API测试模块请求执行引擎
 """
 import re
 import time

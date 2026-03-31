@@ -1,6 +1,5 @@
 <template>
   <div style="padding: 10px">
-    <!-- 列表顶部栏：对齐 api_script 列表风格 -->
     <el-card class="box-card">
       <div class="script-topbar">
         <div class="script-topbar-left">
@@ -244,7 +243,6 @@
         </template>
       </KoiDialog>
 
-      <!-- 运行配置弹窗（旧结构迁移过来，之前缺失导致“立即运行”无反应） -->
       <KoiDialog
         ref="run_koiDialogRef"
         :title="title"
@@ -294,7 +292,7 @@
         </template>
       </KoiDialog>
 
-      <!-- 运行结果弹窗：沿用旧结构，简化为只展示时间线和日志 -->
+
       <KoiDialog
         ref="res_koiDialogRef"
         :title="title"
@@ -429,8 +427,7 @@ const reset_search = () => {
 }
 
 const group_list = async () => {
-  // 后端返回：{ code, message, data: { content: [], total: number } }
-  // 与旧架构 l-vue-ui 保持一致的解包方式
+
   const res: any = await web_group_list(searchParams.value)
   const content = res?.data?.content
   table_data.value = Array.isArray(content) ? content : []

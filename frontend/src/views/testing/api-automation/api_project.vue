@@ -1,3 +1,381 @@
+<template>
+	<div>
+		<!-- 项目表格页面 -->
+		<div v-if="show_type === 'project'">
+			<el-card class="box-card">
+				<div class="project-topbar">
+					<div class="project-topbar-left">
+						<el-input 
+							v-model="project_searchParams.search.name" 
+							placeholder="搜索项目名称" 
+							clearable 
+							style="width: 300px;"
+							@keyup.enter="searchProject"
+						>
+							<template #append>
+								<el-button @click="searchProject">搜索</el-button>
+							</template>
+						</el-input>
+						<el-button @click="resetSearch">重置</el-button>
+					</div>
+					<div class="project-topbar-right">
+						<el-button v-auth="'apiAutomation:project:add'" type="primary" @click="openAddProject">新增项目</el-button>
+					</div>
+				</div>
+			</el-card>
+
+			<el-card class="box-card mt-10px">
+				<el-table :data="project_list" stripe>
+					<el-table-column prop="id" label="ID" width="80" />
+					<el-table-column prop="name" label="项目名称" />
+					<el-table-column prop="description" label="描述" />
+					<el-table-column label="创建时间" width="200">
+						<template #default="{ row }">
+							{{ row.create_time ? String(row.create_time).replace('T', ' ') : '-' }}
+						</template>
+					</el-table-column>
+					<el-table-column label="服务" width="200">
+						<template #default="{ row }">
+							<el-dropdown @command="(command) => handleServiceCommand(command, row)">
+								<el-button type="primary" size="small">
+									服务管理 <el-icon class="el-icon--right"><MoreFilled /></el-icon>
+								</el-button>
+								<template #dropdown>
+									<el-dropdown-menu>
+										<el-dropdown-item command="add_service" :icon="Connection">新增服务</el-dropdown-item>
+										<el-dropdown-item command="service_detail" :icon="View">服务详情</el-dropdown-item>
+										<el-dropdown-item command="scene_manage" :icon="Setting">场景管理</el-dropdown-item>
+										<el-dropdown-item command="result_list" :icon="List">结果列表</el-dropdown-item>
+									</el-dropdown-menu>
+								</template>
+							</el-dropdown>
+						</template>
+					</el-table-column>
+					<el-table-column label="操作" width="120">
+						<template #default="{ row }">
+							<el-button v-auth="'apiAutomation:project:delete'" type="danger" size="small" @click="removeProject(row)">删除</el-button>
+						</template>
+					</el-table-column>
+				</el-table>
+				
+				<div class="pagination-wrapper">
+					<el-pagination
+						v-model:current-page="project_searchParams.currentPage"
+						v-model:page-size="project_searchParams.pageSize"
+						:page-sizes="[10, 20, 50, 100]"
+						:total="project_total"
+						layout="total, sizes, prev, pager, next, jumper"
+						@size-change="getProjectList"
+						@current-change="getProjectList"
+					/>
+				</div>
+			</el-card>
+		</div>
+
+
+		<div v-else-if="show_type === 'service_detail'" class="service-detail-page">
+			<el-card class="box-card service-toolbar-card">
+				<div class="service-topbar">
+					<div class="service-topbar-left">
+						<el-button :icon="Back" @click="goBack">返回项目</el-button>
+						<span class="service-title">{{ current_project?.name }} - 服务详情</span>
+					</div>
+					<div class="service-topbar-right">
+						<el-select v-model="env_id" placeholder="选择环境" style="width: 150px;">
+							<el-option v-for="env in env_list" :key="env.id" :label="env.name" :value="env.id" />
+						</el-select>
+						<el-button :icon="Setting" type="primary" size="small" style="margin-left: 8px" @click="openEnvManage">
+							环境管理
+						</el-button>
+						<el-popover placement="bottom" :width="800" trigger="click">
+							<template #reference>
+								<el-button type="warning" size="small" style="margin-left: 8px">错误码管理</el-button>
+							</template>
+							<ApiCodePopover />
+						</el-popover>
+						<el-popover placement="bottom" :width="1000" trigger="click">
+							<template #reference>
+								<el-button type="success" size="small" style="margin-left: 8px">公共函数</el-button>
+							</template>
+							<ApiFunctionPopover />
+						</el-popover>
+						<el-popover placement="bottom" :width="900" trigger="click">
+							<template #reference>
+								<el-button type="info" size="small" style="margin-left: 8px">直连数据库</el-button>
+							</template>
+							<ApiDbPopover />
+						</el-popover>
+						<el-popover placement="bottom" :width="1000" trigger="click">
+							<template #reference>
+								<el-button type="danger" size="small" style="margin-left: 8px">参数依赖</el-button>
+							</template>
+							<ApiParamsPopover />
+						</el-popover>
+						<el-popover placement="bottom" :width="800" trigger="click">
+							<template #reference>
+								<el-button type="primary" size="small" style="margin-left: 8px">全局变量</el-button>
+							</template>
+							<ApiVarPopover />
+						</el-popover>
+					</div>
+				</div>
+			</el-card>
+
+			<div class="service-main">
+				<div class="service-left">
+					<el-card class="box-card api-tree-card">
+						<div class="tree-container">
+							<div class="tree-title">
+								<span class="font-bold">接口树</span>
+							</div>
+							<div class="tree-service-bar">
+								<el-select
+									v-model="selected_service_id"
+									placeholder="选择服务"
+									style="flex: 1; margin-right: 10px;"
+									@change="onServiceChange"
+								>
+									<el-option v-for="svc in service_list" :key="svc.id" :label="svc.name" :value="svc.id" />
+								</el-select>
+								<el-button type="primary" size="small" @click="openAddService(current_project)">新增服务</el-button>
+								<el-button type="danger" size="small" @click="deleteCurrentService" style="margin-left: 8px">删除服务</el-button>
+							</div>
+							<div class="tree-actions-bar">
+								<el-input v-model="api_tree_filter" placeholder="搜索接口" clearable style="flex: 1; margin-right: 10px;" />
+								<el-dropdown @command="handleAddApiCommand">
+									<el-button type="primary" size="small">
+										添加 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+									</el-button>
+									<template #dropdown>
+										<el-dropdown-menu>
+											<el-dropdown-item command="add_folder">添加目录</el-dropdown-item>
+											<el-dropdown-item command="add_api">添加接口</el-dropdown-item>
+										</el-dropdown-menu>
+									</template>
+								</el-dropdown>
+							</div>
+							<div class="tree-content">
+								<el-tree
+									ref="api_tree_ref"
+									:data="api_tree_data"
+									:props="{ children: 'children', label: 'name' }"
+									node-key="id"
+									:filter-node-method="filterNode"
+									@node-click="onTreeNodeClick"
+								>
+									<template #default="{ data }">
+										<div class="custom-tree-node">
+											<div class="node-content">
+												<el-icon v-if="data.type === 1" class="node-icon icon-folder">
+													<FolderOpened />
+												</el-icon>
+												<el-icon v-else-if="data.type === 3" class="node-icon icon-case">
+													<Link />
+												</el-icon>
+												<span
+													v-if="data.type === 2 || data.type === 3"
+													class="method-badge"
+													:style="{ backgroundColor: getMethodColor(data.method) }"
+												>
+													{{ getMethodLabel(data.method) }}
+												</span>
+												<span class="node-title">{{ data.name }}</span>
+											</div>
+											<div class="node-actions" v-if="data.type === 1 || data.type === 2 || data.type === 3">
+												<el-dropdown @command="(command) => handleNodeCommand(command, data)" trigger="click">
+													<el-button type="text" size="small">
+														<el-icon><MoreFilled /></el-icon>
+													</el-button>
+													<template #dropdown>
+														<el-dropdown-menu>
+															<el-dropdown-item v-if="data.type === 1" command="add_folder">添加子目录</el-dropdown-item>
+															<el-dropdown-item v-if="data.type === 1" command="add_api">添加接口</el-dropdown-item>
+															<el-dropdown-item v-if="data.type === 2" command="copy">复制接口</el-dropdown-item>
+															<el-dropdown-item command="edit">编辑</el-dropdown-item>
+															<el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+														</el-dropdown-menu>
+													</template>
+												</el-dropdown>
+											</div>
+										</div>
+									</template>
+								</el-tree>
+							</div>
+						</div>
+					</el-card>
+				</div>
+				
+				<div class="service-right">
+					<el-card class="box-card api-detail-card">
+						<template #header>
+							<span class="font-bold">接口详情</span>
+						</template>
+						<div v-if="api_tabs.length === 0" class="api-empty">
+							<span>请选择接口查看详情</span>
+						</div>
+						<div v-else class="api-detail-content">
+							<el-tabs v-model="api_active_tab" type="card" closable @tab-remove="closeApiTab">
+								<el-tab-pane v-for="tab in api_tabs" :key="tab.name" :label="tab.title" :name="tab.name">
+									<ApiDetail 
+										:api-data="tab.data" 
+										:env-id="env_id"
+										:env_list="env_list"
+										:tree_list="api_tree_data"
+										:params_list="params_list"
+										:local_db_list="local_db_list"
+										@caseSaved="loadServiceDetail"
+										@apiSaved="loadServiceDetail"
+									/>
+								</el-tab-pane>
+							</el-tabs>
+						</div>
+					</el-card>
+				</div>
+			</div>
+		</div>
+
+
+		<div v-else-if="show_type === 'scene_manage'">
+			<el-card class="box-card">
+				<div class="scene-topbar">
+					<div class="scene-topbar-left">
+						<el-button :icon="Back" @click="goBack">返回项目</el-button>
+						<span class="scene-title">{{ current_project?.name }} - 场景管理</span>
+					</div>
+				</div>
+			</el-card>
+			<ApiScript />
+		</div>
+
+	
+		<div v-else-if="show_type === 'result_list'">
+			<el-card class="box-card">
+				<div class="result-topbar">
+					<div class="result-topbar-left">
+						<el-button :icon="Back" @click="goBack">返回项目</el-button>
+						<span class="result-title">测试结果列表</span>
+					</div>
+				</div>
+			</el-card>
+			<ApiResultList />
+		</div>
+
+		<!-- 对话框 -->
+		<el-dialog v-model="envManageDialogVisible" title="环境管理" width="900px" destroy-on-close>
+			<div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+				<el-button type="primary" @click="newEnv">新增环境</el-button>
+			</div>
+			<el-table :data="env_list" stripe>
+				<el-table-column prop="id" label="ID" width="80" />
+				<el-table-column prop="name" label="环境名称" min-width="200" />
+				<el-table-column label="变量数量" width="120">
+					<template #default="{ row }">
+						{{ Array.isArray(row.variable) ? row.variable.length : 0 }}
+					</template>
+				</el-table-column>
+				<el-table-column label="操作" width="220">
+					<template #default="{ row }">
+						<el-button type="primary" size="small" @click="editEnv(row)">编辑</el-button>
+						<el-button type="danger" size="small" @click="removeEnv(row)">删除</el-button>
+					</template>
+				</el-table-column>
+			</el-table>
+			<template #footer>
+				<el-button @click="envManageDialogVisible = false">关闭</el-button>
+			</template>
+		</el-dialog>
+
+		<el-dialog v-model="envEditDialogVisible" :title="envForm.id ? '编辑环境' : '新增环境'" width="900px" destroy-on-close append-to-body>
+			<el-form ref="envFormRef" :model="envForm" label-width="90px">
+				<el-form-item label="环境名称" required>
+					<el-input v-model="envForm.name" placeholder="请输入环境名称" />
+				</el-form-item>
+				<el-form-item label="配置项">
+					<div style="width: 100%;">
+						<div style="max-height: 260px; overflow-y: auto; border: 1px solid #e4e7ed; padding: 10px; border-radius: 6px;">
+							<div v-for="(c, idx) in envForm.config" :key="idx" style="display:flex; gap:10px; align-items:center; margin-bottom: 8px;">
+								<el-input v-model="c.name" placeholder="配置项名（如 {{base_url}}）" style="width: 260px" />
+								<el-input v-model="c.value" placeholder="配置项值" style="flex: 1" />
+								<el-button type="danger" size="small" @click="removeEnvConfigRow(idx)">删除</el-button>
+							</div>
+							<el-empty v-if="!envForm.config || envForm.config.length === 0" description="暂无配置项，点击下方添加" />
+						</div>
+						<el-button type="primary" plain size="small" style="margin-top: 10px" @click="addEnvConfigRow">
+							添加配置项
+						</el-button>
+					</div>
+				</el-form-item>
+				<el-form-item label="环境变量">
+					<div style="width: 100%;">
+						<div style="max-height: 320px; overflow-y: auto; border: 1px solid #e4e7ed; padding: 10px; border-radius: 6px;">
+							<div v-for="(v, idx) in envForm.variable" :key="idx" style="display:flex; gap:10px; align-items:center; margin-bottom: 8px;">
+								<el-input v-model="v.name" placeholder="变量名（如 {{token}}）" style="width: 260px" />
+								<el-input v-model="v.value" placeholder="变量值" style="flex: 1" />
+								<el-button type="danger" size="small" @click="removeEnvVarRow(idx)">删除</el-button>
+							</div>
+							<el-empty v-if="!envForm.variable || envForm.variable.length === 0" description="暂无变量，点击下方添加" />
+						</div>
+						<el-button type="primary" plain size="small" style="margin-top: 10px" @click="addEnvVarRow">
+							添加变量
+						</el-button>
+					</div>
+				</el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="envEditDialogVisible = false">取消</el-button>
+				<el-button type="primary" :loading="envSaving" @click="saveEnvForm">保存</el-button>
+			</template>
+		</el-dialog>
+
+		<el-dialog v-model="addProjectRef" :title="dialogTitle" width="500px" destroy-on-close>
+			<el-form :model="project_form" label-width="90px">
+				<el-form-item label="项目名称" required><el-input v-model="project_form.name" /></el-form-item>
+				<el-form-item label="描述"><el-input v-model="project_form.description" type="textarea" /></el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="addProjectRef = false">取消</el-button>
+				<el-button type="primary" @click="confirmAddProject">确定</el-button>
+			</template>
+		</el-dialog>
+
+		<!-- 新增服务 -->
+		<el-dialog v-model="addServiceDialogVisible" title="新增服务" width="520px" destroy-on-close>
+			<el-form :model="service_form" label-width="90px">
+				<el-form-item label="所属项目">
+					<el-input :model-value="current_project?.name || '-'" disabled />
+				</el-form-item>
+				<el-form-item label="服务名称" required>
+					<el-input v-model="service_form.name" placeholder="请输入服务名称" />
+				</el-form-item>
+				<el-form-item label="描述">
+					<el-input v-model="service_form.description" type="textarea" placeholder="请输入描述（可选）" />
+				</el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="addServiceDialogVisible = false">取消</el-button>
+				<el-button type="primary" :loading="addingService" @click="confirmAddService">确定</el-button>
+			</template>
+		</el-dialog>
+
+		<!-- 菜单对话框 -->
+		<el-dialog v-model="menuDialogRef" :title="dialogTitle" width="500px" destroy-on-close>
+			<el-form :model="menu_form" label-width="90px">
+				<el-form-item label="名称" required><el-input v-model="menu_form.name" /></el-form-item>
+				<el-form-item label="类型">
+					<el-select v-model="menu_form.type" disabled>
+						<el-option label="目录" :value="1" />
+						<el-option label="接口" :value="2" />
+					</el-select>
+				</el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="menuDialogRef = false">取消</el-button>
+				<el-button type="primary" @click="confirmMenu">确定</el-button>
+			</template>
+		</el-dialog>
+	</div>
+</template>
+
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus';
@@ -271,7 +649,7 @@ const getMethodColor = (methodVal: number | undefined) => {
 	}
 };
 
-// -------------------- 环境管理（修复：接口详情环境下拉为空、缺少新增入口） --------------------
+
 const envManageDialogVisible = ref(false);
 const envEditDialogVisible = ref(false);
 const envFormRef = ref();
@@ -384,7 +762,7 @@ const removeEnv = async (row: any) => {
 const loadServiceDetail = async () => {
 	if (!current_service.value) return;
 	
-	// 加载接口树（关键修复：api_tree_list 不支持按服务过滤，会混入其他项目/服务接口）
+
 	const res: any = await api_tree({
 		search: { api_service_id: Number(current_service.value.id) }
 	});
@@ -597,14 +975,14 @@ const getNodeIconClass = (type: number) => {
 	}
 };
 
-// -------------------- 场景管理页面（迁移自 l-vue-ui api_script.vue）--------------------
+
 const loadSceneManage = async () => {
-	// 场景列表由内嵌 ApiScript 组件自行请求 api_script_list，此处仅切换视图
+
 };
 
-// -------------------- 结果列表页面（迁移自 l-vue-ui api_result_list.vue）--------------------
+
 const loadResultList = async () => {
-	// 结果列表由内嵌 ApiResultList 组件自行请求 get_api_script_result_list，此处仅切换视图
+
 };
 
 // -------------------- 返回操作 --------------------
@@ -661,383 +1039,6 @@ onMounted(async () => {
 });
 </script>
 
-<template>
-	<div>
-		<!-- 项目表格页面 -->
-		<div v-if="show_type === 'project'">
-			<el-card class="box-card">
-				<div class="project-topbar">
-					<div class="project-topbar-left">
-						<el-input 
-							v-model="project_searchParams.search.name" 
-							placeholder="搜索项目名称" 
-							clearable 
-							style="width: 300px;"
-							@keyup.enter="searchProject"
-						>
-							<template #append>
-								<el-button @click="searchProject">搜索</el-button>
-							</template>
-						</el-input>
-						<el-button @click="resetSearch">重置</el-button>
-					</div>
-					<div class="project-topbar-right">
-						<el-button v-auth="'apiAutomation:project:add'" type="primary" @click="openAddProject">新增项目</el-button>
-					</div>
-				</div>
-			</el-card>
-
-			<el-card class="box-card mt-10px">
-				<el-table :data="project_list" stripe>
-					<el-table-column prop="id" label="ID" width="80" />
-					<el-table-column prop="name" label="项目名称" />
-					<el-table-column prop="description" label="描述" />
-					<el-table-column label="创建时间" width="200">
-						<template #default="{ row }">
-							{{ row.create_time ? String(row.create_time).replace('T', ' ') : '-' }}
-						</template>
-					</el-table-column>
-					<el-table-column label="服务" width="200">
-						<template #default="{ row }">
-							<el-dropdown @command="(command) => handleServiceCommand(command, row)">
-								<el-button type="primary" size="small">
-									服务管理 <el-icon class="el-icon--right"><MoreFilled /></el-icon>
-								</el-button>
-								<template #dropdown>
-									<el-dropdown-menu>
-										<el-dropdown-item command="add_service" :icon="Connection">新增服务</el-dropdown-item>
-										<el-dropdown-item command="service_detail" :icon="View">服务详情</el-dropdown-item>
-										<el-dropdown-item command="scene_manage" :icon="Setting">场景管理</el-dropdown-item>
-										<el-dropdown-item command="result_list" :icon="List">结果列表</el-dropdown-item>
-									</el-dropdown-menu>
-								</template>
-							</el-dropdown>
-						</template>
-					</el-table-column>
-					<el-table-column label="操作" width="120">
-						<template #default="{ row }">
-							<el-button v-auth="'apiAutomation:project:delete'" type="danger" size="small" @click="removeProject(row)">删除</el-button>
-						</template>
-					</el-table-column>
-				</el-table>
-				
-				<div class="pagination-wrapper">
-					<el-pagination
-						v-model:current-page="project_searchParams.currentPage"
-						v-model:page-size="project_searchParams.pageSize"
-						:page-sizes="[10, 20, 50, 100]"
-						:total="project_total"
-						layout="total, sizes, prev, pager, next, jumper"
-						@size-change="getProjectList"
-						@current-change="getProjectList"
-					/>
-				</div>
-			</el-card>
-		</div>
-
-		<!-- 服务详情页面（一比一迁移旧架构：顶栏含 环境选择 + 错误码/公共函数/直连数据库/参数依赖/全局变量）-->
-		<div v-else-if="show_type === 'service_detail'" class="service-detail-page">
-			<el-card class="box-card service-toolbar-card">
-				<div class="service-topbar">
-					<div class="service-topbar-left">
-						<el-button :icon="Back" @click="goBack">返回项目</el-button>
-						<span class="service-title">{{ current_project?.name }} - 服务详情</span>
-					</div>
-					<div class="service-topbar-right">
-						<el-select v-model="env_id" placeholder="选择环境" style="width: 150px;">
-							<el-option v-for="env in env_list" :key="env.id" :label="env.name" :value="env.id" />
-						</el-select>
-						<el-button :icon="Setting" type="primary" size="small" style="margin-left: 8px" @click="openEnvManage">
-							环境管理
-						</el-button>
-						<el-popover placement="bottom" :width="800" trigger="click">
-							<template #reference>
-								<el-button type="warning" size="small" style="margin-left: 8px">错误码管理</el-button>
-							</template>
-							<ApiCodePopover />
-						</el-popover>
-						<el-popover placement="bottom" :width="1000" trigger="click">
-							<template #reference>
-								<el-button type="success" size="small" style="margin-left: 8px">公共函数</el-button>
-							</template>
-							<ApiFunctionPopover />
-						</el-popover>
-						<el-popover placement="bottom" :width="900" trigger="click">
-							<template #reference>
-								<el-button type="info" size="small" style="margin-left: 8px">直连数据库</el-button>
-							</template>
-							<ApiDbPopover />
-						</el-popover>
-						<el-popover placement="bottom" :width="1000" trigger="click">
-							<template #reference>
-								<el-button type="danger" size="small" style="margin-left: 8px">参数依赖</el-button>
-							</template>
-							<ApiParamsPopover />
-						</el-popover>
-						<el-popover placement="bottom" :width="800" trigger="click">
-							<template #reference>
-								<el-button type="primary" size="small" style="margin-left: 8px">全局变量</el-button>
-							</template>
-							<ApiVarPopover />
-						</el-popover>
-					</div>
-				</div>
-			</el-card>
-
-			<div class="service-main">
-				<div class="service-left">
-					<el-card class="box-card api-tree-card">
-						<div class="tree-container">
-							<div class="tree-title">
-								<span class="font-bold">接口树</span>
-							</div>
-							<div class="tree-service-bar">
-								<el-select
-									v-model="selected_service_id"
-									placeholder="选择服务"
-									style="flex: 1; margin-right: 10px;"
-									@change="onServiceChange"
-								>
-									<el-option v-for="svc in service_list" :key="svc.id" :label="svc.name" :value="svc.id" />
-								</el-select>
-								<el-button type="primary" size="small" @click="openAddService(current_project)">新增服务</el-button>
-								<el-button type="danger" size="small" @click="deleteCurrentService" style="margin-left: 8px">删除服务</el-button>
-							</div>
-							<div class="tree-actions-bar">
-								<el-input v-model="api_tree_filter" placeholder="搜索接口" clearable style="flex: 1; margin-right: 10px;" />
-								<el-dropdown @command="handleAddApiCommand">
-									<el-button type="primary" size="small">
-										添加 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-									</el-button>
-									<template #dropdown>
-										<el-dropdown-menu>
-											<el-dropdown-item command="add_folder">添加目录</el-dropdown-item>
-											<el-dropdown-item command="add_api">添加接口</el-dropdown-item>
-										</el-dropdown-menu>
-									</template>
-								</el-dropdown>
-							</div>
-							<div class="tree-content">
-								<el-tree
-									ref="api_tree_ref"
-									:data="api_tree_data"
-									:props="{ children: 'children', label: 'name' }"
-									node-key="id"
-									:filter-node-method="filterNode"
-									@node-click="onTreeNodeClick"
-								>
-									<template #default="{ data }">
-										<div class="custom-tree-node">
-											<div class="node-content">
-												<el-icon v-if="data.type === 1" class="node-icon icon-folder">
-													<FolderOpened />
-												</el-icon>
-												<el-icon v-else-if="data.type === 3" class="node-icon icon-case">
-													<Link />
-												</el-icon>
-												<span
-													v-if="data.type === 2 || data.type === 3"
-													class="method-badge"
-													:style="{ backgroundColor: getMethodColor(data.method) }"
-												>
-													{{ getMethodLabel(data.method) }}
-												</span>
-												<span class="node-title">{{ data.name }}</span>
-											</div>
-											<div class="node-actions" v-if="data.type === 1 || data.type === 2 || data.type === 3">
-												<el-dropdown @command="(command) => handleNodeCommand(command, data)" trigger="click">
-													<el-button type="text" size="small">
-														<el-icon><MoreFilled /></el-icon>
-													</el-button>
-													<template #dropdown>
-														<el-dropdown-menu>
-															<el-dropdown-item v-if="data.type === 1" command="add_folder">添加子目录</el-dropdown-item>
-															<el-dropdown-item v-if="data.type === 1" command="add_api">添加接口</el-dropdown-item>
-															<el-dropdown-item v-if="data.type === 2" command="copy">复制接口</el-dropdown-item>
-															<el-dropdown-item command="edit">编辑</el-dropdown-item>
-															<el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-														</el-dropdown-menu>
-													</template>
-												</el-dropdown>
-											</div>
-										</div>
-									</template>
-								</el-tree>
-							</div>
-						</div>
-					</el-card>
-				</div>
-				
-				<div class="service-right">
-					<el-card class="box-card api-detail-card">
-						<template #header>
-							<span class="font-bold">接口详情</span>
-						</template>
-						<div v-if="api_tabs.length === 0" class="api-empty">
-							<span>请选择接口查看详情</span>
-						</div>
-						<div v-else class="api-detail-content">
-							<el-tabs v-model="api_active_tab" type="card" closable @tab-remove="closeApiTab">
-								<el-tab-pane v-for="tab in api_tabs" :key="tab.name" :label="tab.title" :name="tab.name">
-									<ApiDetail 
-										:api-data="tab.data" 
-										:env-id="env_id"
-										:env_list="env_list"
-										:tree_list="api_tree_data"
-										:params_list="params_list"
-										:local_db_list="local_db_list"
-										@caseSaved="loadServiceDetail"
-										@apiSaved="loadServiceDetail"
-									/>
-								</el-tab-pane>
-							</el-tabs>
-						</div>
-					</el-card>
-				</div>
-			</div>
-		</div>
-
-		<!-- 场景管理页面（迁移自 l-vue-ui api_script.vue）-->
-		<div v-else-if="show_type === 'scene_manage'">
-			<el-card class="box-card">
-				<div class="scene-topbar">
-					<div class="scene-topbar-left">
-						<el-button :icon="Back" @click="goBack">返回项目</el-button>
-						<span class="scene-title">{{ current_project?.name }} - 场景管理</span>
-					</div>
-				</div>
-			</el-card>
-			<ApiScript />
-		</div>
-
-		<!-- 结果列表页面（迁移自 l-vue-ui api_result_list.vue）-->
-		<div v-else-if="show_type === 'result_list'">
-			<el-card class="box-card">
-				<div class="result-topbar">
-					<div class="result-topbar-left">
-						<el-button :icon="Back" @click="goBack">返回项目</el-button>
-						<span class="result-title">测试结果列表</span>
-					</div>
-				</div>
-			</el-card>
-			<ApiResultList />
-		</div>
-
-		<!-- 对话框 -->
-		<el-dialog v-model="envManageDialogVisible" title="环境管理" width="900px" destroy-on-close>
-			<div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-				<el-button type="primary" @click="newEnv">新增环境</el-button>
-			</div>
-			<el-table :data="env_list" stripe>
-				<el-table-column prop="id" label="ID" width="80" />
-				<el-table-column prop="name" label="环境名称" min-width="200" />
-				<el-table-column label="变量数量" width="120">
-					<template #default="{ row }">
-						{{ Array.isArray(row.variable) ? row.variable.length : 0 }}
-					</template>
-				</el-table-column>
-				<el-table-column label="操作" width="220">
-					<template #default="{ row }">
-						<el-button type="primary" size="small" @click="editEnv(row)">编辑</el-button>
-						<el-button type="danger" size="small" @click="removeEnv(row)">删除</el-button>
-					</template>
-				</el-table-column>
-			</el-table>
-			<template #footer>
-				<el-button @click="envManageDialogVisible = false">关闭</el-button>
-			</template>
-		</el-dialog>
-
-		<el-dialog v-model="envEditDialogVisible" :title="envForm.id ? '编辑环境' : '新增环境'" width="900px" destroy-on-close append-to-body>
-			<el-form ref="envFormRef" :model="envForm" label-width="90px">
-				<el-form-item label="环境名称" required>
-					<el-input v-model="envForm.name" placeholder="请输入环境名称" />
-				</el-form-item>
-				<el-form-item label="配置项">
-					<div style="width: 100%;">
-						<div style="max-height: 260px; overflow-y: auto; border: 1px solid #e4e7ed; padding: 10px; border-radius: 6px;">
-							<div v-for="(c, idx) in envForm.config" :key="idx" style="display:flex; gap:10px; align-items:center; margin-bottom: 8px;">
-								<el-input v-model="c.name" placeholder="配置项名（如 {{base_url}}）" style="width: 260px" />
-								<el-input v-model="c.value" placeholder="配置项值" style="flex: 1" />
-								<el-button type="danger" size="small" @click="removeEnvConfigRow(idx)">删除</el-button>
-							</div>
-							<el-empty v-if="!envForm.config || envForm.config.length === 0" description="暂无配置项，点击下方添加" />
-						</div>
-						<el-button type="primary" plain size="small" style="margin-top: 10px" @click="addEnvConfigRow">
-							添加配置项
-						</el-button>
-					</div>
-				</el-form-item>
-				<el-form-item label="环境变量">
-					<div style="width: 100%;">
-						<div style="max-height: 320px; overflow-y: auto; border: 1px solid #e4e7ed; padding: 10px; border-radius: 6px;">
-							<div v-for="(v, idx) in envForm.variable" :key="idx" style="display:flex; gap:10px; align-items:center; margin-bottom: 8px;">
-								<el-input v-model="v.name" placeholder="变量名（如 {{token}}）" style="width: 260px" />
-								<el-input v-model="v.value" placeholder="变量值" style="flex: 1" />
-								<el-button type="danger" size="small" @click="removeEnvVarRow(idx)">删除</el-button>
-							</div>
-							<el-empty v-if="!envForm.variable || envForm.variable.length === 0" description="暂无变量，点击下方添加" />
-						</div>
-						<el-button type="primary" plain size="small" style="margin-top: 10px" @click="addEnvVarRow">
-							添加变量
-						</el-button>
-					</div>
-				</el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="envEditDialogVisible = false">取消</el-button>
-				<el-button type="primary" :loading="envSaving" @click="saveEnvForm">保存</el-button>
-			</template>
-		</el-dialog>
-
-		<el-dialog v-model="addProjectRef" :title="dialogTitle" width="500px" destroy-on-close>
-			<el-form :model="project_form" label-width="90px">
-				<el-form-item label="项目名称" required><el-input v-model="project_form.name" /></el-form-item>
-				<el-form-item label="描述"><el-input v-model="project_form.description" type="textarea" /></el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="addProjectRef = false">取消</el-button>
-				<el-button type="primary" @click="confirmAddProject">确定</el-button>
-			</template>
-		</el-dialog>
-
-		<!-- 新增服务 -->
-		<el-dialog v-model="addServiceDialogVisible" title="新增服务" width="520px" destroy-on-close>
-			<el-form :model="service_form" label-width="90px">
-				<el-form-item label="所属项目">
-					<el-input :model-value="current_project?.name || '-'" disabled />
-				</el-form-item>
-				<el-form-item label="服务名称" required>
-					<el-input v-model="service_form.name" placeholder="请输入服务名称" />
-				</el-form-item>
-				<el-form-item label="描述">
-					<el-input v-model="service_form.description" type="textarea" placeholder="请输入描述（可选）" />
-				</el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="addServiceDialogVisible = false">取消</el-button>
-				<el-button type="primary" :loading="addingService" @click="confirmAddService">确定</el-button>
-			</template>
-		</el-dialog>
-
-		<!-- 菜单对话框 -->
-		<el-dialog v-model="menuDialogRef" :title="dialogTitle" width="500px" destroy-on-close>
-			<el-form :model="menu_form" label-width="90px">
-				<el-form-item label="名称" required><el-input v-model="menu_form.name" /></el-form-item>
-				<el-form-item label="类型">
-					<el-select v-model="menu_form.type" disabled>
-						<el-option label="目录" :value="1" />
-						<el-option label="接口" :value="2" />
-					</el-select>
-				</el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="menuDialogRef = false">取消</el-button>
-				<el-button type="primary" @click="confirmMenu">确定</el-button>
-			</template>
-		</el-dialog>
-	</div>
-</template>
 
 <style scoped>
 /* 通用样式 */

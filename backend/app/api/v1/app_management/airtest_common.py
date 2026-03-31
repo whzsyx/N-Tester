@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 APP 自动化 Airtest 运行时公共函数
-一比一从 l-tester/views/app/app_common.py + l-tester/common/device.py 迁移（同步化，供子进程调用）
 """
 from __future__ import annotations
 
@@ -159,7 +158,7 @@ def allocate_install_app(device_id: str, apk_path: str) -> bool:
 
 
 def allocate_package(device_id: str, version: str, channel_id: str) -> bool:
-    """从共享目录选包安装（对齐旧逻辑，修复原 for 循环里 file_path 未定义问题）"""
+    """从共享目录选包安装（对齐逻辑，修复原 for 循环里 file_path 未定义问题）"""
     try:
         if channel_id == "1000":
             folder_path = rf"\\Share\upload\包体共享\国服{version}正式包\android\官包"
@@ -213,7 +212,7 @@ def ocr_version(image_path: str) -> str:
         return "unknown"
 
 
-# ---------- 性能（同步 adb，对齐旧 get_performance 数据结构） ----------
+# ---------- 性能（同步 adb，对齐 get_performance 数据结构） ----------
 
 
 def _shell(device_id: str, *args: str, timeout: int = 30) -> str:
@@ -325,7 +324,7 @@ def get_performance(device_id: str, performance: Dict[str, Any]) -> Dict[str, An
 
 
 def get_sms(now_time: int, sms_device_id: str, timeout: int = 3000000, interval: float = 1.0) -> str:
-    """从「验证码手机」读短信（adb content query），对齐旧 common/device.get_sms"""
+    """从「验证码手机」读短信（adb content query），对齐 common/device.get_sms"""
     sms_code = "000000"
     if not sms_device_id:
         return sms_code
@@ -357,7 +356,7 @@ def get_sms(now_time: int, sms_device_id: str, timeout: int = 3000000, interval:
     return sms_code
 
 
-# 设备硬编码映射（与旧 app_script.py 一致）
+# 设备硬编码映射
 PHONE_BY_DEVICE = {
     "10CE6R0NP7001KX": "19065402394",
     "10CE970KH2002YQ": "18127803668",
@@ -368,7 +367,7 @@ PHONE_BY_DEVICE = {
 }
 
 EMAIL_BY_DEVICE = {
-    "10CE6R0NP7001KX": "linjiyong@bluepoch.com",
+    "10CE6R0NP7001KX": "liyong@bluepoch.com",
     "10CE970KH2002YQ": "z19928355488@gmail.com",
     "10AE8D2RXP001CT": "ljy951697407@163.com",
     "10CE9F1UHC0037A": "linjiyong996@gmail.com",

@@ -1,11 +1,3 @@
-/**
- * 接口自动化模块接口
- * 对应后端 /api/v1/api_automation/*
- *
- * 注意：接口路径与入参字段严格按新架构后端 controller/schema 定义编写：
- * - 前端 request.baseURL 已包含 /api 前缀（见后端 config.API_PREFIX）
- * - 这里的 url 以 /v1 开头
- */
 import request from '/@/utils/request';
 
 // ---------- 项目 ----------
@@ -176,7 +168,7 @@ export const del_api_params = (data: { id: number }) => {
 	return request.post('/v1/api_automation/del_api_params', data);
 };
 
-// 兼容旧接口命名（controller 也提供了 /api_params + add/edit/del_params + params_select）
+
 export const api_params = (data: Record<string, any> = {}) => {
 	return request.post('/v1/api_automation/api_params', data);
 };
@@ -198,7 +190,7 @@ export const edit_api_function = (data: { id: number; name?: string; description
 export const del_api_function = (data: { id: number }) => {
 	return request.post('/v1/api_automation/del_api_function', data);
 };
-// 兼容旧分页接口
+
 export const api_function = (data: Record<string, any> = {}) => request.post('/v1/api_automation/api_function', data);
 export const add_function = (data: Record<string, any>) => request.post('/v1/api_automation/add_function', data);
 export const edit_function = (data: Record<string, any>) => request.post('/v1/api_automation/edit_function', data);

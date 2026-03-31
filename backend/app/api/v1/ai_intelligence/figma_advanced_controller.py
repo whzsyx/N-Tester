@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Figma高级功能Controller
-包含：速率限制、缓存、更新检测等API
 """
 
 from fastapi import APIRouter, Depends

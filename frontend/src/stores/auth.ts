@@ -11,7 +11,7 @@ export const useAuthStore = defineStore("auth", () => {
 
 	async function Login(params: any) {
 		const { data } = await useUserApi().signIn(params)
-		// 新API返回access_token，兼容旧的token字段
+
 		const token = data?.access_token || data?.token
 		Session.set('token', token);
 		// 如果有refresh_token，也保存

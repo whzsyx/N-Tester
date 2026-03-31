@@ -3,121 +3,111 @@
  */
 import request from '/@/utils/request'
 
-// ==================== 需求文档管理 ====================
+
 export const requirementDocumentApi = {
-  // 获取需求文档列表
+
   list: (params?: any) => request.get('/v1/ai_intelligence/requirement-documents', { params }),
   
-  // 上传需求文档
+
   upload: (data: FormData) => request.post('/v1/ai_intelligence/requirement-documents', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   
-  // 获取需求文档详情
   get: (id: number) => request.get(`/v1/ai_intelligence/requirement-documents/${id}`),
-  
-  // 更新需求文档
   update: (id: number, data: any) => request.put(`/v1/ai_intelligence/requirement-documents/${id}`, data),
-  
-  // 删除需求文档
   delete: (id: number) => request.delete(`/v1/ai_intelligence/requirement-documents/${id}`),
-  
-  // 分析需求文档
   analyze: (id: number) => request.post(`/v1/ai_intelligence/requirement-documents/${id}/analyze`),
-  
-  // 获取分析结果
   getAnalysis: (id: number) => request.get(`/v1/ai_intelligence/requirement-documents/${id}/analysis`)
 }
 
 // ==================== AI模型配置 ====================
 export const aiModelConfigApi = {
-  // 获取AI模型配置列表
+
   list: (params?: any) => request.get('/v1/ai_intelligence/ai-model-configs', { params }),
   
-  // 创建AI模型配置
+
   create: (data: any) => request.post('/v1/ai_intelligence/ai-model-configs', data),
   
-  // 获取AI模型配置详情
+
   get: (id: number) => request.get(`/v1/ai_intelligence/ai-model-configs/${id}`),
   
-  // 更新AI模型配置
+
   update: (id: number, data: any) => request.put(`/v1/ai_intelligence/ai-model-configs/${id}`, data),
   
-  // 删除AI模型配置
+
   delete: (id: number) => request.delete(`/v1/ai_intelligence/ai-model-configs/${id}`)
 }
 
 // ==================== 提示词配置 ====================
 export const promptConfigApi = {
-  // 获取提示词配置列表
+
   list: (params?: any) => request.get('/v1/ai_intelligence/prompt-configs', { params }),
   
-  // 创建提示词配置
+
   create: (data: any) => request.post('/v1/ai_intelligence/prompt-configs', data),
   
-  // 获取提示词配置详情
+
   get: (id: number) => request.get(`/v1/ai_intelligence/prompt-configs/${id}`),
   
-  // 更新提示词配置
+
   update: (id: number, data: any) => request.put(`/v1/ai_intelligence/prompt-configs/${id}`, data),
   
-  // 删除提示词配置
+
   delete: (id: number) => request.delete(`/v1/ai_intelligence/prompt-configs/${id}`)
 }
 
 // ==================== 测试用例生成任务 ====================
 export const generationTaskApi = {
-  // 获取生成任务列表
+
   list: (params?: any) => request.get('/v1/ai_intelligence/generation-tasks', { params }),
   
-  // 创建生成任务
+
   create: (data: any) => request.post('/v1/ai_intelligence/generation-tasks', data),
-  
-  // 获取生成任务详情
+
   get: (taskId: string) => request.get(`/v1/ai_intelligence/generation-tasks/${taskId}`),
   
-  // 流式获取生成任务输出
+ 
   stream: (taskId: string) => `/v1/ai_intelligence/generation-tasks/${taskId}/stream`,
   
-  // 保存到测试用例管理
+
   saveToTestcases: (taskId: string, data: any) => request.post(`/v1/ai_intelligence/generation-tasks/${taskId}/save-to-testcases`, data),
   
-  // 删除生成任务
+
   delete: (taskId: string) => request.delete(`/v1/ai_intelligence/generation-tasks/${taskId}`),
   
-  // 批量删除生成任务
+ 
   batchDelete: (taskIds: string[]) => request.post('/v1/ai_intelligence/generation-tasks/batch-delete', taskIds)
 }
 
 // ==================== 项目管理 ====================
 export const projectApi = {
-  // 获取主项目下的子项目
+
   getSubProjects: (projectId: number, params?: any) => request.get(`/v1/ai_intelligence/projects/${projectId}/sub-projects`, { params })
 }
 
 // ==================== 测试用例模板 ====================
 export const testcaseTemplateApi = {
-  // 获取模板列表
+
   list: (params?: any) => request.get('/v1/ai_intelligence/testcase-templates', { params }),
   
-  // 获取模板详情
+
   get: (id: number) => request.get(`/v1/ai_intelligence/testcase-templates/${id}`),
   
-  // 创建模板
+
   create: (data: any) => request.post('/v1/ai_intelligence/testcase-templates', data),
   
-  // 更新模板
+ 
   update: (id: number, data: any) => request.put(`/v1/ai_intelligence/testcase-templates/${id}`, data),
   
-  // 删除模板
+ 
   delete: (id: number) => request.delete(`/v1/ai_intelligence/testcase-templates/${id}`),
   
-  // 导出模板
+
   export: (id: number) => request.get(`/v1/ai_intelligence/testcase-templates/${id}/export`, {
     responseType: 'blob'
   }),
   
-  // 导入模板
+  
   import: (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -126,44 +116,44 @@ export const testcaseTemplateApi = {
     })
   },
   
-  // 预览模板
+ 
   preview: (id: number, sampleData: any) => request.post(`/v1/ai_intelligence/testcase-templates/${id}/preview`, sampleData)
 }
 
 // ==================== AI智能浏览器用例 ====================
 export const aiCaseApi = {
-  // 获取AI用例列表
+ 
   list: (params?: any) => request.get('/v1/ai_intelligence/ai-cases', { params }),
   
-  // 创建AI用例
+ 
   create: (data: any) => request.post('/v1/ai_intelligence/ai-cases', data),
   
-  // 获取AI用例详情
+
   get: (id: number) => request.get(`/v1/ai_intelligence/ai-cases/${id}`),
   
-  // 更新AI用例
+  
   update: (id: number, data: any) => request.put(`/v1/ai_intelligence/ai-cases/${id}`, data),
   
-  // 删除AI用例（硬删除）
+ 
   delete: (id: number) => request.delete(`/v1/ai_intelligence/ai-cases/${id}`),
   
-  // 批量删除AI用例（硬删除）
+
   batchDelete: (case_ids: number[]) => request.post('/v1/ai_intelligence/ai-cases/batch-delete', { case_ids }),
   
-  // 执行AI用例
+  
   execute: (id: number, headless: boolean = false) => request.post(`/v1/ai_intelligence/ai-cases/${id}/execute`, null, {
     params: { headless }
   }),
   
-  // 批量执行AI用例
+
   batchExecute: (data: { task_name: string, execution_mode: string, parallel_count: number, case_ids: number[] }) => 
     request.post('/v1/ai_intelligence/ai-cases/batch-execute', data),
   
-  // 从测试用例模块批量导入
+
   importFromModules: (data: { project_id: number, module_ids: number[] }) => 
     request.post('/v1/ai_intelligence/ai-cases/import-from-modules', data),
   
-  // 从Excel导入AI用例
+
   importFromExcel: (file: File, project_id?: number, module_id?: number) => {
     const formData = new FormData()
     formData.append('file', file)

@@ -1,306 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { ElMessage, ElMessageBox, ElTree } from 'element-plus';
-import { Session } from '/@/utils/storage';
-import ApiDetail from './api_detail.vue';
-import {
-	api_tree_list,
-	api_script_list,
-	add_api_script,
-	edit_api_script,
-	del_api_script,
-	api_env,
-	params_select,
-	run_api_script,
-	get_api_script_log,
-	get_api_script_result,
-	api_db_list,
-	api_service,
-	api_tree,
-} from '/@/api/v1/api_automation';
-
-const searchParams = ref({
-	search: { name__icontains: '', type__icontains: '' },
-	currentPage: 1,
-	pageSize: 10,
-});
-const table_data = ref<any[]>([]);
-const total = ref(0);
-
-const get_script_list = async () => {
-	const res: any = await api_script_list(searchParams.value as any);
-	const raw = res?.data;
-	const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
-	table_data.value = list;
-	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
-};
-
-const reset_search = () => {
-	searchParams.value = { search: { name__icontains: '', type__icontains: '' }, currentPage: 1, pageSize: 10 };
-	get_script_list();
-};
-
-const addDialogRef = ref(false);
-const editDialogRef = ref(false);
-const runDialogRef = ref(false);
-const resultDialogRef = ref(false);
-const dialogTitle = ref('');
-
-const add_form = ref<any>({
-	name: '',
-	description: '',
-	type: 1,
-	config: { params_id: null, env_id: null, api_service_id: null },
-	script: [],
-});
-
-const env_list = ref<any[]>([]);
-const params_list = ref<any[]>([]);
-const tree_list = ref<any[]>([]);
-const service_list = ref<any[]>([]);
-
-const load_service_list = async () => {
-	try {
-		const res: any = await api_service({ page: 1, pageSize: 200, search: {} });
-		const raw = res?.data;
-		service_list.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
-	} catch (e) {
-		console.error('加载服务列表失败:', e);
-		service_list.value = [];
-	}
-};
-
-const get_env_list = async () => {
-	const res: any = await api_env({});
-	env_list.value = res.data || [];
-};
-const get_params = async () => {
-	const res: any = await params_select({});
-	params_list.value = res.data || [];
-};
-const get_api_tree_list = async () => {
-	// 默认加载全量接口树；若选择了服务，则按服务过滤（避免混入其他服务接口）
-	const serviceId = add_form.value?.config?.api_service_id;
-	if (serviceId) {
-		const res: any = await api_tree({ search: { api_service_id: Number(serviceId) } });
-		tree_list.value = res.data || [];
-	} else {
-		const res: any = await api_tree_list({});
-		tree_list.value = res.data || [];
-	}
-};
-const get_db_list = async () => {
-	await api_db_list({});
-};
-
-const Add = async () => {
-	add_form.value = { name: '', description: '', type: 1, config: { params_id: null, env_id: null, api_service_id: null }, script: [] };
-	await Promise.all([load_service_list(), get_api_tree_list(), get_env_list(), get_params(), get_db_list()]);
-	dialogTitle.value = '新增测试场景';
-	addDialogRef.value = true;
-};
-
-const add_confirm = async () => {
-	const res: any = await add_api_script(add_form.value);
-	ElMessage.success(res.message || '已创建');
-	addDialogRef.value = false;
-	await get_script_list();
-};
-
-const edit_confirm = async () => {
-	const res: any = await edit_api_script(add_form.value);
-	ElMessage.success(res.message || '已保存');
-	editDialogRef.value = false;
-	await get_script_list();
-};
-
-const Edit = async (row: any) => {
-	await Promise.all([load_service_list(), get_api_tree_list(), get_env_list(), get_params(), get_db_list()]);
-	dialogTitle.value = `编辑脚本：${row.name}`;
-	add_form.value = { ...row };
-	editDialogRef.value = true;
-};
-
-const Delete = async (row: any) => {
-	await ElMessageBox.confirm(`您确认需要删除：${row.name} 么？`, '提示', { type: 'warning' });
-	const res: any = await del_api_script({ id: row.id });
-	ElMessage.success(res.message || '已删除');
-	await get_script_list();
-};
-
-// run
-const run_form = ref<any>({ name: '', config: { env_id: null, params_id: null }, run_list: [] });
-const result_id = ref<number | null>(null);
-const run_type = ref('准备执行');
-const run_env = ref('');
-const run_result_log = ref<any[]>([]);
-const run_result_list = ref<any[]>([]);
-const run_count = ref(0);
-const run_fail = ref(0);
-const start_time = ref('');
-const end_time = ref('');
-
-// 结果详情抽屉（对齐旧架构“查看详情”）
-const detail_drawer = ref(false);
-const detail = ref<any>({});
-
-const view_result = async (row: any) => {
-	// 与报告页保持一致：row.res / row.req 直接传给 ApiDetail
-	detail.value = row;
-	detail_drawer.value = true;
-};
-
-const buildDetailApiData = (d: any) => {
-	// ApiDetail 组件依赖 api_id/id 触发初始化；这里给一个稳定的兜底值即可
-	const stableId = d?.api_id ?? d?.id ?? d?.uuid ?? d?.menu_id ?? `${d?.result_id ?? ''}-${d?.name ?? ''}`;
-	return {
-		api_id: stableId,
-		api_info: {
-			id: stableId,
-			name: d?.name,
-			req: d?.req ?? d?.request ?? d?.req_info,
-			res: d?.res ?? d?.response ?? d?.res_info,
-		},
-	};
-};
-const interval = ref<any>(null);
-
-const run_script = async (row: any) => {
-	// 打开运行弹窗前，确保环境/参数集已加载（否则下拉为空）
-	await Promise.all([get_env_list(), get_params()]);
-	run_form.value = { name: row.name, config: { env_id: null, params_id: null }, run_list: [row] };
-	dialogTitle.value = '请配置调试信息';
-	runDialogRef.value = true;
-};
-
-// -------------------- 从接口树添加用例（新架构实现） --------------------
-const casePickerVisible = ref(false);
-const caseTreeRef = ref<InstanceType<typeof ElTree>>();
-const caseTreeFilter = ref('');
-
-const open_case_picker = async () => {
-	await get_api_tree_list();
-	casePickerVisible.value = true;
-};
-
-const isLeafApiNode = (node: any) => {
-	return node && (node.type === 2 || node.type === 3) && node.api_id != null;
-};
-
-const collectCheckedLeafNodes = () => {
-	const nodes = caseTreeRef.value?.getCheckedNodes?.(false, true) ?? [];
-	return (nodes as any[]).filter(isLeafApiNode);
-};
-
-const confirm_add_cases = async () => {
-	const picked = collectCheckedLeafNodes();
-	if (!picked.length) {
-		ElMessage.warning('请先在接口树中勾选需要添加的接口/用例');
-		return;
-	}
-	const existingApiIds = new Set((add_form.value.script || []).map((s: any) => Number(s?.api_id)).filter((x: any) => !Number.isNaN(x)));
-	const start = (add_form.value.script || []).length;
-	const nextSteps = picked
-		.filter((n: any) => !existingApiIds.has(Number(n.api_id)))
-		.map((n: any, idx: number) => ({
-			name: n.name,
-			api_id: Number(n.api_id),
-			step: start + idx + 1,
-		}));
-	add_form.value.script = [...(add_form.value.script || []), ...nextSteps];
-	ElMessage.success(`已添加 ${nextSteps.length} 个步骤`);
-	casePickerVisible.value = false;
-};
-
-const filterCaseNode = (value: string, data: any) => {
-	if (!value) return true;
-	return String(data?.name || '').includes(value);
-};
-
-watch(caseTreeFilter, (v) => {
-	caseTreeRef.value?.filter?.(v);
-});
-
-const startPolling = async () => {
-	if (interval.value) return;
-	interval.value = setInterval(async () => {
-		await get_result();
-	}, 1500);
-};
-const stopPolling = () => {
-	if (interval.value) clearInterval(interval.value);
-	interval.value = null;
-};
-
-const get_result = async () => {
-	await Promise.all([get_script_log(), get_script_result()]);
-};
-
-const get_script_log = async () => {
-	if (!result_id.value) return;
-	const res: any = await get_api_script_log({ result_id: result_id.value });
-	run_result_log.value = res.data || [];
-};
-const get_script_result = async () => {
-	if (!result_id.value) return;
-	const res: any = await get_api_script_result({ result_id: result_id.value });
-	run_result_list.value = res.data || [];
-
-	// 统计 + 结束检测（对齐旧架构）
-	const list = run_result_list.value || [];
-	run_count.value = list.length;
-	run_fail.value = 0;
-	if (list.length > 0) {
-		start_time.value = String(list[list.length - 1]?.create_time ?? '');
-	}
-	end_time.value = '';
-	for (const item of list) {
-		if (item?.status === 0) run_fail.value += 1;
-		if (item?.name === '执行结束') {
-			run_type.value = '执行结束';
-			run_count.value = Math.max(0, run_count.value - 1);
-			end_time.value = String(item?.create_time ?? '');
-			stopPolling();
-			break;
-		}
-	}
-};
-
-const run_confirm = async () => {
-	run_result_log.value = [];
-	run_result_list.value = [];
-	run_count.value = 0;
-	run_fail.value = 0;
-	start_time.value = '';
-	end_time.value = '';
-	run_type.value = '正在执行';
-	if (!run_form.value.config.env_id || !run_form.value.name) {
-		ElMessage.error('请选择环境并填写任务名称');
-		return;
-	}
-	env_list.value.forEach((item: any) => {
-		if (run_form.value.config.env_id === item.id) run_env.value = item.name;
-	});
-	result_id.value = Date.now();
-	run_form.value.result_id = result_id.value;
-
-	// 兼容旧逻辑：把用户信息带上（后端可忽略）
-	try {
-		const userInfo = Session.get('userInfo');
-		if (userInfo?.username) run_form.value.username = userInfo.username;
-	} catch (_) {}
-
-	resultDialogRef.value = true;
-	await startPolling();
-	const res: any = await run_api_script(run_form.value);
-	ElMessage.success(res.message || '已触发执行');
-};
-
-onMounted(async () => {
-	await get_script_list();
-});
-</script>
-
 <template>
 	<div>
 		<el-card class="box-card">
@@ -464,7 +161,7 @@ onMounted(async () => {
 			</template>
 		</el-dialog>
 
-		<!-- 执行结果对话框（对齐旧架构：顶部概览 + 左侧时间线 + 右侧日志 + 详情抽屉） -->
+
 		<el-dialog v-model="resultDialogRef" :title="run_form.name + ' - ' + run_type" width="81%" destroy-on-close @close="stopPolling">
 			<el-card shadow="never" style="margin-bottom: 10px;">
 				<el-descriptions :column="4" border>
@@ -534,6 +231,310 @@ onMounted(async () => {
 		</el-drawer>
 	</div>
 </template>
+
+<script setup lang="ts">
+import { onMounted, ref, watch } from 'vue';
+import { ElMessage, ElMessageBox, ElTree } from 'element-plus';
+import { Session } from '/@/utils/storage';
+import ApiDetail from './api_detail.vue';
+import {
+	api_tree_list,
+	api_script_list,
+	add_api_script,
+	edit_api_script,
+	del_api_script,
+	api_env,
+	params_select,
+	run_api_script,
+	get_api_script_log,
+	get_api_script_result,
+	api_db_list,
+	api_service,
+	api_tree,
+} from '/@/api/v1/api_automation';
+
+const searchParams = ref({
+	search: { name__icontains: '', type__icontains: '' },
+	currentPage: 1,
+	pageSize: 10,
+});
+const table_data = ref<any[]>([]);
+const total = ref(0);
+
+const get_script_list = async () => {
+	const res: any = await api_script_list(searchParams.value as any);
+	const raw = res?.data;
+	const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+	table_data.value = list;
+	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
+};
+
+const reset_search = () => {
+	searchParams.value = { search: { name__icontains: '', type__icontains: '' }, currentPage: 1, pageSize: 10 };
+	get_script_list();
+};
+
+const addDialogRef = ref(false);
+const editDialogRef = ref(false);
+const runDialogRef = ref(false);
+const resultDialogRef = ref(false);
+const dialogTitle = ref('');
+
+const add_form = ref<any>({
+	name: '',
+	description: '',
+	type: 1,
+	config: { params_id: null, env_id: null, api_service_id: null },
+	script: [],
+});
+
+const env_list = ref<any[]>([]);
+const params_list = ref<any[]>([]);
+const tree_list = ref<any[]>([]);
+const service_list = ref<any[]>([]);
+
+const load_service_list = async () => {
+	try {
+		const res: any = await api_service({ page: 1, pageSize: 200, search: {} });
+		const raw = res?.data;
+		service_list.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+	} catch (e) {
+		console.error('加载服务列表失败:', e);
+		service_list.value = [];
+	}
+};
+
+const get_env_list = async () => {
+	const res: any = await api_env({});
+	env_list.value = res.data || [];
+};
+const get_params = async () => {
+	const res: any = await params_select({});
+	params_list.value = res.data || [];
+};
+const get_api_tree_list = async () => {
+
+	const serviceId = add_form.value?.config?.api_service_id;
+	if (serviceId) {
+		const res: any = await api_tree({ search: { api_service_id: Number(serviceId) } });
+		tree_list.value = res.data || [];
+	} else {
+		const res: any = await api_tree_list({});
+		tree_list.value = res.data || [];
+	}
+};
+const get_db_list = async () => {
+	await api_db_list({});
+};
+
+const Add = async () => {
+	add_form.value = { name: '', description: '', type: 1, config: { params_id: null, env_id: null, api_service_id: null }, script: [] };
+	await Promise.all([load_service_list(), get_api_tree_list(), get_env_list(), get_params(), get_db_list()]);
+	dialogTitle.value = '新增测试场景';
+	addDialogRef.value = true;
+};
+
+const add_confirm = async () => {
+	const res: any = await add_api_script(add_form.value);
+	ElMessage.success(res.message || '已创建');
+	addDialogRef.value = false;
+	await get_script_list();
+};
+
+const edit_confirm = async () => {
+	const res: any = await edit_api_script(add_form.value);
+	ElMessage.success(res.message || '已保存');
+	editDialogRef.value = false;
+	await get_script_list();
+};
+
+const Edit = async (row: any) => {
+	await Promise.all([load_service_list(), get_api_tree_list(), get_env_list(), get_params(), get_db_list()]);
+	dialogTitle.value = `编辑脚本：${row.name}`;
+	add_form.value = { ...row };
+	editDialogRef.value = true;
+};
+
+const Delete = async (row: any) => {
+	await ElMessageBox.confirm(`您确认需要删除：${row.name} 么？`, '提示', { type: 'warning' });
+	const res: any = await del_api_script({ id: row.id });
+	ElMessage.success(res.message || '已删除');
+	await get_script_list();
+};
+
+// run
+const run_form = ref<any>({ name: '', config: { env_id: null, params_id: null }, run_list: [] });
+const result_id = ref<number | null>(null);
+const run_type = ref('准备执行');
+const run_env = ref('');
+const run_result_log = ref<any[]>([]);
+const run_result_list = ref<any[]>([]);
+const run_count = ref(0);
+const run_fail = ref(0);
+const start_time = ref('');
+const end_time = ref('');
+
+
+const detail_drawer = ref(false);
+const detail = ref<any>({});
+
+const view_result = async (row: any) => {
+
+	detail.value = row;
+	detail_drawer.value = true;
+};
+
+const buildDetailApiData = (d: any) => {
+
+	const stableId = d?.api_id ?? d?.id ?? d?.uuid ?? d?.menu_id ?? `${d?.result_id ?? ''}-${d?.name ?? ''}`;
+	return {
+		api_id: stableId,
+		api_info: {
+			id: stableId,
+			name: d?.name,
+			req: d?.req ?? d?.request ?? d?.req_info,
+			res: d?.res ?? d?.response ?? d?.res_info,
+		},
+	};
+};
+const interval = ref<any>(null);
+
+const run_script = async (row: any) => {
+
+	await Promise.all([get_env_list(), get_params()]);
+	run_form.value = { name: row.name, config: { env_id: null, params_id: null }, run_list: [row] };
+	dialogTitle.value = '请配置调试信息';
+	runDialogRef.value = true;
+};
+
+
+const casePickerVisible = ref(false);
+const caseTreeRef = ref<InstanceType<typeof ElTree>>();
+const caseTreeFilter = ref('');
+
+const open_case_picker = async () => {
+	await get_api_tree_list();
+	casePickerVisible.value = true;
+};
+
+const isLeafApiNode = (node: any) => {
+	return node && (node.type === 2 || node.type === 3) && node.api_id != null;
+};
+
+const collectCheckedLeafNodes = () => {
+	const nodes = caseTreeRef.value?.getCheckedNodes?.(false, true) ?? [];
+	return (nodes as any[]).filter(isLeafApiNode);
+};
+
+const confirm_add_cases = async () => {
+	const picked = collectCheckedLeafNodes();
+	if (!picked.length) {
+		ElMessage.warning('请先在接口树中勾选需要添加的接口/用例');
+		return;
+	}
+	const existingApiIds = new Set((add_form.value.script || []).map((s: any) => Number(s?.api_id)).filter((x: any) => !Number.isNaN(x)));
+	const start = (add_form.value.script || []).length;
+	const nextSteps = picked
+		.filter((n: any) => !existingApiIds.has(Number(n.api_id)))
+		.map((n: any, idx: number) => ({
+			name: n.name,
+			api_id: Number(n.api_id),
+			step: start + idx + 1,
+		}));
+	add_form.value.script = [...(add_form.value.script || []), ...nextSteps];
+	ElMessage.success(`已添加 ${nextSteps.length} 个步骤`);
+	casePickerVisible.value = false;
+};
+
+const filterCaseNode = (value: string, data: any) => {
+	if (!value) return true;
+	return String(data?.name || '').includes(value);
+};
+
+watch(caseTreeFilter, (v) => {
+	caseTreeRef.value?.filter?.(v);
+});
+
+const startPolling = async () => {
+	if (interval.value) return;
+	interval.value = setInterval(async () => {
+		await get_result();
+	}, 1500);
+};
+const stopPolling = () => {
+	if (interval.value) clearInterval(interval.value);
+	interval.value = null;
+};
+
+const get_result = async () => {
+	await Promise.all([get_script_log(), get_script_result()]);
+};
+
+const get_script_log = async () => {
+	if (!result_id.value) return;
+	const res: any = await get_api_script_log({ result_id: result_id.value });
+	run_result_log.value = res.data || [];
+};
+const get_script_result = async () => {
+	if (!result_id.value) return;
+	const res: any = await get_api_script_result({ result_id: result_id.value });
+	run_result_list.value = res.data || [];
+
+
+	const list = run_result_list.value || [];
+	run_count.value = list.length;
+	run_fail.value = 0;
+	if (list.length > 0) {
+		start_time.value = String(list[list.length - 1]?.create_time ?? '');
+	}
+	end_time.value = '';
+	for (const item of list) {
+		if (item?.status === 0) run_fail.value += 1;
+		if (item?.name === '执行结束') {
+			run_type.value = '执行结束';
+			run_count.value = Math.max(0, run_count.value - 1);
+			end_time.value = String(item?.create_time ?? '');
+			stopPolling();
+			break;
+		}
+	}
+};
+
+const run_confirm = async () => {
+	run_result_log.value = [];
+	run_result_list.value = [];
+	run_count.value = 0;
+	run_fail.value = 0;
+	start_time.value = '';
+	end_time.value = '';
+	run_type.value = '正在执行';
+	if (!run_form.value.config.env_id || !run_form.value.name) {
+		ElMessage.error('请选择环境并填写任务名称');
+		return;
+	}
+	env_list.value.forEach((item: any) => {
+		if (run_form.value.config.env_id === item.id) run_env.value = item.name;
+	});
+	result_id.value = Date.now();
+	run_form.value.result_id = result_id.value;
+
+
+	try {
+		const userInfo = Session.get('userInfo');
+		if (userInfo?.username) run_form.value.username = userInfo.username;
+	} catch (_) {}
+
+	resultDialogRef.value = true;
+	await startPolling();
+	const res: any = await run_api_script(run_form.value);
+	ElMessage.success(res.message || '已触发执行');
+};
+
+onMounted(async () => {
+	await get_script_list();
+});
+</script>
+
 
 
 <style scoped>

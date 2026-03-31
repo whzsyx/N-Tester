@@ -8,7 +8,9 @@ from sqlalchemy.orm import aliased
 
 from app.models.api_models import LegacyModuleInfo, ProjectInfo
 from app.models.base import Base
-from app.api.v1.system.user.model import UserModel
+
+if TYPE_CHECKING:
+    from app.api.v1.system.user.model import UserModel
 
 
 class TimedTask(Base):
@@ -50,6 +52,9 @@ class TimedTask(Base):
 
     @classmethod
     async def get_list(cls, params: "TimedTasksQuerySchema"):
+        # 延迟导入避免循环导入
+        from app.api.v1.system.user.model import UserModel
+        
         q = [cls.enabled_flag == 1]
         u = aliased(UserModel)
         if params.id:

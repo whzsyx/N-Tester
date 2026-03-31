@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 日志管理API - 新架构
+ * 日志管理API
  */
 export function useLogApi() {
   return {

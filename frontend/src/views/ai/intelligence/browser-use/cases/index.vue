@@ -816,7 +816,7 @@ import { Plus, Download, Upload, VideoPlay, ArrowDown, Delete, UploadFilled } fr
 import { getProjectList } from '/@/api/v1/project'
 import { getModuleList, getModuleTree } from '/@/api/v1/modules'
 import { getTestCaseList } from '/@/api/v1/testcases'
-// 导入旧的AI智能浏览器API（用于执行功能）
+
 import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
 
 // 数据
@@ -1146,7 +1146,7 @@ const handleExecute = async (row: any, mode: string) => {
   ).then(async () => {
     try {
       const headless = mode === 'headless'
-      // 调用旧的AI智能浏览器API执行
+
       const res = await aiCaseApi.execute(row.id, headless)
       if (res.code === 200) {
         ElMessage.success('AI用例执行已启动')

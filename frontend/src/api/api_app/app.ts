@@ -1,5 +1,3 @@
-// 1:1 迁移自 l-vue-ui/src/api/api_app/app.ts
-// 仅将 base url 从旧 /api/app/* 映射到新 /api/v1/app_management/*
 import axios from '@/utils/axios.ts';
 
 enum API {
@@ -10,11 +8,9 @@ enum API {
 	ADD_MENU = '/api/v1/app_management/add_menu',
 	DEL_MENU = '/api/v1/app_management/del_menu',
 	RENAME_MENU = '/api/v1/app_management/rename_menu',
-	// 对齐旧 get_app_result：单设备步骤列表（传 result_id + device）
 	APP_RESULT = '/api/v1/app_management/get_app_result',
 	PID_STATUS = '/api/v1/app_management/pid_status',
 	STOP_PROCESS = '/api/v1/app_management/stop_process',
-	// 对齐旧 get_result_detail：单设备汇总统计
 	APP_RESULT_DETAIL = '/api/v1/app_management/get_result_detail',
 	MENU_SCRIPT_LIST = '/api/v1/app_management/menu_script_list',
 	RUN_SCRIPT_LIST = '/api/v1/app_management/run_script_list',
@@ -27,6 +23,7 @@ enum API {
 	VIEW_SCRIPT_LIST = '/api/v1/app_management/view_script_list',
 	APP_CORRECTION = '/api/v1/app_management/app_correction',
 	APP_MENU_SELECT = '/api/v1/app_management/app_menu_select',
+	RECOVER_ROOT_MENU = '/api/v1/app_management/recover_root_menu',
 }
 
 export const app_menu = (params: any) => axios.post(API.APP_MENU, params);
@@ -51,4 +48,5 @@ export const get_process = (params: any) => axios.post(API.GET_PROCESS, params);
 export const view_script_list = (params: any) => axios.post(API.VIEW_SCRIPT_LIST, params);
 export const app_correction = (params: any) => axios.post(API.APP_CORRECTION, params);
 export const app_menu_select = (params: any) => axios.post(API.APP_MENU_SELECT, params);
+export const recover_root_menu = (params: any) => axios.post(API.RECOVER_ROOT_MENU, params);
 

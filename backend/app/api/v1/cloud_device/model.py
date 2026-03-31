@@ -1,6 +1,5 @@
 """
-云真机模块 - 数据模型
-迁移自 l-tester/views/app/app_model.py
+云真机模块数据模型
 """
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, Boolean, ForeignKey
@@ -10,7 +9,7 @@ from app.models.base import Base
 
 
 class AppDevice(Base):
-    """云真机设备模型 - 对应旧架构 App_device"""
+    """云真机设备模型"""
     __tablename__ = 'app_devices'
     __table_args__ = {'comment': '云真机设备表'}
     
@@ -24,7 +23,7 @@ class AppDevice(Base):
     device_description = Column(Text, comment='设备描述')
     user_id = Column(Integer, ForeignKey('sys_user.id'), nullable=False, comment='用户ID')
     
-    # 兼容字段（数据库表有created_at和updated_at）
+
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
     
@@ -34,7 +33,7 @@ class AppDevice(Base):
 
 
 class AppDeviceLog(Base):
-    """设备使用日志模型 - 对应旧架构 App_device_log"""
+    """设备使用日志模型"""
     __tablename__ = 'app_device_logs'
     __table_args__ = {'comment': '设备使用日志表'}
     
@@ -43,7 +42,7 @@ class AppDeviceLog(Base):
     start_time = Column(DateTime, server_default=func.now(), comment='开始使用时间')
     end_time = Column(DateTime, comment='结束使用时间')
     
-    # 兼容字段
+
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
     
@@ -52,7 +51,7 @@ class AppDeviceLog(Base):
 
 
 class AppDeviceInstall(Base):
-    """设备APP安装历史模型 - 对应旧架构 App_device_install"""
+    """设备APP安装历史模型"""
     __tablename__ = 'app_device_installs'
     __table_args__ = {'comment': '设备APP安装历史表'}
     
@@ -61,8 +60,7 @@ class AppDeviceInstall(Base):
     device_id = Column(Integer, ForeignKey('app_devices.id'), nullable=False, comment='设备ID')
     user_id = Column(Integer, ForeignKey('sys_user.id'), nullable=False, comment='用户ID')
     create_time = Column(DateTime, server_default=func.now(), comment='安装时间')
-    
-    # 兼容字段
+
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
     
@@ -71,13 +69,13 @@ class AppDeviceInstall(Base):
 
 
 class AppDeviceLogList(Base):
-    """设备日志列表模型 - 对应旧架构 App_device_log_list"""
+    """设备日志列表模型"""
     __tablename__ = 'app_device_log_lists'
     __table_args__ = {'comment': '设备日志列表表'}
     
     name = Column(String(255), nullable=False, comment='名称')
     together_id = Column(Integer, nullable=False, comment='关联ID')
     
-    # 兼容字段
+
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')

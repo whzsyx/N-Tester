@@ -91,7 +91,7 @@ class UserRole(Base):
     @classmethod
     async def batch_create(cls, user_id: int, role_ids: typing.List[int], created_by: int = None):
         """批量创建用户角色关联"""
-        # 先删除旧的关联
+
         await cls.delete_by_user_id(user_id)
         
         # 创建新的关联
@@ -150,7 +150,7 @@ class RoleMenu(Base):
     @classmethod
     async def batch_create(cls, role_id: int, menu_ids: typing.List[int], created_by: int = None):
         """批量创建角色菜单关联"""
-        # 先删除旧的关联
+
         await cls.delete_by_role_id(role_id)
         
         # 创建新的关联
@@ -209,7 +209,7 @@ class RolePermission(Base):
     @classmethod
     async def batch_create(cls, role_id: int, permission_ids: typing.List[int], created_by: int = None):
         """批量创建角色权限关联"""
-        # 先删除旧的关联
+
         await cls.delete_by_role_id(role_id)
         
         # 创建新的关联

@@ -457,7 +457,7 @@ class UIPageObjectService:
         
         # 如果提供了元素列表，更新关联关系
         if elements_data is not None:
-            # 删除旧的关联
+
             await page_object_element_crud.delete_by_page_object_id(
                 db=db,
                 page_object_id=page_object_id,
@@ -788,7 +788,7 @@ class UITestSuiteService:
             
             logger.info(f"更新套件用例关联: suite_id={test_suite_id}, 原始数量={len(test_case_ids)}, 去重后数量={len(unique_case_ids)}")
             
-            # 删除旧的关联
+
             await suite_case_crud.delete_by_suite_id(
                 db=db,
                 suite_id=test_suite_id,

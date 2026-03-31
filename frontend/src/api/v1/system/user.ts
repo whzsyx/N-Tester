@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 用户管理API - 新架构
+ * 用户管理API
  */
 export function useUserApi() {
   return {
@@ -20,7 +20,7 @@ export function useUserApi() {
         ...params,
         page_size: params?.page_size || params?.pageSize || 10,
       };
-      // 删除旧的pageSize参数
+
       if ('pageSize' in transformedParams) {
         delete (transformedParams as any).pageSize;
       }

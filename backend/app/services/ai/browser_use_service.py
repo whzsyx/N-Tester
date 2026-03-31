@@ -1,6 +1,5 @@
 """
-Browser-use AI浏览器服务
-基于browser-use框架实现自然语言驱动的浏览器自动化
+Browser-use AI浏览器服务，基于browser-use框架实现自然语言驱动的浏览器自动化
 """
 
 import os

@@ -1,4 +1,4 @@
-# AI助手模块 - 数据传输对象层
+# -*- coding: utf-8 -*-
 
 from typing import Optional, List
 from datetime import datetime

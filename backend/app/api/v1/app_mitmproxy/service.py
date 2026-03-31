@@ -49,7 +49,7 @@ class MitmproxyService:
     def _addon_script_path() -> str:
         """
         mitmweb -s 的脚本路径。
-        这里先放到 static/mitmproxy 下，后续你们改成独立部署的 addon。
+        这里先放到 static/mitmproxy 下，后续改成独立部署的 addon。
         """
         addon = Path(config.BASEDIR) / "static" / "mitmproxy" / "mitmproxy_save_to_db.py"
         return str(addon)

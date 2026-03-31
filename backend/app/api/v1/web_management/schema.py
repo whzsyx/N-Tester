@@ -53,7 +53,7 @@ class WebResultListRequest(BaseModel):
 
 class WebGroupListRequest(BaseModel):
     """Web脚本集列表请求"""
-    # 旧接口无参数，保留空请求体但不使用 pass
+
     dummy: Optional[int] = Field(None, description="占位字段（可不传）")
 
 

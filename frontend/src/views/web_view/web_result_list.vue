@@ -127,7 +127,7 @@ const searchParams = ref({
 
 const total = ref(0)
 
-// 格式化时间：2026-03-15T13:20:05 → 2026-03-15 13:20:05
+
 const formatTime = (t: string) => t ? t.replace('T', ' ') : '-'
 
 const result_list = async () => {

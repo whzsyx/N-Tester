@@ -23,7 +23,7 @@ router = APIRouter(prefix="/testcases", tags=["测试用例管理"])
 
 # ========== 模块管理 ==========
 
-# 注意：更具体的路由必须放在更通用的路由之前，避免路径匹配冲突
+
 
 @router.get("/modules/tree/{project_id}", summary="获取模块树形结构")
 async def get_module_tree(
@@ -176,7 +176,7 @@ async def get_testcase_list(
 
 
 # ========== 版本管理 ==========
-# 注意：版本路由必须在 /{testcase_id} 之前，否则会被错误匹配
+
 
 @router.post("/versions", summary="创建版本")
 async def create_version(
@@ -258,7 +258,7 @@ async def associate_testcases(
 
 
 # ========== Excel导入导出 ==========
-# 注意：必须在 /{testcase_id} 之前，避免路径冲突
+
 
 @router.post("/import-from-excel", summary="从Excel导入测试用例")
 async def import_testcases_from_excel(
@@ -727,7 +727,7 @@ def _convert_status(ai_status: str) -> str:
 
 
 # ========== 测试用例详情/更新/删除 ==========
-# 注意：这些路由必须在版本路由和Excel路由之后，避免路径冲突
+
 
 @router.get("/{testcase_id}", summary="获取测试用例详情")
 async def get_testcase_detail(

@@ -1,15 +1,9 @@
 """
 Web管理模块 - 控制器
-处理Web UI自动化测试、元素管理、脚本集管理等相关API请求
-
-说明：
-- 这里优先完成 L-Tester 旧架构中 web 元素管理相关接口的一比一迁移
-- 与新架构其他 UI 自动化模块保持解耦，作为独立 WebUI 自动化子模块
 """
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.sqlalchemy import get_db
 from app.core.dependencies import get_current_user_id
 from app.common.enums import ResponseCode
@@ -21,14 +15,14 @@ from .service import WebManagementService
 router = APIRouter()
 
 
-# -------------------- 元素菜单 & 元素管理（迁移自 l-tester/views/web/element_view.py） --------------------
+# -------------------- 元素菜单 & 元素管理 --------------------
 
 @router.post("/web_element/element_tree")
 async def element_tree(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取元素菜单树（对齐旧 /api/web_element/element_tree）"""
+    """获取元素菜单树"""
     try:
         data = await WebManagementService.get_element_tree(db, only_menu=True)
         return success_response(data, message="请求成功")
@@ -42,7 +36,7 @@ async def add_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """新增元素菜单（对齐旧 /api/web_element/add_menu）"""
+    """新增元素菜单"""
     try:
         body = await body_to_json(request)
         await WebManagementService.add_menu(
@@ -65,7 +59,7 @@ async def edit_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """编辑元素菜单（对齐旧 /api/web_element/edit_menu）"""
+    """编辑元素菜单"""
     try:
         body = await body_to_json(request)
         await WebManagementService.edit_menu(
@@ -87,7 +81,7 @@ async def del_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """删除元素菜单（对齐旧 /api/web_element/del_menu）"""
+    """删除元素菜单"""
     try:
         body = await body_to_json(request)
         await WebManagementService.delete_menu(db, menu_id=int(body["id"]))
@@ -104,7 +98,7 @@ async def get_element_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取元素列表（对齐旧 /api/web_element/get_element_list）"""
+    """获取元素列表"""
     try:
         body = await body_to_json(request)
         page = int(body.get("page") or 1)
@@ -126,7 +120,7 @@ async def add_element(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """新增元素（对齐旧 /api/web_element/add_element）"""
+    """新增元素"""
     try:
         body = await body_to_json(request)
         await WebManagementService.add_element(
@@ -149,7 +143,7 @@ async def edit_element(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """编辑元素（对齐旧 /api/web_element/edit_element）"""
+    """编辑元素"""
     try:
         body = await body_to_json(request)
         await WebManagementService.edit_element(
@@ -172,7 +166,7 @@ async def del_element(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """删除元素（对齐旧 /api/web_element/del_element）"""
+    """删除元素"""
     try:
         body = await body_to_json(request)
         await WebManagementService.delete_element(db, element_id=int(body["id"]))
@@ -188,7 +182,7 @@ async def get_element_select(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取元素选择树（对齐旧 /api/web_element/get_element_select）"""
+    """获取元素选择"""
     try:
         data = await WebManagementService.get_element_tree(db, only_menu=False)
         return success_response(data, message="请求成功")
@@ -196,7 +190,7 @@ async def get_element_select(
         return error_response(f"接口请求异常，原因是：{str(e)}")
 
 
-# -------------------- Web 脚本 & 菜单（迁移自 l-tester/views/web/web_view.py） --------------------
+
 
 @router.post("/web/add_menu")
 async def add_web_menu(
@@ -204,7 +198,7 @@ async def add_web_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """新增 Web 脚本菜单（对齐旧 /api/web/add_menu）"""
+    """新增 Web 脚本菜单"""
     try:
         body = await body_to_json(request)
         data = await WebManagementService.create_web_menu(
@@ -227,7 +221,7 @@ async def delete_web_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """删除 Web 脚本菜单（对齐旧 /api/web/del_menu）"""
+    """删除 Web 脚本菜单"""
     try:
         body = await body_to_json(request)
         ok, msg = await WebManagementService.delete_web_menu(
@@ -251,7 +245,7 @@ async def rename_web_menu(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """重命名 Web 脚本菜单（对齐旧 /api/web/rename_menu）"""
+    """重命名 Web 脚本菜单"""
     try:
         body = await body_to_json(request)
         await WebManagementService.rename_web_menu(
@@ -286,7 +280,7 @@ async def menu_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """根据菜单ID获取子脚本列表（对齐旧 /menu_script_list）"""
+    """根据菜单ID获取子脚本列表"""
     try:
         body = await body_to_json(request)
         data = await WebManagementService.get_menu_script_list(db, pid=int(body["id"]))
@@ -375,7 +369,7 @@ async def stop_web_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """停止Web执行进程（对齐旧 /stop_web_script）"""
+    """停止Web执行进程"""
     try:
         body = await body_to_json(request)
         pid = int(body["pid"])
@@ -407,7 +401,7 @@ async def get_web_result_log(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取Web执行日志（对齐旧 /get_web_result_log）"""
+    """获取Web执行日志"""
     try:
         body = await body_to_json(request)
         data = await WebManagementService.get_web_result_log(
@@ -438,7 +432,7 @@ async def get_web_result_report(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取Web执行报告（对齐旧 /get_web_result_report）"""
+    """获取Web执行报告"""
     try:
         body = await body_to_json(request)
         result_id = str(body.get("result_id") or "").strip()
@@ -458,7 +452,7 @@ async def get_web_result_detail(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取Web执行详情（对齐旧 /get_web_result_detail）"""
+    """获取Web执行详情"""
     try:
         body = await body_to_json(request)
         data = await WebManagementService.get_web_result_detail(
@@ -478,7 +472,7 @@ async def get_web_group_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取Web脚本集列表（与旧框架 l-vue-ui 对齐：返回 { content: [], total }）"""
+    """获取Web脚本集列表"""
     try:
         data = await WebManagementService.get_web_groups(db, current_user_id)
         data = data if isinstance(data, list) else []
@@ -510,7 +504,7 @@ async def edit_web_group(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """编辑Web脚本集（对齐旧 /edit_web_group）"""
+    """编辑Web脚本集"""
     try:
         body = await body_to_json(request)
         await WebManagementService.edit_web_group(db, body, current_user_id)
@@ -527,7 +521,7 @@ async def del_web_group(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """删除Web脚本集（对齐旧 /del_web_group）"""
+    """删除Web脚本集"""
     try:
         body = await body_to_json(request)
         await WebManagementService.delete_web_group(db, int(body["id"]))
@@ -543,7 +537,7 @@ async def web_group_select(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取全部Web脚本集（对齐旧 /web_group_select）"""
+    """获取全部Web脚本集"""
     try:
         data = await WebManagementService.get_web_group_all(db, current_user_id)
         return success_response(data, message="请求成功")
@@ -556,7 +550,7 @@ async def get_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取脚本菜单列表（对齐旧 /get_script_list）"""
+    """获取脚本菜单"""
     try:
         data = await WebManagementService.get_script_list(db)
         return success_response(data, message="请求成功")
@@ -570,7 +564,7 @@ async def group_add_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """根据脚本树选择返回脚本菜单列表（对齐旧 /group_add_script）"""
+    """根据脚本树选择返回脚本菜单列表"""
     try:
         body = await body_to_json(request)
         data = await WebManagementService.group_add_script(db, body.get("web_list") or [])

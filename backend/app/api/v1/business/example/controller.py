@@ -1,5 +1,5 @@
 """
-示例业务模块 - 展示数据权限和接口权限的使用
+示例 展示数据权限和接口权限的使用
 """
 
 from typing import List, Optional

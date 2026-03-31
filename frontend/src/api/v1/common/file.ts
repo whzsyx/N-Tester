@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 文件管理API - 新架构
+ * 文件管理API
  */
 export function useFileApi() {
   return {

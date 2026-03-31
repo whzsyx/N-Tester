@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 角色管理API - 新架构
+ * 角色管理API
  */
 export function useRoleApi() {
   return {
@@ -19,7 +19,7 @@ export function useRoleApi() {
         ...params,
         page_size: params?.page_size || params?.pageSize || 10,
       };
-      // 删除旧的pageSize参数
+
       if ('pageSize' in transformedParams) {
         delete (transformedParams as any).pageSize;
       }

@@ -1,6 +1,5 @@
 """
-云真机模块 - 业务逻辑服务
-迁移自 l-tester/views/app/device_view.py 和 l-tester/common/device.py
+云真机模块业务逻辑服务
 """
 import os
 import re
@@ -24,11 +23,7 @@ class DeviceService:
 
     @staticmethod
     def _with_base_url(path: Any) -> Any:
-        """
-        对齐旧架构 img_review：把相对路径补全为可访问的绝对URL。
-        - 旧：source_ip + /xxx
-        - 新：使用 config.BASE_URL 作为对外访问基地址
-        """
+        """使用 config.BASE_URL 作为对外访问基地址"""
         if not path or not isinstance(path, str):
             return path
         if path.startswith("http://") or path.startswith("https://"):
@@ -61,7 +56,7 @@ class DeviceService:
                 for db_device in device_list:
                     if actual_device["deviceid"] == db_device.device_id:
                         actual_device["id"] = db_device.id
-                        # 对齐旧架构：如果数据库中维护了设备名称，则覆盖探测到的名称
+                       
                         actual_device["name"] = db_device.device_name
                         devices.append(actual_device)
                         break
@@ -238,7 +233,6 @@ class DeviceService:
     ) -> Dict[str, Any]:
         """
         获取设备详细信息（分页 + 筛选）
-        对齐旧架构 device_info_list：body.search + currentPage/pageSize
         """
         try:
             # 先将所有空闲设备标记为离线
@@ -590,7 +584,7 @@ class DeviceService:
     
     @staticmethod
     async def batch_install_apps(db: AsyncSession, install_config: List[Dict[str, Any]], user_id: int) -> Dict[str, Any]:
-        """批量安装APP - 对应旧架构的device_install接口"""
+        """批量安装APP"""
         try:
             import multiprocessing
             from concurrent.futures import ProcessPoolExecutor
@@ -635,7 +629,7 @@ class DeviceService:
     
     @staticmethod
     async def batch_uninstall_apps(db: AsyncSession, package_name: str, device_list: List[str], user_id: int) -> Dict[str, Any]:
-        """批量卸载APP - 对应旧架构的device_uninstall接口"""
+        """批量卸载APP"""
         try:
             import multiprocessing
             from concurrent.futures import ProcessPoolExecutor
@@ -708,11 +702,11 @@ class DeviceService:
             print(f"编辑设备失败: {e}")
             return {"success": False, "message": str(e)}
     
-    # 私有方法 - 迁移自 l-tester/common/device.py
+ 
     
     @staticmethod
     async def _get_device_info():
-        """获取设备信息 - 迁移自 device_info()"""
+        """获取设备信息"""
         try:
             device_info_list = []
             

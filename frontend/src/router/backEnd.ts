@@ -34,43 +34,56 @@ export async function initBackEndControlRoutes() {
 	if (window.nextLoading === undefined) NextLoading.start();
 	// 无 token 停止执行下一步
 	if (!Session.get('token')) return false;
-	// 触发初始化用户信息 pinia
-	await useUserStore().setUserInfos();
-	// 设置数据字典
-	await useLookupStore().setLookup();
-	// 获取路由菜单数据
-	const menuData = await useMenuInfo().getMenuData();
 	
-	// 调试：打印菜单数据
-	console.log('📋 后端返回的菜单数据:', JSON.stringify(menuData, null, 2));
-	
-	// 无登录权限时，添加判断
-	// if (res.data.length <= 0) return Promise.resolve(true);
-	// 存储接口原始路由（未处理component），根据需求选择使用
-	await useRequestOldRoutes().setRequestOldRoutes(JSON.parse(JSON.stringify(menuData)));
-	
-	// 清空动态路由的children，避免与静态路由冲突
-	dynamicRoutes[0].children = [];
-	
-	// 处理路由（component），替换 dynamicRoutes（/@/router/route）第一个顶级 children 的路由
-	dynamicRoutes[0].children = await backEndComponent(menuData);
-	
-	// 调试：打印处理后的路由
-	console.log('🔧 处理后的路由:', dynamicRoutes[0].children);
-	
-	// 添加动态路由
-	await setAddRoute();
-	
-	// 调试：打印所有注册的路由
-	console.log('✅ 所有注册的路由:', router.getRoutes().map(r => ({
-		path: r.path,
-		name: r.name,
-		isHide: r.meta?.isHide
-	})));
-	
-	// 设置路由到 pinia routesList 中（已处理成多级嵌套路由）及缓存多级嵌套数组处理后的一维数组
-	await setFilterMenuAndCacheTagsViewRoutes();
-
+	try {
+		// 触发初始化用户信息 pinia
+		await useUserStore().setUserInfos();
+		// 设置数据字典
+		await useLookupStore().setLookup();
+		// 获取路由菜单数据
+		const menuData = await useMenuInfo().getMenuData();
+		
+		// 验证菜单数据
+		if (!menuData || !Array.isArray(menuData) || menuData.length === 0) {
+			console.warn('菜单数据为空或格式错误');
+			return false;
+		}
+		
+		// 存储接口原始路由（未处理component），根据需求选择使用
+		await useRequestOldRoutes().setRequestOldRoutes(JSON.parse(JSON.stringify(menuData)));
+		
+		// 清空动态路由的children，避免与静态路由冲突
+		dynamicRoutes[0].children = [];
+		
+		// 处理路由（component），替换 dynamicRoutes（/@/router/route）第一个顶级 children 的路由
+		const processedRoutes = await backEndComponent(menuData);
+		if (processedRoutes && processedRoutes.length > 0) {
+			dynamicRoutes[0].children = processedRoutes;
+		}
+		
+		// 添加动态路由
+		await setAddRoute();
+		
+		// 设置路由到 pinia routesList 中（已处理成多级嵌套路由）及缓存多级嵌套数组处理后的一维数组
+		await setFilterMenuAndCacheTagsViewRoutes();
+		
+		// 验证APP路由是否正确注册
+		const allRoutes = router.getRoutes();
+		const appRoutes = allRoutes.filter(r => 
+			r.path.includes('/app_manage') || r.path.includes('/app_report')
+		);
+		
+		if (appRoutes.length > 0) {
+			console.log(`✅ 成功注册 ${appRoutes.length} 个APP路由`);
+		} else {
+			console.warn('⚠️ 未找到APP相关路由');
+		}
+		
+		return true;
+	} catch (error) {
+		console.error('路由初始化失败:', error);
+		return false;
+	}
 }
 
 /**
@@ -116,25 +129,40 @@ export function setFilterRouteEnd() {
 export async function setAddRoute() {
 	const routes = setFilterRouteEnd();
 	
+	if (!routes || routes.length === 0) {
+		console.warn('没有路由需要添加');
+		return;
+	}
+	
+	let successCount = 0;
+	let failCount = 0;
+	
 	// 添加路由
 	routes.forEach((route: RouteRecordRaw) => {
 		try {
-			router.addRoute(route);
-			console.log(`✅ [Router] 成功添加路由: ${route.name} -> ${route.path}`);
+			// 检查路由是否已存在
+			const existingRoute = router.hasRoute(route.name as string);
+			if (existingRoute) {
+				router.removeRoute(route.name as string);
+			}
 			
-			// 特别检查UI自动化路由
-			if (route.path?.includes('ui-automation')) {
-				console.log(`🎯 [Router] UI自动化路由详情:`, {
-					name: route.name,
-					path: route.path,
-					component: route.component ? 'Found' : 'Missing',
-					meta: route.meta
-				});
+			router.addRoute(route);
+			successCount++;
+			
+			// 特别检查APP相关路由
+			if (route.path?.includes('/app_manage') || route.path?.includes('/app_report')) {
+				console.log(`✅ [APP路由] 成功注册: ${route.path} -> ${route.name}`);
 			}
 		} catch (error) {
 			console.error(`❌ [Router] 添加路由失败: ${route.name} -> ${route.path}`, error);
+			failCount++;
 		}
 	});
+	
+	console.log(`路由注册完成: 成功 ${successCount} 个，失败 ${failCount} 个`);
+	
+	// 等待路由注册完成
+	await new Promise(resolve => setTimeout(resolve, 50));
 }
 
 /**
@@ -201,7 +229,10 @@ export function backEndComponent(routes: any) {
 			item.name = uniqueName;
 			usedNames.add(uniqueName);
 			
-			console.log(`🏷️ [Router] 生成路由名称: ${item.path} -> ${uniqueName} (ID: ${item.id})`);
+			// 只为APP相关路由输出日志
+			if (item.path?.includes('/app_manage') || item.path?.includes('/app_report')) {
+				console.log(`🏷️ [APP路由] 生成路由名称: ${item.path} -> ${uniqueName} (ID: ${item.id})`);
+			}
 		}
 		
 		// 递归处理子路由
@@ -224,17 +255,11 @@ export function backEndComponent(routes: any) {
 export function dynamicImport(dynamicViewsModules: Record<string, Function>, component: string) {
 	const keys = Object.keys(dynamicViewsModules);
 	
-	// 调试日志
-	console.log(`🔍 [Router] 查找组件: ${component}`);
-	console.log(`📁 [Router] 可用模块数量: ${keys.length}`);
-	
 	// 标准化组件路径
 	const normalizedComponent = component.replace(/^\//, '').replace(/\.vue$/, '');
 	
 	const matchKeys = keys.filter((key) => {
 		// 处理路径：移除 ../views 或 ../layout 前缀，保留相对模块路径
-		// - ../views/testing/api-automation/index.vue  -> testing/api-automation/index
-		// - ../layout/routerView/parent.vue           -> layout/routerView/parent
 		const k = key
 			.replace(/^\.\.\/views\//, '')
 			.replace(/^\.\.\/layout\//, 'layout/')
@@ -247,38 +272,59 @@ export function dynamicImport(dynamicViewsModules: Record<string, Function>, com
 		const match3 = k.endsWith(`/${normalizedComponent}`);
 		const match4 = k.endsWith(`/${normalizedComponent}/index`);
 		
-		const isMatch = match1 || match2 || match3 || match4;
-		
-		if (isMatch) {
-			console.log(`✅ [Router] 匹配成功: ${key} -> ${k} (组件: ${normalizedComponent})`);
-		}
-		
-		return isMatch;
+		return match1 || match2 || match3 || match4;
 	});
-	
-	console.log(`🎯 [Router] 找到 ${matchKeys.length} 个匹配项`);
 	
 	if (matchKeys?.length >= 1) {
 		const matchKey = matchKeys[0];
-		console.log(`✅ [Router] 使用组件: ${matchKey}`);
+		// 只为APP相关组件输出日志
+		if (normalizedComponent.includes('app-management')) {
+			console.log(`✅ [APP组件] 匹配成功: ${normalizedComponent} -> ${matchKey}`);
+		}
 		return dynamicViewsModules[matchKey];
 	}
 	
 	// 如果没有找到，尝试更宽松的匹配
-	console.warn(`❌ [Router] 未找到精确匹配，尝试模糊匹配...`);
-	
 	const fuzzyMatchKeys = keys.filter((key) => {
 		const k = key.replace(/^\.\.\/views\//, '').replace(/\.vue$/, '');
 		return k.includes(normalizedComponent) || normalizedComponent.includes(k);
 	});
 	
 	if (fuzzyMatchKeys.length > 0) {
-		console.log(`🔍 [Router] 模糊匹配成功: ${fuzzyMatchKeys[0]}`);
+		if (normalizedComponent.includes('app-management')) {
+			console.log(`🔍 [APP组件] 模糊匹配成功: ${normalizedComponent} -> ${fuzzyMatchKeys[0]}`);
+		}
 		return dynamicViewsModules[fuzzyMatchKeys[0]];
 	}
 	
-	console.error(`❌ [Router] 完全无法匹配组件: ${component}`);
-	console.error(`📋 [Router] 可用的路径:`, keys.slice(0, 10).map(k => k.replace(/^\.\.\/views\//, '')));
+	// 最后尝试：直接匹配文件名
+	const fileNameMatchKeys = keys.filter((key) => {
+		const fileName = key.split('/').pop()?.replace(/\.vue$/, '');
+		const componentFileName = normalizedComponent.split('/').pop();
+		return fileName === componentFileName || (fileName === 'index' && componentFileName === 'index');
+	});
 	
-	return undefined;
+	if (fileNameMatchKeys.length > 0) {
+		if (normalizedComponent.includes('app-management')) {
+			console.log(`📄 [APP组件] 文件名匹配成功: ${normalizedComponent} -> ${fileNameMatchKeys[0]}`);
+		}
+		return dynamicViewsModules[fileNameMatchKeys[0]];
+	}
+	
+	// 只为关键组件输出错误日志
+	if (normalizedComponent.includes('app-management') || normalizedComponent.includes('testing')) {
+		console.error(`❌ [组件匹配] 无法找到组件: ${component}`);
+	}
+	
+	// 返回一个空组件而不是undefined，避免路由注册失败
+	return () => import('../views/error/404.vue').catch(() => {
+		// 如果连404页面都没有，返回一个简单的组件
+		return {
+			template: `<div style="padding: 20px; text-align: center;">
+				<h3>组件加载失败</h3>
+				<p>无法找到组件: ${component}</p>
+				<p>请检查组件路径是否正确</p>
+			</div>`
+		};
+	});
 }

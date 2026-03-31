@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 APP 自动化执行器（Airtest 子进程入口）
-一比一迁移自 l-tester/views/app/app_script.py::run_script
 """
 from __future__ import annotations
 
@@ -11,9 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
 from sqlalchemy import select
-
 from app.db.sqlalchemy import async_session
 
 from .airtest_common import (
@@ -35,7 +32,8 @@ from .airtest_common import (
     wait_until_install,
 )
 from .executor import _log_result, _release_device
-from .model import AppDevice, AppResultListModel, AppResultModel
+from .model import AppResultListModel, AppResultModel
+from app.api.v1.cloud_device.model import AppDevice
 
 
 async def _task_end_legacy(
@@ -46,7 +44,7 @@ async def _task_end_legacy(
     total: int,
     end_time: str,
 ) -> None:
-    """对齐旧 task_end：统计 app_results、追加 script_status、通知 app_report"""
+    """对齐 task_end：统计 app_results、追加 script_status、通知 app_report"""
     from app.api.v1.api_automation.service import ApiAutomationService
 
     async with async_session() as db:
@@ -146,7 +144,7 @@ def run_airtest_script_process(
     install_path: str,
 ) -> None:
     """
-    子进程入口：与旧 Multi_process -> run_script 参数语义一致。
+    子进程入口：与 Multi_process -> run_script 参数语义一致。
     script_blocks: [{"id": menu_id, "script": [step,...]}, ...]
     """
     try:
@@ -217,7 +215,7 @@ def run_airtest_script_process(
 
     first_menu = int((script_blocks[0] or {}).get("id") or 0) if script_blocks else 0
 
-    # ---------- run_type 安装（对齐旧逻辑）----------
+    # ---------- run_type 安装----------
     if run_type == 1:
         file_path = os.path.join(install_path or "", package or "")
         performance = get_performance(deviceid, performance)

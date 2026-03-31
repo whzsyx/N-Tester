@@ -1,724 +1,3 @@
-<script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import VueJsonPretty from "vue-json-pretty";
-import JsonEditor from "/@/components/code-editor/JsonEditor.vue";
-import "vue-json-pretty/lib/styles.css";
-import { 
-	Operation, 
-	Clock, 
-	EditPen, 
-	CircleCheck, 
-	Coin, 
-	InfoFilled,
-	Connection,
-	ArrowDown,
-	View,
-	Document,
-	Delete
-} from '@element-plus/icons-vue';
-import { api_send, save_api, save_api_case, req_history, edit_history, api_params } from '/@/api/v1/api_automation';
-import { useFileApi } from '/@/api/v1/common/file';
-import { ElMessage, ElMessageBox } from 'element-plus';
-
-const props = defineProps({
-	apiData: { type: Object, default: () => ({}) },
-	envId: { type: [Number, String], default: null },
-	env_list: { type: Array, default: () => [] },
-	tree_list: { type: Array, default: () => [] },
-	redis_example_list: { type: Array, default: () => ["common"] },
-	local_db_list: { type: Array, default: () => [] },
-	params_list: { type: Array, default: () => [{ name: "", id: null }] }
-});
-
-const emit = defineEmits(['caseSaved', 'apiSaved']);
-
-const fileApi = useFileApi();
-
-// vue-json-pretty 的 height 参数需要 number（旧架构传 260），传字符串会导致高度不生效
-const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900);
-const onResize = () => { viewportH.value = window.innerHeight; };
-onMounted(() => window.addEventListener('resize', onResize));
-onBeforeUnmount(() => window.removeEventListener('resize', onResize));
-
-const resJsonHeight = computed(() => {
-	// 经验值：尽量接近旧版“响应区大面板”，同时限制上下界避免过大/过小
-	const h = Math.floor(viewportH.value * 0.38);
-	return Math.max(260, Math.min(780, h));
-});
-
-const val_type_list = ref([
-	{ name: "环境变量", value: 1 },
-	{ name: "全局变量", value: 2 }
-]);
-
-const res_type_list = ref([
-	{ name: "响应结果-JSON", value: 1 },
-	{ name: "请求头-Headers", value: 2 },
-	{ name: "请求头-Body", value: 3 },
-	{ name: "Headers-响应结果", value: 4 },
-	{ name: "自定义目标值", value: 5 }
-]);
-
-const tips = ref<any>(
-	'路径示例，结果={"code": 200, "info": {"username": "admin"}, "list": [{"id": 1},{"id": 2}]}\n' +
-	"例子：code：$.code, username：$.info.username，数组：$.list[0].id / $.list[1].id分别等于1 / 2"
-);
-
-const method_list = ref([
-	{ name: "GET", value: 1, color: "#67C23A" },
-	{ name: "POST", value: 2, color: "#409EFF" },
-	{ name: "PUT", value: 3, color: "#E6A23C" },
-	{ name: "DELETE", value: 4, color: "#F56C6C" },
-	{ name: "PATCH", value: 5, color: "#8E44AD" },
-	{ name: "OPTIONS", value: 6, color: "#909399" }
-]);
-
-const req_active = ref<any>("body");
-const res_active = ref<any>("res");
-
-// 对话框状态
-const toolboxDialogVisible = ref(false);
-const paramsDepDialogVisible = ref(false);
-const directDbDialogVisible = ref(false);
-const publicFuncDialogVisible = ref(false);
-const errorCodeDialogVisible = ref(false);
-const envManageDialogVisible = ref(false);
-const editRecordDialogVisible = ref(false);
-const debugRecordDialogVisible = ref(false);
-const apiDocDialogVisible = ref(false);
-
-// 对话框数据
-const paramsDepList = ref<any[]>([]);
-const directDbList = ref<any[]>([]);
-const publicFuncList = ref<any[]>([]);
-const errorCodeList = ref<any[]>([]);
-const envList = ref<any[]>([]);
-const editRecordList = ref<any[]>([]);
-const debugRecordList = ref<any[]>([]);
-const apiDocInfo = ref<any>({});
-
-// 接口请求数据结构
-const req = ref({
-	method: 1,
-	url: '',
-	params: [],
-	header: [],
-	body: '',
-	body_type: 2,
-	form_data: [],
-	form_urlencoded: [],
-	file_path: [],
-	params_id: null,
-	before: [],
-	after: [],
-	assert: [],
-	config: {
-		retry: 0,
-		req_timeout: 30,
-		res_timeout: 30
-	}
-});
-
-// 接口响应数据结构
-const res = ref({
-	body: {},
-	header: {},
-	before: [],
-	after: [],
-	assert: [],
-	code: 0,
-	size: 0,
-	res_time: 0
-});
-
-// 当前接口 ID（保存/发送/记录用）：树节点 api_id 为接口ID，后端 get_api_info 不返回 id
-const apiId = computed(() => {
-	const d = props.apiData;
-	return d?.api_id ?? d?.api_info?.id ?? d?.id ?? null;
-});
-
-// 仅在“切换到另一个接口”时初始化一次，避免编辑过程中被 deep watch 重置（导致 body_type 跳回 JSON）
-const lastApiId = ref<number | string | null>(null);
-watch(
-	() => apiId.value,
-	() => {
-		const newId = apiId.value;
-		if (newId == null) return;
-		if (lastApiId.value === newId) return;
-		lastApiId.value = newId;
-
-		const newData = props.apiData;
-		if (!newData) return;
-		const apiInfo = newData.api_info || newData;
-		const reqSrc = apiInfo.req || apiInfo;
-		const resSrc = apiInfo.response || apiInfo.res || {};
-
-		req.value = {
-			method: reqSrc.method ?? 1,
-			url: reqSrc.url ?? apiInfo.url ?? '',
-			params: Array.isArray(reqSrc.params) ? reqSrc.params : [],
-			header: Array.isArray(reqSrc.header) ? reqSrc.header : [],
-			body: typeof reqSrc.body === 'string' ? reqSrc.body : JSON.stringify(reqSrc.body != null ? reqSrc.body : {}, null, 2),
-			body_type: reqSrc.body_type ?? 2,
-			form_data: Array.isArray(reqSrc.form_data) ? reqSrc.form_data : [],
-			form_urlencoded: Array.isArray(reqSrc.form_urlencoded) ? reqSrc.form_urlencoded : [],
-			file_path: Array.isArray(reqSrc.file_path) ? reqSrc.file_path : [],
-			params_id: reqSrc.params_id ?? apiInfo.params_id ?? null,
-			before: Array.isArray(reqSrc.before) ? reqSrc.before : [],
-			after: Array.isArray(reqSrc.after) ? reqSrc.after : [],
-			assert: Array.isArray(reqSrc.assert) ? reqSrc.assert : [],
-			config: {
-				retry: reqSrc.config?.retry ?? 0,
-				req_timeout: reqSrc.config?.req_timeout ?? 30,
-				res_timeout: reqSrc.config?.res_timeout ?? 30,
-			},
-		};
-
-		res.value = {
-			body: resSrc.body ?? {},
-			header: resSrc.header ?? {},
-			before: Array.isArray(resSrc.before) ? resSrc.before : [],
-			after: Array.isArray(resSrc.after) ? resSrc.after : [],
-			assert: Array.isArray(resSrc.assert) ? resSrc.assert : [],
-			code: resSrc.code ?? 0,
-			size: resSrc.size ?? 0,
-			res_time: resSrc.res_time ?? 0,
-		};
-	},
-	{ immediate: true }
-);
-// 添加参数行
-const addParam = () => {
-	req.value.params.push({ key: '', value: '', status: true });
-};
-
-// 删除参数行
-const removeParam = (index: number) => {
-	req.value.params.splice(index, 1);
-};
-
-// 添加Header行
-const addHeader = () => {
-	req.value.header.push({ key: '', value: '', status: true });
-};
-
-// 删除Header行
-const removeHeader = (index: number) => {
-	req.value.header.splice(index, 1);
-};
-
-// 添加form-data行
-const addFormData = () => {
-	req.value.form_data.push({ key: '', value: '', status: true });
-};
-
-// 删除form-data行
-const removeFormData = (index: number) => {
-	req.value.form_data.splice(index, 1);
-};
-
-// 添加form-urlencoded行
-const addFormUrlencoded = () => {
-	req.value.form_urlencoded.push({ key: '', value: '', status: true });
-};
-
-// 删除form-urlencoded行
-const removeFormUrlencoded = (index: number) => {
-	req.value.form_urlencoded.splice(index, 1);
-};
-
-// 添加前置操作
-const addBefore = (type: number) => {
-	const beforeItem: any = { type };
-	
-	switch (type) {
-		case 1: // 预请求接口
-			beforeItem.title = '';
-			beforeItem.env_id = null;
-			beforeItem.api_id = [];
-			break;
-		case 2: // 预设变量
-			beforeItem.name = '';
-			beforeItem.value = '';
-			beforeItem.env_type = 1;
-			break;
-		case 3: // 等待时长
-			beforeItem.wait_time = 1;
-			break;
-		case 4: // 自定义脚本
-			beforeItem.title = '';
-			beforeItem.code = '';
-			break;
-	}
-	
-	req.value.before.push(beforeItem);
-};
-
-// 删除前置操作
-const removeBefore = (index: number) => {
-	req.value.before.splice(index, 1);
-};
-
-// 添加后置操作
-const addAfter = (type: number) => {
-	const afterItem: any = { type };
-	
-	switch (type) {
-		case 1: // 提取变量
-			afterItem.name = '';
-			afterItem.value = '';
-			afterItem.res_type = 1;
-			afterItem.env_type = 1;
-			break;
-		case 2: // 等待时长
-			afterItem.wait_time = 1;
-			break;
-	}
-	
-	req.value.after.push(afterItem);
-};
-
-// 删除后置操作
-const removeAfter = (index: number) => {
-	req.value.after.splice(index, 1);
-};
-// 添加断言
-const addAssert = (type: number) => {
-	const assertItem: any = { type };
-	
-	switch (type) {
-		case 1: // 响应断言
-			assertItem.name = '';
-			assertItem.value = '';
-			assertItem.res_type = 1;
-			break;
-		case 2: // ops-数据库断言
-			assertItem.ops_db = null;
-			assertItem.ops_db_table = '';
-			assertItem.ops_db_where = '';
-			assertItem.ops_db_assert = [];
-			break;
-		case 3: // ops-redis断言
-			assertItem.ops_redis = null;
-			assertItem.ops_redis_key = '';
-			assertItem.ops_redis_assert = [];
-			break;
-		case 4: // 直连-数据库断言
-			assertItem.local_db = null;
-			assertItem.local_db_table = '';
-			assertItem.local_db_where = '';
-			assertItem.local_db_assert = [];
-			break;
-	}
-	
-	req.value.assert.push(assertItem);
-};
-
-// 删除断言
-const removeAssert = (index: number) => {
-	req.value.assert.splice(index, 1);
-};
-
-// 添加数据库断言配置
-const addDbAssertConfig = (dbAssertList: any[]) => {
-	dbAssertList.push({
-		name: '',
-		type: 1,
-		value: ''
-	});
-};
-
-// 删除数据库断言配置
-const removeDbAssertConfig = (dbAssertList: any[], index: number) => {
-	dbAssertList.splice(index, 1);
-};
-
-// 添加ops-数据库断言配置
-const addOpsDbAssertConfig = (opsDbAssertList: any[]) => {
-	opsDbAssertList.push({
-		name: '',
-		type: 1,
-		value: ''
-	});
-};
-
-// 删除ops-数据库断言配置
-const removeOpsDbAssertConfig = (opsDbAssertList: any[], index: number) => {
-	opsDbAssertList.splice(index, 1);
-};
-
-// 添加ops-redis断言配置
-const addOpsRedisAssertConfig = (opsRedisAssertList: any[]) => {
-	opsRedisAssertList.push({
-		name: '',
-		type: 1,
-		value: ''
-	});
-};
-
-// 删除ops-redis断言配置
-const removeOpsRedisAssertConfig = (opsRedisAssertList: any[], index: number) => {
-	opsRedisAssertList.splice(index, 1);
-};
-
-const formatTime = (value: any) => {
-	if (!value) return '-';
-	const d = new Date(value);
-	if (!isNaN(d.getTime())) {
-		return d.toLocaleString();
-	}
-	return String(value);
-};
-
-const getMethodColor = (methodVal: number | undefined) => {
-	const v = Number(methodVal);
-	switch (v) {
-		case 1: return '#67C23A'; // GET
-		case 2: return '#409EFF'; // POST
-		case 3: return '#E6A23C'; // PUT
-		case 4: return '#F56C6C'; // DELETE
-		case 5: return '#8E44AD'; // PATCH
-		case 6: return '#909399'; // OPTIONS
-		default: return '#409EFF';
-	}
-};
-
-const currentMethodColor = computed(() => getMethodColor(req.value?.method));
-
-const uploadBinaryFile = async (options: any) => {
-	try {
-		const form = new FormData();
-		form.append('file', options.file);
-		// 需要落盘，后端 api_automation 以文件路径 open()
-		form.append('store_in_database', 'false');
-		const res: any = await fileApi.upload(form);
-		const filePath = res?.data?.file_path;
-		if (!filePath) throw new Error('未获取到文件路径');
-		req.value.file_path = Array.isArray(req.value.file_path) ? req.value.file_path : [];
-		req.value.file_path.push(filePath);
-		ElMessage.success('上传成功');
-		options?.onSuccess?.(res);
-	} catch (e: any) {
-		console.error('上传失败:', e);
-		ElMessage.error(e?.message || '上传失败');
-		options?.onError?.(e);
-	}
-};
-
-// 发送请求
-const sendRequest = async () => {
-	const id = apiId.value;
-	if (id == null) {
-		ElMessage.warning('无法获取接口ID');
-		return;
-	}
-	try {
-		const requestData = {
-			id: Number(id),
-			env_id: props.envId,
-			req: req.value
-		};
-		const response: any = await api_send(requestData);
-		if (response.code === 200) {
-			const data = response.data;
-			// 兼容后端返回 data 或 data.res
-			res.value = data?.res ? { ...res.value, ...data.res } : (data || res.value);
-			ElMessage.success('请求发送成功');
-		}
-	} catch (error) {
-		console.error('发送请求失败:', error);
-		ElMessage.error('请求发送失败');
-	}
-};
-
-// 保存接口
-const saveApiData = async () => {
-	const id = apiId.value;
-	if (id == null) {
-		ElMessage.warning('无法获取接口ID');
-		return;
-	}
-	try {
-		const saveData = {
-			id: Number(id),
-			url: req.value.url || props.apiData?.api_info?.url || props.apiData?.url || '/',
-			req: req.value
-		};
-		const response: any = await save_api(saveData);
-		if (response.code === 200) {
-			ElMessage.success('保存成功');
-			emit('apiSaved');
-		}
-	} catch (error) {
-		console.error('保存失败:', error);
-		ElMessage.error('保存失败');
-	}
-};
-
-// 保存项下拉命令
-const handleSaveCommand = (command: string) => {
-	if (command === 'save') saveApiData();
-	else if (command === 'saveAsCase') saveAsCase();
-};
-
-// 保存为用例
-const saveAsCase = async () => {
-	const id = apiId.value;
-	if (id == null) {
-		ElMessage.warning('无法获取接口ID');
-		return;
-	}
-	try {
-		const defaultName = `${props.apiData?.name || props.apiData?.api_info?.name || '接口'}_用例_${Date.now()}`;
-		const { value, action } = await ElMessageBox.prompt('请输入用例名称', '保存为用例', {
-			inputValue: defaultName,
-			confirmButtonText: '确定',
-			cancelButtonText: '取消'
-		});
-		if (action === 'cancel') return;
-		const caseName = (value || '').trim() || defaultName;
-		const caseData: Record<string, any> = {
-			id: Number(id),
-			name: caseName,
-			req: req.value,
-			url: req.value.url
-		};
-		const apiServiceId = props.apiData?.api_info?.api_service_id ?? props.apiData?.api_service_id;
-		if (apiServiceId != null) caseData.api_service_id = Number(apiServiceId);
-		const response: any = await save_api_case(caseData);
-		if (response.code === 200) {
-			ElMessage.success('保存为用例成功');
-			emit('caseSaved');
-		}
-	} catch (error) {
-		console.error('保存为用例失败:', error);
-		ElMessage.error('保存为用例失败');
-	}
-};
-
-// 显示编辑记录
-const showEditRecord = () => {
-	editRecordDialogVisible.value = true;
-	loadEditRecords();
-};
-
-// 显示调试记录
-const showDebugRecord = () => {
-	debugRecordDialogVisible.value = true;
-	loadDebugRecords();
-};
-
-// 显示接口文档
-const showApiDoc = () => {
-	apiDocDialogVisible.value = true;
-	loadApiDoc();
-};
-
-// 加载编辑记录（对接 edit_history 接口）
-const loadEditRecords = async () => {
-	const id = apiId.value;
-	if (id == null) {
-		editRecordList.value = [];
-		return;
-	}
-	try {
-		const response: any = await edit_history({ api_id: Number(id) });
-		const data = response?.data;
-		let raw: any[] = [];
-		if (Array.isArray(data)) raw = data;
-		else if (data?.content && Array.isArray(data.content)) raw = data.content;
-		else if (data?.list && Array.isArray(data.list)) raw = data.list;
-		editRecordList.value = raw.map((row: any) => {
-			const editSummary = row.edit != null
-				? (Array.isArray(row.edit) ? row.edit.map((e: any) => `${e.field || ''} ${e.type || ''}`).filter(Boolean).join('; ') : JSON.stringify(row.edit))
-				: (row.details ?? row.content ?? row.description ?? '-');
-			return {
-				id: row.id,
-				operation: row.operation ?? row.operation_type ?? '接口编辑',
-				user: row.user ?? row.username ?? row.created_by ?? '-',
-				time: formatTime(row.time ?? row.create_time ?? row.creation_date ?? row.created_at ?? '-'),
-				details: row.details ?? editSummary
-			};
-		});
-	} catch (e) {
-		console.error('加载编辑记录失败:', e);
-		editRecordList.value = [];
-	}
-};
-
-// 加载调试记录（对接 req_history 接口）
-const loadDebugRecords = async () => {
-	const id = apiId.value;
-	if (id == null) {
-		debugRecordList.value = [];
-		return;
-	}
-	try {
-		const response: any = await req_history({ api_id: Number(id) });
-		const data = response?.data;
-		let list: any[] = [];
-		if (Array.isArray(data)) {
-			list = data;
-		} else if (data?.content && Array.isArray(data.content)) {
-			list = data.content;
-		} else if (data?.list && Array.isArray(data.list)) {
-			list = data.list;
-		} else if (data?.items && Array.isArray(data.items)) {
-			list = data.items;
-		}
-		const curId = apiId.value != null ? Number(apiId.value) : null;
-		const filtered = curId != null ? list.filter((row: any) => (row.api_id != null ? Number(row.api_id) : null) === curId) : list;
-		// 映射为弹窗表格字段：id, status, statusCode, responseTime, time, size
-		debugRecordList.value = filtered.map((row: any) => ({
-			id: row.id,
-			status: row.status ?? (row.code === 200 || row.status_code === 200 ? '成功' : '失败'),
-			statusCode: row.code ?? row.status_code ?? row.statusCode ?? 0,
-			responseTime: row.res_time != null ? `${row.res_time}ms` : (row.response_time != null ? `${row.response_time}ms` : (row.responseTime ?? '-')),
-			time: formatTime(row.create_time ?? row.created_at ?? row.creation_date ?? row.time ?? '-'),
-			size: row.size != null ? `${row.size} B` : row.size_str ?? row.size ?? '-',
-			details: row.details ?? row.res ?? row.body
-		}));
-	} catch (e) {
-		console.error('加载调试记录失败:', e);
-		debugRecordList.value = [];
-	}
-};
-
-const debugRecordDetailDialogVisible = ref(false);
-const currentDebugRecord = ref<any | null>(null);
-
-const showDebugRecordDetail = (row: any) => {
-	currentDebugRecord.value = row;
-	debugRecordDetailDialogVisible.value = true;
-};
-
-// 加载接口文档
-const loadApiDoc = () => {
-	apiDocInfo.value = {
-		name: props.apiData.name || '接口名称',
-		url: req.value.url || '/api/example',
-		method: getMethodName(req.value.method),
-		description: '接口描述信息',
-		requestParams: req.value.params || [],
-		requestHeaders: req.value.header || [],
-		requestBody: req.value.body || '',
-		responseExample: res.value.body || {}
-	};
-};
-
-// 获取方法名称
-const getMethodName = (methodValue: number) => {
-	const method = method_list.value.find(m => m.value === methodValue);
-	return method ? method.name : 'GET';
-};
-
-// 处理工具箱命令
-const handleToolboxCommand = (command: string) => {
-	switch (command) {
-		case 'params_dependency':
-			openParamsDependency();
-			break;
-		case 'direct_db':
-			openDirectDatabase();
-			break;
-		case 'public_functions':
-			openPublicFunctions();
-			break;
-		case 'error_code':
-			openErrorCodeManagement();
-			break;
-		case 'env_management':
-			openEnvironmentManagement();
-			break;
-	}
-};
-// 打开参数依赖管理
-const openParamsDependency = () => {
-	paramsDepDialogVisible.value = true;
-	// 加载参数依赖数据
-	loadParamsDependency();
-};
-
-// 打开直连数据库管理
-const openDirectDatabase = () => {
-	directDbDialogVisible.value = true;
-	// 加载数据库连接数据
-	loadDirectDatabase();
-};
-
-// 打开公共函数管理
-const openPublicFunctions = () => {
-	publicFuncDialogVisible.value = true;
-	// 加载公共函数数据
-	loadPublicFunctions();
-};
-
-// 打开错误码管理
-const openErrorCodeManagement = () => {
-	errorCodeDialogVisible.value = true;
-	// 加载错误码数据
-	loadErrorCodes();
-};
-
-// 打开环境管理
-const openEnvironmentManagement = () => {
-	envManageDialogVisible.value = true;
-	// 加载环境数据
-	loadEnvironments();
-};
-
-// 加载数据的函数
-const loadParamsDependency = async () => {
-	try {
-		const res: any = await api_params({ currentPage: 1, pageSize: 100, search: {} });
-		const data = res?.data;
-		const list: any[] = Array.isArray(data?.content) ? data.content : (Array.isArray(data) ? data : []);
-		paramsDepList.value = list.map((row: any) => ({
-			id: row.id,
-			name: row.name,
-			description: row.description ?? '',
-			// 以字符串形式展示，避免 [object Object]
-			value: typeof row.value === 'string' ? row.value : JSON.stringify(row.value ?? {}, null, 2)
-		}));
-	} catch (e) {
-		console.error('加载参数依赖失败:', e);
-		paramsDepList.value = [];
-	}
-};
-
-const loadDirectDatabase = () => {
-	// 数据源统一由父组件传入的 local_db_list，在弹窗中仅做展示
-	directDbList.value = Array.isArray(local_db_list) ? local_db_list : [];
-};
-
-const loadPublicFunctions = () => {
-	// 模拟公共函数数据
-	publicFuncList.value = [
-		{ id: 1, name: '${randomUuid()}', description: '生成随机UUID', example: 'uuid: 550e8400-e29b-41d4-a716-446655440000' },
-		{ id: 2, name: '${timestamp()}', description: '获取当前时间戳', example: 'timestamp: 1640995200000' },
-		{ id: 3, name: '${randomString(num)}', description: '生成指定长度随机字符串', example: 'randomString(8): AbC12345' }
-	];
-};
-
-const loadErrorCodes = () => {
-	// 模拟错误码数据
-	errorCodeList.value = [
-		{ id: 1, code: 200, message: '请求成功', description: '操作成功完成' },
-		{ id: 2, code: 400, message: '请求参数错误', description: '请求参数格式不正确' },
-		{ id: 3, code: 401, message: '未授权访问', description: '用户未登录或token无效' },
-		{ id: 4, code: 500, message: '服务器内部错误', description: '服务器处理请求时发生错误' }
-	];
-};
-
-const loadEnvironments = () => {
-	// 模拟环境数据
-	envList.value = [
-		{ id: 1, name: '开发环境', host: 'http://dev.api.com', description: '开发测试环境' },
-		{ id: 2, name: '测试环境', host: 'http://test.api.com', description: '功能测试环境' },
-		{ id: 3, name: '生产环境', host: 'http://api.com', description: '正式生产环境' }
-	];
-};
-</script>
 <template>
 	<div class="api-detail-container">
 		<el-card class="api-detail-card">
@@ -1582,6 +861,728 @@ const loadEnvironments = () => {
 		</template>
 	</el-dialog>
 </template>
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import VueJsonPretty from "vue-json-pretty";
+import JsonEditor from "/@/components/code-editor/JsonEditor.vue";
+import "vue-json-pretty/lib/styles.css";
+import { 
+	Operation, 
+	Clock, 
+	EditPen, 
+	CircleCheck, 
+	Coin, 
+	InfoFilled,
+	Connection,
+	ArrowDown,
+	View,
+	Document,
+	Delete
+} from '@element-plus/icons-vue';
+import { api_send, save_api, save_api_case, req_history, edit_history, api_params } from '/@/api/v1/api_automation';
+import { useFileApi } from '/@/api/v1/common/file';
+import { ElMessage, ElMessageBox } from 'element-plus';
+
+const props = defineProps({
+	apiData: { type: Object, default: () => ({}) },
+	envId: { type: [Number, String], default: null },
+	env_list: { type: Array, default: () => [] },
+	tree_list: { type: Array, default: () => [] },
+	redis_example_list: { type: Array, default: () => ["common"] },
+	local_db_list: { type: Array, default: () => [] },
+	params_list: { type: Array, default: () => [{ name: "", id: null }] }
+});
+
+const emit = defineEmits(['caseSaved', 'apiSaved']);
+
+const fileApi = useFileApi();
+
+
+const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900);
+const onResize = () => { viewportH.value = window.innerHeight; };
+onMounted(() => window.addEventListener('resize', onResize));
+onBeforeUnmount(() => window.removeEventListener('resize', onResize));
+
+const resJsonHeight = computed(() => {
+	
+	const h = Math.floor(viewportH.value * 0.38);
+	return Math.max(260, Math.min(780, h));
+});
+
+const val_type_list = ref([
+	{ name: "环境变量", value: 1 },
+	{ name: "全局变量", value: 2 }
+]);
+
+const res_type_list = ref([
+	{ name: "响应结果-JSON", value: 1 },
+	{ name: "请求头-Headers", value: 2 },
+	{ name: "请求头-Body", value: 3 },
+	{ name: "Headers-响应结果", value: 4 },
+	{ name: "自定义目标值", value: 5 }
+]);
+
+const tips = ref<any>(
+	'路径示例，结果={"code": 200, "info": {"username": "admin"}, "list": [{"id": 1},{"id": 2}]}\n' +
+	"例子：code：$.code, username：$.info.username，数组：$.list[0].id / $.list[1].id分别等于1 / 2"
+);
+
+const method_list = ref([
+	{ name: "GET", value: 1, color: "#67C23A" },
+	{ name: "POST", value: 2, color: "#409EFF" },
+	{ name: "PUT", value: 3, color: "#E6A23C" },
+	{ name: "DELETE", value: 4, color: "#F56C6C" },
+	{ name: "PATCH", value: 5, color: "#8E44AD" },
+	{ name: "OPTIONS", value: 6, color: "#909399" }
+]);
+
+const req_active = ref<any>("body");
+const res_active = ref<any>("res");
+
+// 对话框状态
+const toolboxDialogVisible = ref(false);
+const paramsDepDialogVisible = ref(false);
+const directDbDialogVisible = ref(false);
+const publicFuncDialogVisible = ref(false);
+const errorCodeDialogVisible = ref(false);
+const envManageDialogVisible = ref(false);
+const editRecordDialogVisible = ref(false);
+const debugRecordDialogVisible = ref(false);
+const apiDocDialogVisible = ref(false);
+
+// 对话框数据
+const paramsDepList = ref<any[]>([]);
+const directDbList = ref<any[]>([]);
+const publicFuncList = ref<any[]>([]);
+const errorCodeList = ref<any[]>([]);
+const envList = ref<any[]>([]);
+const editRecordList = ref<any[]>([]);
+const debugRecordList = ref<any[]>([]);
+const apiDocInfo = ref<any>({});
+
+// 接口请求数据结构
+const req = ref({
+	method: 1,
+	url: '',
+	params: [],
+	header: [],
+	body: '',
+	body_type: 2,
+	form_data: [],
+	form_urlencoded: [],
+	file_path: [],
+	params_id: null,
+	before: [],
+	after: [],
+	assert: [],
+	config: {
+		retry: 0,
+		req_timeout: 30,
+		res_timeout: 30
+	}
+});
+
+// 接口响应数据结构
+const res = ref({
+	body: {},
+	header: {},
+	before: [],
+	after: [],
+	assert: [],
+	code: 0,
+	size: 0,
+	res_time: 0
+});
+
+// 当前接口 ID（保存/发送/记录用）：树节点 api_id 为接口ID，后端 get_api_info 不返回 id
+const apiId = computed(() => {
+	const d = props.apiData;
+	return d?.api_id ?? d?.api_info?.id ?? d?.id ?? null;
+});
+
+// 仅在“切换到另一个接口”时初始化一次，避免编辑过程中被 deep watch 重置（导致 body_type 跳回 JSON）
+const lastApiId = ref<number | string | null>(null);
+watch(
+	() => apiId.value,
+	() => {
+		const newId = apiId.value;
+		if (newId == null) return;
+		if (lastApiId.value === newId) return;
+		lastApiId.value = newId;
+
+		const newData = props.apiData;
+		if (!newData) return;
+		const apiInfo = newData.api_info || newData;
+		const reqSrc = apiInfo.req || apiInfo;
+		const resSrc = apiInfo.response || apiInfo.res || {};
+
+		req.value = {
+			method: reqSrc.method ?? 1,
+			url: reqSrc.url ?? apiInfo.url ?? '',
+			params: Array.isArray(reqSrc.params) ? reqSrc.params : [],
+			header: Array.isArray(reqSrc.header) ? reqSrc.header : [],
+			body: typeof reqSrc.body === 'string' ? reqSrc.body : JSON.stringify(reqSrc.body != null ? reqSrc.body : {}, null, 2),
+			body_type: reqSrc.body_type ?? 2,
+			form_data: Array.isArray(reqSrc.form_data) ? reqSrc.form_data : [],
+			form_urlencoded: Array.isArray(reqSrc.form_urlencoded) ? reqSrc.form_urlencoded : [],
+			file_path: Array.isArray(reqSrc.file_path) ? reqSrc.file_path : [],
+			params_id: reqSrc.params_id ?? apiInfo.params_id ?? null,
+			before: Array.isArray(reqSrc.before) ? reqSrc.before : [],
+			after: Array.isArray(reqSrc.after) ? reqSrc.after : [],
+			assert: Array.isArray(reqSrc.assert) ? reqSrc.assert : [],
+			config: {
+				retry: reqSrc.config?.retry ?? 0,
+				req_timeout: reqSrc.config?.req_timeout ?? 30,
+				res_timeout: reqSrc.config?.res_timeout ?? 30,
+			},
+		};
+
+		res.value = {
+			body: resSrc.body ?? {},
+			header: resSrc.header ?? {},
+			before: Array.isArray(resSrc.before) ? resSrc.before : [],
+			after: Array.isArray(resSrc.after) ? resSrc.after : [],
+			assert: Array.isArray(resSrc.assert) ? resSrc.assert : [],
+			code: resSrc.code ?? 0,
+			size: resSrc.size ?? 0,
+			res_time: resSrc.res_time ?? 0,
+		};
+	},
+	{ immediate: true }
+);
+// 添加参数行
+const addParam = () => {
+	req.value.params.push({ key: '', value: '', status: true });
+};
+
+// 删除参数行
+const removeParam = (index: number) => {
+	req.value.params.splice(index, 1);
+};
+
+// 添加Header行
+const addHeader = () => {
+	req.value.header.push({ key: '', value: '', status: true });
+};
+
+// 删除Header行
+const removeHeader = (index: number) => {
+	req.value.header.splice(index, 1);
+};
+
+// 添加form-data行
+const addFormData = () => {
+	req.value.form_data.push({ key: '', value: '', status: true });
+};
+
+// 删除form-data行
+const removeFormData = (index: number) => {
+	req.value.form_data.splice(index, 1);
+};
+
+// 添加form-urlencoded行
+const addFormUrlencoded = () => {
+	req.value.form_urlencoded.push({ key: '', value: '', status: true });
+};
+
+// 删除form-urlencoded行
+const removeFormUrlencoded = (index: number) => {
+	req.value.form_urlencoded.splice(index, 1);
+};
+
+// 添加前置操作
+const addBefore = (type: number) => {
+	const beforeItem: any = { type };
+	
+	switch (type) {
+		case 1: // 预请求接口
+			beforeItem.title = '';
+			beforeItem.env_id = null;
+			beforeItem.api_id = [];
+			break;
+		case 2: // 预设变量
+			beforeItem.name = '';
+			beforeItem.value = '';
+			beforeItem.env_type = 1;
+			break;
+		case 3: // 等待时长
+			beforeItem.wait_time = 1;
+			break;
+		case 4: // 自定义脚本
+			beforeItem.title = '';
+			beforeItem.code = '';
+			break;
+	}
+	
+	req.value.before.push(beforeItem);
+};
+
+// 删除前置操作
+const removeBefore = (index: number) => {
+	req.value.before.splice(index, 1);
+};
+
+// 添加后置操作
+const addAfter = (type: number) => {
+	const afterItem: any = { type };
+	
+	switch (type) {
+		case 1: // 提取变量
+			afterItem.name = '';
+			afterItem.value = '';
+			afterItem.res_type = 1;
+			afterItem.env_type = 1;
+			break;
+		case 2: // 等待时长
+			afterItem.wait_time = 1;
+			break;
+	}
+	
+	req.value.after.push(afterItem);
+};
+
+// 删除后置操作
+const removeAfter = (index: number) => {
+	req.value.after.splice(index, 1);
+};
+// 添加断言
+const addAssert = (type: number) => {
+	const assertItem: any = { type };
+	
+	switch (type) {
+		case 1: // 响应断言
+			assertItem.name = '';
+			assertItem.value = '';
+			assertItem.res_type = 1;
+			break;
+		case 2: // ops-数据库断言
+			assertItem.ops_db = null;
+			assertItem.ops_db_table = '';
+			assertItem.ops_db_where = '';
+			assertItem.ops_db_assert = [];
+			break;
+		case 3: // ops-redis断言
+			assertItem.ops_redis = null;
+			assertItem.ops_redis_key = '';
+			assertItem.ops_redis_assert = [];
+			break;
+		case 4: // 直连-数据库断言
+			assertItem.local_db = null;
+			assertItem.local_db_table = '';
+			assertItem.local_db_where = '';
+			assertItem.local_db_assert = [];
+			break;
+	}
+	
+	req.value.assert.push(assertItem);
+};
+
+// 删除断言
+const removeAssert = (index: number) => {
+	req.value.assert.splice(index, 1);
+};
+
+// 添加数据库断言配置
+const addDbAssertConfig = (dbAssertList: any[]) => {
+	dbAssertList.push({
+		name: '',
+		type: 1,
+		value: ''
+	});
+};
+
+// 删除数据库断言配置
+const removeDbAssertConfig = (dbAssertList: any[], index: number) => {
+	dbAssertList.splice(index, 1);
+};
+
+// 添加ops-数据库断言配置
+const addOpsDbAssertConfig = (opsDbAssertList: any[]) => {
+	opsDbAssertList.push({
+		name: '',
+		type: 1,
+		value: ''
+	});
+};
+
+// 删除ops-数据库断言配置
+const removeOpsDbAssertConfig = (opsDbAssertList: any[], index: number) => {
+	opsDbAssertList.splice(index, 1);
+};
+
+// 添加ops-redis断言配置
+const addOpsRedisAssertConfig = (opsRedisAssertList: any[]) => {
+	opsRedisAssertList.push({
+		name: '',
+		type: 1,
+		value: ''
+	});
+};
+
+// 删除ops-redis断言配置
+const removeOpsRedisAssertConfig = (opsRedisAssertList: any[], index: number) => {
+	opsRedisAssertList.splice(index, 1);
+};
+
+const formatTime = (value: any) => {
+	if (!value) return '-';
+	const d = new Date(value);
+	if (!isNaN(d.getTime())) {
+		return d.toLocaleString();
+	}
+	return String(value);
+};
+
+const getMethodColor = (methodVal: number | undefined) => {
+	const v = Number(methodVal);
+	switch (v) {
+		case 1: return '#67C23A'; // GET
+		case 2: return '#409EFF'; // POST
+		case 3: return '#E6A23C'; // PUT
+		case 4: return '#F56C6C'; // DELETE
+		case 5: return '#8E44AD'; // PATCH
+		case 6: return '#909399'; // OPTIONS
+		default: return '#409EFF';
+	}
+};
+
+const currentMethodColor = computed(() => getMethodColor(req.value?.method));
+
+const uploadBinaryFile = async (options: any) => {
+	try {
+		const form = new FormData();
+		form.append('file', options.file);
+		
+		form.append('store_in_database', 'false');
+		const res: any = await fileApi.upload(form);
+		const filePath = res?.data?.file_path;
+		if (!filePath) throw new Error('未获取到文件路径');
+		req.value.file_path = Array.isArray(req.value.file_path) ? req.value.file_path : [];
+		req.value.file_path.push(filePath);
+		ElMessage.success('上传成功');
+		options?.onSuccess?.(res);
+	} catch (e: any) {
+		console.error('上传失败:', e);
+		ElMessage.error(e?.message || '上传失败');
+		options?.onError?.(e);
+	}
+};
+
+// 发送请求
+const sendRequest = async () => {
+	const id = apiId.value;
+	if (id == null) {
+		ElMessage.warning('无法获取接口ID');
+		return;
+	}
+	try {
+		const requestData = {
+			id: Number(id),
+			env_id: props.envId,
+			req: req.value
+		};
+		const response: any = await api_send(requestData);
+		if (response.code === 200) {
+			const data = response.data;
+			
+			res.value = data?.res ? { ...res.value, ...data.res } : (data || res.value);
+			ElMessage.success('请求发送成功');
+		}
+	} catch (error) {
+		console.error('发送请求失败:', error);
+		ElMessage.error('请求发送失败');
+	}
+};
+
+// 保存接口
+const saveApiData = async () => {
+	const id = apiId.value;
+	if (id == null) {
+		ElMessage.warning('无法获取接口ID');
+		return;
+	}
+	try {
+		const saveData = {
+			id: Number(id),
+			url: req.value.url || props.apiData?.api_info?.url || props.apiData?.url || '/',
+			req: req.value
+		};
+		const response: any = await save_api(saveData);
+		if (response.code === 200) {
+			ElMessage.success('保存成功');
+			emit('apiSaved');
+		}
+	} catch (error) {
+		console.error('保存失败:', error);
+		ElMessage.error('保存失败');
+	}
+};
+
+// 保存项下拉命令
+const handleSaveCommand = (command: string) => {
+	if (command === 'save') saveApiData();
+	else if (command === 'saveAsCase') saveAsCase();
+};
+
+// 保存为用例
+const saveAsCase = async () => {
+	const id = apiId.value;
+	if (id == null) {
+		ElMessage.warning('无法获取接口ID');
+		return;
+	}
+	try {
+		const defaultName = `${props.apiData?.name || props.apiData?.api_info?.name || '接口'}_用例_${Date.now()}`;
+		const { value, action } = await ElMessageBox.prompt('请输入用例名称', '保存为用例', {
+			inputValue: defaultName,
+			confirmButtonText: '确定',
+			cancelButtonText: '取消'
+		});
+		if (action === 'cancel') return;
+		const caseName = (value || '').trim() || defaultName;
+		const caseData: Record<string, any> = {
+			id: Number(id),
+			name: caseName,
+			req: req.value,
+			url: req.value.url
+		};
+		const apiServiceId = props.apiData?.api_info?.api_service_id ?? props.apiData?.api_service_id;
+		if (apiServiceId != null) caseData.api_service_id = Number(apiServiceId);
+		const response: any = await save_api_case(caseData);
+		if (response.code === 200) {
+			ElMessage.success('保存为用例成功');
+			emit('caseSaved');
+		}
+	} catch (error) {
+		console.error('保存为用例失败:', error);
+		ElMessage.error('保存为用例失败');
+	}
+};
+
+// 显示编辑记录
+const showEditRecord = () => {
+	editRecordDialogVisible.value = true;
+	loadEditRecords();
+};
+
+// 显示调试记录
+const showDebugRecord = () => {
+	debugRecordDialogVisible.value = true;
+	loadDebugRecords();
+};
+
+// 显示接口文档
+const showApiDoc = () => {
+	apiDocDialogVisible.value = true;
+	loadApiDoc();
+};
+
+// 加载编辑记录（对接 edit_history 接口）
+const loadEditRecords = async () => {
+	const id = apiId.value;
+	if (id == null) {
+		editRecordList.value = [];
+		return;
+	}
+	try {
+		const response: any = await edit_history({ api_id: Number(id) });
+		const data = response?.data;
+		let raw: any[] = [];
+		if (Array.isArray(data)) raw = data;
+		else if (data?.content && Array.isArray(data.content)) raw = data.content;
+		else if (data?.list && Array.isArray(data.list)) raw = data.list;
+		editRecordList.value = raw.map((row: any) => {
+			const editSummary = row.edit != null
+				? (Array.isArray(row.edit) ? row.edit.map((e: any) => `${e.field || ''} ${e.type || ''}`).filter(Boolean).join('; ') : JSON.stringify(row.edit))
+				: (row.details ?? row.content ?? row.description ?? '-');
+			return {
+				id: row.id,
+				operation: row.operation ?? row.operation_type ?? '接口编辑',
+				user: row.user ?? row.username ?? row.created_by ?? '-',
+				time: formatTime(row.time ?? row.create_time ?? row.creation_date ?? row.created_at ?? '-'),
+				details: row.details ?? editSummary
+			};
+		});
+	} catch (e) {
+		console.error('加载编辑记录失败:', e);
+		editRecordList.value = [];
+	}
+};
+
+// 加载调试记录（对接 req_history 接口）
+const loadDebugRecords = async () => {
+	const id = apiId.value;
+	if (id == null) {
+		debugRecordList.value = [];
+		return;
+	}
+	try {
+		const response: any = await req_history({ api_id: Number(id) });
+		const data = response?.data;
+		let list: any[] = [];
+		if (Array.isArray(data)) {
+			list = data;
+		} else if (data?.content && Array.isArray(data.content)) {
+			list = data.content;
+		} else if (data?.list && Array.isArray(data.list)) {
+			list = data.list;
+		} else if (data?.items && Array.isArray(data.items)) {
+			list = data.items;
+		}
+		const curId = apiId.value != null ? Number(apiId.value) : null;
+		const filtered = curId != null ? list.filter((row: any) => (row.api_id != null ? Number(row.api_id) : null) === curId) : list;
+		// 映射为弹窗表格字段：id, status, statusCode, responseTime, time, size
+		debugRecordList.value = filtered.map((row: any) => ({
+			id: row.id,
+			status: row.status ?? (row.code === 200 || row.status_code === 200 ? '成功' : '失败'),
+			statusCode: row.code ?? row.status_code ?? row.statusCode ?? 0,
+			responseTime: row.res_time != null ? `${row.res_time}ms` : (row.response_time != null ? `${row.response_time}ms` : (row.responseTime ?? '-')),
+			time: formatTime(row.create_time ?? row.created_at ?? row.creation_date ?? row.time ?? '-'),
+			size: row.size != null ? `${row.size} B` : row.size_str ?? row.size ?? '-',
+			details: row.details ?? row.res ?? row.body
+		}));
+	} catch (e) {
+		console.error('加载调试记录失败:', e);
+		debugRecordList.value = [];
+	}
+};
+
+const debugRecordDetailDialogVisible = ref(false);
+const currentDebugRecord = ref<any | null>(null);
+
+const showDebugRecordDetail = (row: any) => {
+	currentDebugRecord.value = row;
+	debugRecordDetailDialogVisible.value = true;
+};
+
+// 加载接口文档
+const loadApiDoc = () => {
+	apiDocInfo.value = {
+		name: props.apiData.name || '接口名称',
+		url: req.value.url || '/api/example',
+		method: getMethodName(req.value.method),
+		description: '接口描述信息',
+		requestParams: req.value.params || [],
+		requestHeaders: req.value.header || [],
+		requestBody: req.value.body || '',
+		responseExample: res.value.body || {}
+	};
+};
+
+// 获取方法名称
+const getMethodName = (methodValue: number) => {
+	const method = method_list.value.find(m => m.value === methodValue);
+	return method ? method.name : 'GET';
+};
+
+// 处理工具箱命令
+const handleToolboxCommand = (command: string) => {
+	switch (command) {
+		case 'params_dependency':
+			openParamsDependency();
+			break;
+		case 'direct_db':
+			openDirectDatabase();
+			break;
+		case 'public_functions':
+			openPublicFunctions();
+			break;
+		case 'error_code':
+			openErrorCodeManagement();
+			break;
+		case 'env_management':
+			openEnvironmentManagement();
+			break;
+	}
+};
+// 打开参数依赖管理
+const openParamsDependency = () => {
+	paramsDepDialogVisible.value = true;
+	// 加载参数依赖数据
+	loadParamsDependency();
+};
+
+// 打开直连数据库管理
+const openDirectDatabase = () => {
+	directDbDialogVisible.value = true;
+	// 加载数据库连接数据
+	loadDirectDatabase();
+};
+
+// 打开公共函数管理
+const openPublicFunctions = () => {
+	publicFuncDialogVisible.value = true;
+	// 加载公共函数数据
+	loadPublicFunctions();
+};
+
+// 打开错误码管理
+const openErrorCodeManagement = () => {
+	errorCodeDialogVisible.value = true;
+	// 加载错误码数据
+	loadErrorCodes();
+};
+
+// 打开环境管理
+const openEnvironmentManagement = () => {
+	envManageDialogVisible.value = true;
+	// 加载环境数据
+	loadEnvironments();
+};
+
+// 加载数据的函数
+const loadParamsDependency = async () => {
+	try {
+		const res: any = await api_params({ currentPage: 1, pageSize: 100, search: {} });
+		const data = res?.data;
+		const list: any[] = Array.isArray(data?.content) ? data.content : (Array.isArray(data) ? data : []);
+		paramsDepList.value = list.map((row: any) => ({
+			id: row.id,
+			name: row.name,
+			description: row.description ?? '',
+		
+			value: typeof row.value === 'string' ? row.value : JSON.stringify(row.value ?? {}, null, 2)
+		}));
+	} catch (e) {
+		console.error('加载参数依赖失败:', e);
+		paramsDepList.value = [];
+	}
+};
+
+const loadDirectDatabase = () => {
+	// 数据源统一由父组件传入的 local_db_list，在弹窗中仅做展示
+	directDbList.value = Array.isArray(local_db_list) ? local_db_list : [];
+};
+
+const loadPublicFunctions = () => {
+	// 模拟公共函数数据
+	publicFuncList.value = [
+		{ id: 1, name: '${randomUuid()}', description: '生成随机UUID', example: 'uuid: 550e8400-e29b-41d4-a716-446655440000' },
+		{ id: 2, name: '${timestamp()}', description: '获取当前时间戳', example: 'timestamp: 1640995200000' },
+		{ id: 3, name: '${randomString(num)}', description: '生成指定长度随机字符串', example: 'randomString(8): AbC12345' }
+	];
+};
+
+const loadErrorCodes = () => {
+	// 模拟错误码数据
+	errorCodeList.value = [
+		{ id: 1, code: 200, message: '请求成功', description: '操作成功完成' },
+		{ id: 2, code: 400, message: '请求参数错误', description: '请求参数格式不正确' },
+		{ id: 3, code: 401, message: '未授权访问', description: '用户未登录或token无效' },
+		{ id: 4, code: 500, message: '服务器内部错误', description: '服务器处理请求时发生错误' }
+	];
+};
+
+const loadEnvironments = () => {
+	// 模拟环境数据
+	envList.value = [
+		{ id: 1, name: '开发环境', host: 'http://dev.api.com', description: '开发测试环境' },
+		{ id: 2, name: '测试环境', host: 'http://test.api.com', description: '功能测试环境' },
+		{ id: 3, name: '生产环境', host: 'http://api.com', description: '正式生产环境' }
+	];
+};
+</script>
+
 <style lang="scss" scoped>
 .api-detail-container {
 	height: calc(100vh - 100px);

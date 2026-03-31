@@ -3,7 +3,6 @@
 from sqlalchemy import Column, BigInteger, String, Text, DateTime, Boolean, Integer, JSON, Index, UniqueConstraint
 from sqlalchemy.sql import func
 from app.core.base_model import BaseModel
-from app.models.base import Base
 
 
 class TestCaseReview(BaseModel):
@@ -97,25 +96,16 @@ class ReviewTemplate(BaseModel):
     )
 
 
-class ReviewResult(Base):
+class ReviewResult(BaseModel):
     """评审结果表"""
     __tablename__ = 'review_results'
     
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
     review_id = Column(BigInteger, nullable=False, comment='评审ID')
     test_case_id = Column(BigInteger, nullable=False, comment='测试用例ID')
     reviewer_id = Column(BigInteger, nullable=False, comment='评审人ID')
     result = Column(String(20), nullable=False, comment='评审结果: pass/fail/modify')
     comment = Column(Text, comment='评审意见')
     reviewed_at = Column(DateTime, default=func.now(), comment='评审时间')
-    
-    # 使用与数据库表匹配的字段名
-    creation_date = Column(DateTime, default=func.now(), comment='创建时间')
-    created_by = Column(BigInteger, comment='创建人')
-    updation_date = Column(DateTime, default=func.now(), onupdate=func.now(), comment='更新时间')
-    updated_by = Column(BigInteger, comment='更新人')
-    enabled_flag = Column(Integer, default=1, comment='启用标志')
-    trace_id = Column(String(36), comment='追踪ID')
     
     __table_args__ = (
         UniqueConstraint('review_id', 'test_case_id', 'reviewer_id', name='uk_review_case_reviewer'),

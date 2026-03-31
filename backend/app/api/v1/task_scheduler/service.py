@@ -51,7 +51,7 @@ class TaskSchedulerService:
                     "next_run_at": t.next_run_at,
                     "total_run_count": t.total_run_count or 0,
                     "creation_date": t.creation_date,
-                    # 兼容旧接口 task_list 里的 next_time 字段
+            
                     "next_time": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if (job and job.next_run_time) else "",
                 }
             )
@@ -169,7 +169,7 @@ class TaskSchedulerService:
                 setattr(task, field, task_data[field])
         task.updated_by = user_id
 
-        # 重建调度（兼容旧 edit_task 行为：status=1 就重新 add_scheduler_task）
+      
         await TaskSchedulerService.unschedule_task(str(task.id))
         task.scheduler_job_id = None
         task.next_run_at = None
@@ -410,7 +410,6 @@ class TaskSchedulerService:
 
         try:
             # 根据 task_config["type"] 调用对应模块执行入口
-            # - API(3) -> api_automation（对齐旧 gitlab_ci_notice / 定时执行接口自动化脚本）
             if int(task_config.get("type") or 0) == 3:
                 from app.db.sqlalchemy import async_session
                 from app.api.v1.api_automation.service import ApiAutomationService
@@ -430,7 +429,7 @@ class TaskSchedulerService:
                         ).scalar_one_or_none()
                         if not row:
                             continue
-                        # ApiScriptModel.script 在旧架构里就是 run_list 结构
+                        # ApiScriptModel.script 就是 run_list 结构
                         run_body = {
                             "result_id": int(time.time() * 1000),
                             "name": f"{task_config.get('id')}-{row.name}",
@@ -473,7 +472,7 @@ class TaskSchedulerService:
             # 落库失败不影响调度器线程继续跑
             pass
 
-        # 执行统一通知（使用新架构 notifications 配置）
+        # 执行统一通知
         try:
             await TaskSchedulerService.send_task_notification(
                 {

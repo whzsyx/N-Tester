@@ -1,6 +1,5 @@
 /**
  * 云真机模块接口
- * 对应后端 /api/v1/cloud_device/*
  */
 import request from '/@/utils/request';
 

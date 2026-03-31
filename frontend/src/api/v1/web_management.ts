@@ -1,6 +1,5 @@
 /**
- * L-Tester Web 管理模块接口（元素管理 / Web 自动化 / Web 场景 / Web 结果）
- * 对应后端 `app.api.v1.web_management.controller`，统一前缀 `/v1/web_management`
+ * Web 管理模块接口
  */
 import request from '/@/utils/request'
 

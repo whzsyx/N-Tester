@@ -1,5 +1,5 @@
 """
-API测试模块 - 数据模型
+API测试模块数据模型
 """
 from sqlalchemy import Column, BigInteger, String, Text, Integer, Float, DateTime, JSON, Boolean
 from sqlalchemy.orm import relationship

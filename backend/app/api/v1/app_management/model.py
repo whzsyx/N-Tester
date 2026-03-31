@@ -1,11 +1,9 @@
 """
-APP自动化模块 - 数据模型
-一比一迁移自 l-tester/views/app/app_model.py（Tortoise ORM）
+APP自动化模块数据模型
 """
 
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger, ForeignKey
 from sqlalchemy.sql import func
-
 from app.models.base import Base
 
 
@@ -72,7 +70,7 @@ class AppResultListModel(Base):
 
 
 class AppAirtestImageModel(Base):
-    """Airtest 图像库（迁移自 l-tester/views/common/upload_model.py airtest_img）"""
+    """Airtest 图像库"""
 
     __tablename__ = "app_airtest_images"
     __table_args__ = {"comment": "APP自动化 Airtest 图像库"}

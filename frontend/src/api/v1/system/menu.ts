@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 菜单管理API - 新架构
+ * 菜单管理API
  */
 export function useMenuApi() {
   return {

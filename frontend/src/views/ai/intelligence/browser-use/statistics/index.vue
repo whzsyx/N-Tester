@@ -225,7 +225,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getProjectList } from '/@/api/v1/project'
-// 导入旧的AI智能浏览器API（用于查询执行记录）
+
 import { aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
 
 const loading = ref(false)

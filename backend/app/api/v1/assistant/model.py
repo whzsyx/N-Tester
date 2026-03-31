@@ -1,4 +1,4 @@
-# AI助手模块 - 数据模型层
+# -*- coding: utf-8 -*-
 
 from sqlalchemy import Column, BigInteger, String, Text, DateTime, Boolean, Index
 from sqlalchemy.sql import func

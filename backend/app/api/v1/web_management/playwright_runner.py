@@ -1,26 +1,18 @@
 """
-Web管理模块 - Playwright 执行引擎（独立模块）
-
-说明：
-- 迁移自旧架构 l-tester/views/web/web_commom.py 的 run_web_async / run_script_async 等逻辑
-- 仅依赖本模块的数据表（WebResultListModel/WebResultDetailModel）+ 新架构基础设施（SQLAlchemy AsyncSession）
+Web管理模块 - Playwright 执行引擎
 """
 
 from __future__ import annotations
-
 import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
-
 from playwright.async_api import async_playwright
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from config import config as app_config
-
 from .model import WebResultDetailModel, WebResultListModel
 
 
@@ -28,10 +20,6 @@ def _playwright_base_dir() -> Path:
     return Path(app_config.BASEDIR) / app_config.STATIC_DIR / "media" / "playwright"
 
 def _get_ai_fixture():
-    """
-    可选依赖：旧版使用 autowing 的 AI 能力（ai_action/ai_assert/ai_remedy）。
-    新版保持兼容：如果库不存在，则 AI 相关步骤/断言返回失败提示，但不影响非 AI 步骤。
-    """
     try:
         from dotenv import load_dotenv  # type: ignore
         from autowing.playwright.async_fixture import create_async_fixture  # type: ignore
@@ -50,8 +38,6 @@ async def run_web_async(
 ) -> Tuple[bool, str]:
     """
     执行单个浏览器任务。
-
-    data 结构对齐旧版：
     - browser: int (1 chrome, 2 firefox, 3 edge, 4 webkit)
     - script: List[step]
     - result_id: str
@@ -98,7 +84,7 @@ async def run_web_async(
             await context.close()
             await browser.close()
 
-            # video 文件写回 DB（对齐旧逻辑：给 log="执行结束" 的记录补 video 字段）
+            # video 文件写回 DB
             video_files = [f for f in os.listdir(base_dir) if f.endswith(".webm")]
             if video_files:
                 async with session_factory() as session:
@@ -330,7 +316,7 @@ async def run_script_async(
                     else:
                         result = (True, f"{step['name']}执行成功", None)
 
-            # 失败时 AI 补救（对齐旧版“AI补救”逻辑，能用则尝试）
+ 
             if not result[0] and ai and hasattr(ai, "ai_remedy"):
                 try:
                     await write_log(f"{step['name']}：尝试AI补救中", browser, result_id)
@@ -542,10 +528,7 @@ async def handle_element(driver, action: Dict[str, Any], result_id: str, browser
         return False, str(e)
 
 async def ta_handle_element(driver, action: Dict[str, Any], result_id: str, browser: int):
-    """
-    目标元素定位（拖拽目标）
-    对齐旧版：使用 target / target_locator / target_locator_select
-    """
+
     try:
         element_value = action.get("target") or ""
         if not element_value:
@@ -614,9 +597,7 @@ async def locator_action(driver, action: Dict[str, Any], result_id: str, browser
         return False, str(e)
 
 async def assert_locator_action(driver, action: Dict[str, Any], result_id: str, browser: int):
-    """
-    断言定位器：与 locator_action 类似，但不 wait visible（按旧逻辑依然可用于 is_visible 判断）
-    """
+
     element_value = action.get("element") or ""
     locator = int(action.get("locator") or 1)
     locator_select = int(action.get("locator_select") or 1)
@@ -815,7 +796,7 @@ async def for_run_script_async(
     *,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> Tuple[bool, str, Any, Any]:
-    # 复用 run_script_async 的核心执行方式：仅执行传入 children
+
     ok, msg = await run_script_async(
         browser,
         script,
@@ -937,7 +918,7 @@ async def element_upload_file(element_or_page, name: str, browser: int, result_i
         # 优先 locator.set_input_files，否则退回 page.set_input_files
         file_path = element
         if file_path and not os.path.isabs(file_path):
-            # 旧版拼 project_path，这里保持兼容：相对路径按 BASEDIR/files 或项目目录处理
+    
             file_path = str(Path(app_config.BASEDIR) / file_path.lstrip("/\\"))
         if hasattr(element_or_page, "set_input_files"):
             await element_or_page.set_input_files(file_path)
@@ -955,7 +936,7 @@ async def element_eval(driver, element: str, result_id: str, browser: int):
         from playwright.async_api import expect  # noqa: F401
         page = driver
         await write_log(f"正在执行自定义脚本：{element}", browser, result_id)
-        # 按旧逻辑 eval 自定义脚本（提供 page/driver/expect）
+
         eval(element, {"page": page, "driver": driver, "expect": expect})
         await write_log("执行自定义脚本成功", browser, result_id)
         return True, f"执行自定义脚本成功: {element}"

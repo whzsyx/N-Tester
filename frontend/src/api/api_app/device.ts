@@ -1,5 +1,3 @@
-// 1:1 迁移自 l-vue-ui/src/api/api_app/device.ts
-// 映射到新后端 /api/v1/cloud_device/*
 import axios from '@/utils/axios.ts';
 
 enum API {

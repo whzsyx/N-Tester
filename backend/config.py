@@ -179,7 +179,7 @@ class Configs(BaseSettings):
     # ================================================= #
     # 项目根目录（media/app_result、相对模板路径等）；不填则自动推断仓库根
     APP_PROJECT_ROOT: str = Field(default="", validation_alias="APP_PROJECT_ROOT")
-    # 与旧 l-tester config.settings.project_path 同名，可与 APP_PROJECT_ROOT 二选一
+    # 与config.settings.project_path 同名，可与 APP_PROJECT_ROOT 二选一
     PROJECT_PATH: str = Field(default="", validation_alias="PROJECT_PATH")
     # 截图/视频 URL 前缀（浏览器可访问的后端或网关地址）；不填则尝试用下方 BASE_URL
     APP_PUBLIC_BASE_URL: str = Field(default="", validation_alias="APP_PUBLIC_BASE_URL")

@@ -25,10 +25,15 @@ export const useMenuInfo = defineStore('useMenuInfo', {
 			if (Session.get('menuData')) {
 				data = Session.get('menuData');
 			} else {
-				let res = await useUserApi().getMenuByToken()
-				this.menuData = data = res.data
-
-				Session.set("menuData", this.menuData)
+				try {
+					let res = await useUserApi().getMenuByToken()
+					this.menuData = data = res.data
+					Session.set("menuData", this.menuData)
+				} catch (error) {
+					console.error('获取菜单数据失败:', error);
+					// 如果获取失败，返回空数组而不是undefined
+					this.menuData = data = [];
+				}
 			}
 			return data
 		},

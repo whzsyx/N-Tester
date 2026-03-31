@@ -1,723 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref, watch, computed } from 'vue'
-import { ElTree, ElMessage, ElMessageBox } from 'element-plus'
-import {
-  DocumentCopy,
-  Delete,
-  HomeFilled,
-  Folder,
-  ChromeFilled,
-  ArrowDown,
-  MoreFilled,
-  CirclePlus,
-  Edit,
-  Upload,
-  Remove,
-} from '@element-plus/icons-vue'
-import KoiDialog from '/@/components/koi/KoiDialog.vue'
-import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue'
-import {
-  web_menu,
-  get_web_script,
-  menu_script_list,
-  run_web_script,
-  get_web_result,
-  get_web_result_log,
-  add_web_menu,
-  del_web_menu,
-  rename_web_menu,
-  save_web_script,
-  input_element,
-  get_element_select,
-} from '/@/api/v1/web_management'
-
-// 数据表格加载页面动画
-const loading = ref(false)
-const filterText = ref<any>('')
-const treeRef = ref<InstanceType<typeof ElTree>>()
-const tree_data = ref<any>()
-const defaultProps = {
-  children: 'children',
-  label: 'name',
-}
-// 当前页面的脚本数据 — 始终指向当前激活 tab 的 script 数组
-const script_list = computed<any[]>(() => {
-  const active = tab_list.value.find((t: any) => t.name === tab_active.value)
-  return active?.content?.script ?? []
-})
-const script_info = ref<any>({
-  name: '',
-  type: 0,
-  status: true,
-  children: [],
-  action: {
-    type: 1,
-    locator: 1,
-    locator_select: 1,
-    target_locator: 1,
-    target_locator_select: 1,
-    target_type: 1,
-    up_type: 1,
-    sway_type: 1,
-    before_wait: 1,
-    after_wait: 1,
-    timeout: 15,
-    input: '',
-    element: '',
-    target: '',
-    assert: [],
-    cookies: [],
-    localstorage: [],
-    role: 'button',
-    element_id: null,
-    target_id: '',
-  },
-})
-const table_list = ref<any>([])
-const tab_active = ref('')
-const tab_list = ref<any>([])
-const add_menu_form = ref<any>({})
-const icon_style = ref<any>('padding-right: 5px; padding-left: 5px; padding-top: 4px;')
-const locator_list = ref<any>([
-  { name: '定位器', value: 1 },
-  { name: '选择器', value: 2 },
-])
-const locator_selects = ref<any>([
-  { label: 'id', value: 1 },
-  { label: 'text', value: 2 },
-  { label: 'label', value: 3 },
-  { label: 'title', value: 4 },
-  { label: 'placeholder', value: 5 },
-  { label: 'alt', value: 6 },
-  { label: 'role', value: 7 },
-])
-const role_list = ref<any>([
-  { label: 'button', value: 'button' },
-  { label: 'link', value: 'link' },
-  { label: 'tab', value: 'tab' },
-  { label: 'tabpanel', value: 'tabpanel' },
-  { label: 'textbox', value: 'textbox' },
-  { label: 'checkbox', value: 'checkbox' },
-  { label: 'radio', value: 'radio' },
-  { label: 'combobox', value: 'combobox' },
-  { label: 'listbox', value: 'listbox' },
-  { label: 'menu', value: 'menu' },
-  { label: 'menuitem', value: 'menuitem' },
-  { label: 'alert', value: 'alert' },
-  { label: 'status', value: 'status' },
-  { label: 'progressbar', value: 'progressbar' },
-  { label: 'spinbutton', value: 'spinbutton' },
-  { label: 'heading', value: 'heading' },
-  { label: 'tree', value: 'tree' },
-  { label: 'treeitem', value: 'treeitem' },
-])
-const browser_list = ref<any>([
-  { name: 'Chrome', value: 1 },
-  { name: 'Firefox', value: 2 },
-  { name: 'Edge', value: 3 },
-  { name: 'Safari', value: 4 },
-])
-
-// web目录过滤
-watch(filterText, (val) => {
-  treeRef.value?.filter(val)
-})
-
-const filterNode = (value: string, data: any): boolean => {
-  if (!value) return true
-  return data.name.includes(value)
-}
-
-const element_select_change = (selection: any) => {
-  console.log(selection)
-}
-
-const get_web_menu = async () => {
-  try {
-    loading.value = true
-    const res: any = await web_menu({})
-    tree_data.value = res.data
-  } catch {
-    ElMessage.error('数据查询失败，请刷新重试')
-  } finally {
-    loading.value = false
-  }
-}
-
-const web_menu_click = async (node: any) => {
-  try {
-    if (node.type === 1) {
-      const res: any = await menu_script_list({ id: node.id })
-      table_list.value = res.data
-      await addTab(node, res.data)
-    } else if (node.type === 2) {
-      const res: any = await get_web_script({ id: node.id })
-      script_info.value = res.data.script[0]
-      await addTab(node, res.data)
-    }
-  } catch {
-    ElMessage.error('数据查询失败，请刷新重试')
-  }
-}
-
-const addTab = async (node: any, target: any) => {
-  const newTabName = node.name
-  const index = tab_list.value.findIndex((item: any) => item.title === newTabName)
-  if (index === -1) {
-    tab_list.value.push({
-      title: newTabName,
-      name: newTabName,
-      content: target,
-      id: node.id,
-      type: node.type,
-    })
-  }
-  tab_active.value = node.name
-}
-
-const removeTab = (targetName: string) => {
-  const tabs = tab_list.value
-  let activeName = tab_active.value
-  if (activeName === targetName) {
-    tab_list.value.forEach((tab: any, index: any) => {
-      if (tab.name === targetName) {
-        const nextTab = tabs[index + 1] || tabs[index - 1]
-        if (nextTab) {
-          activeName = nextTab.name
-        }
-      }
-    })
-  }
-  tab_active.value = activeName
-  tab_list.value = tabs.filter((tab: any) => tab.name !== targetName)
-}
-
-const select_list = ref<any>([])
-const handleSelectionChange = (selection: any) => {
-  select_list.value = selection.sort((a: any, b: any) => a.step - b.step)
-}
-
-const menu_form = ref<any>({
-  name: '',
-  id: null,
-})
-const title = ref<string>('')
-const add_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const rename_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-
-const add_menu = (data: any) => {
-  title.value = '新增子菜单'
-  add_koiDialogRef.value?.koiOpen()
-  menu_form.value = data
-}
-
-const check_children = (data: any, menu: any) => {
-  if ('children' in data) {
-    data.children.push(menu)
-  } else {
-    data.children = []
-    data.children.push(menu)
-  }
-}
-
-const add_menu_confirm = async () => {
-  try {
-    add_menu_form.value.pid = menu_form.value.id
-    const res: any = await add_web_menu(add_menu_form.value)
-    await check_children(menu_form.value, res.data)
-    add_koiDialogRef.value?.koiQuickClose(res.message)
-  } catch {
-    ElMessage.error('保存失败，请重试')
-  } finally {
-    add_menu_form.value = {}
-  }
-}
-
-const add_menu_cancel = () => {
-  add_koiDialogRef.value?.koiClose()
-}
-
-const rename_menu = (data: any) => {
-  title.value = '重命名'
-  rename_koiDialogRef.value?.koiOpen()
-  menu_form.value = data
-}
-
-const edit_menu_confirm = async () => {
-  try {
-    add_menu_form.value.id = menu_form.value.id
-    const res: any = await rename_web_menu(add_menu_form.value)
-    rename_koiDialogRef.value?.koiQuickClose(res.message)
-    menu_form.value.name = add_menu_form.value.name
-  } catch {
-    ElMessage.error('保存失败，请重试')
-  } finally {
-    add_menu_form.value = {}
-  }
-}
-
-const edit_menu_cancel = () => {
-  rename_koiDialogRef.value?.koiClose()
-}
-
-const on_menu_allowDrop = (moveNode: any, inNode: any, type: any) => {
-  console.log(moveNode)
-  if (inNode.data.type === 2) {
-    return type !== 'inner'
-  }
-  return type
-}
-
-const del_menu = (data: any) => {
-  ElMessageBox.confirm('您确认需要删除该目录么？', '提示', {
-    type: 'warning',
-  })
-    .then(async () => {
-      const res: any = await del_web_menu({ id: data.id, type: data.type })
-      ElMessage.success(res.message || '删除成功')
-      await get_web_menu()
-    })
-    .catch(() => {})
-}
-
-const step_style = (type: any) => {
-  if (type === 0) {
-    return 'border: 1px solid #3e7be5; border-radius: 5px; width: 93%; color: #3e7be5'
-  } else if (type === 1 || type === 2 || type === 3 || type === 4) {
-    return 'border: 1px solid #400ae6; border-radius: 5px; width: 93%; color: #400ae6'
-  } else if (type === 5 || type === 6 || type === 7) {
-    return 'border: 1px solid #ee4866; border-radius: 5px; width: 93%; color: #ee4866'
-  } else if (type === 8 || type === 9) {
-    return 'border: 1px solid #e99516; border-radius: 5px; width: 93%; color: #e99516'
-  } else if (type === 10 || type === 11) {
-    return 'border: 1px solid #ea035f; border-radius: 5px; width: 93%; color: #ea035f'
-  } else if (type === 12) {
-    return 'border: 1px solid #20a162; border-radius: 5px; width: 93%; color: #20a162'
-  }
-  return 'border: 1px solid #3e7be5; border-radius: 5px; width: 93%; color: #3e7be5'
-}
-
-const random_string = (data_length: any) => {
-  return Array.from(crypto.getRandomValues(new Uint8Array(data_length)))
-    .map((n) => n.toString(36))
-    .join('')
-}
-
-// 自动化脚本：新增步骤
-const add_script = (command: any) => {
-  const active = tab_list.value.find((t: any) => t.name === tab_active.value)
-  if (!active?.content?.script) return
-  const new_string = random_string(2)
-  active.content.script.push({
-    name: `${command.name}-${new_string}`,
-    type: command.type,
-    status: true,
-    children: [],
-    action: {
-      type: 1,
-      locator: 1,
-      locator_select: 1,
-      target_locator: 1,
-      target_locator_select: 1,
-      input: '',
-      element: '',
-      element_id: null,
-      target: '',
-      target_id: '',
-      target_type: 1,
-      assert: [],
-      up_type: 1,
-      sway_type: 1,
-      wait_time: 1,
-      before_wait: 1,
-      after_wait: 1,
-      role: 'button',
-      cookies: [],
-      localstorage: [],
-      timeout: 15,
-    },
-  })
-}
-
-const config_active = ref('first')
-const assert_list = ref<any>([
-  { name: '元素存在', value: 1 },
-  { name: '元素不存在', value: 2 },
-  { name: '文本存在', value: 3 },
-  { name: '文本不存在', value: 4 },
-  { name: '页面属性', value: 5 },
-  { name: '自定义断言', value: 6 },
-  { name: 'AI 断言', value: 7 },
-])
-const browser_assert = ref<any>([
-  { name: '网页地址', value: 1 },
-  { name: '网页标题', value: 2 },
-])
-
-const add_assert = (data: any) => {
-  data.push({
-    type: 1,
-    locator: 1,
-    locator_select: 1,
-    page_type: 1,
-    element: '',
-    role: 'button',
-  })
-}
-
-const add_cookie = (data: any) => {
-  data.push({
-    name: '',
-    value: '',
-  })
-}
-
-const del_cookie = (data: any, index: any) => {
-  data.splice(index, 1)
-}
-
-const add_localstorage = (data: any) => {
-  data.push({
-    name: '',
-    value: '',
-  })
-}
-
-const del_localstorage = (data: any, index: any) => {
-  data.splice(index, 1)
-}
-
-const del_assert = (data: any, index: any) => {
-  data.splice(index, 1)
-}
-
-const web_script_click = (node: any) => {
-  // 重要：这里必须保持对步骤节点对象的引用（不能 clone），否则右侧表单改动不会写回树数据，
-  // 保存后再次切换回来就会像“没记忆”一样被清空。
-  if (!node.action) node.action = {}
-  const action = node.action
-
-  action.type ??= 1
-  action.locator ??= 1
-  action.locator_select ??= 1
-  action.target_locator ??= 1
-  action.target_locator_select ??= 1
-  action.target_type ??= 1
-  action.up_type ??= 1
-  action.sway_type ??= 1
-  action.before_wait ??= 1
-  action.after_wait ??= 1
-  action.timeout ??= 15
-  action.input ??= ''
-  action.element ??= ''
-  action.target ??= ''
-  action.role ??= 'button'
-  action.element_id ??= null
-  action.target_id ??= ''
-
-  if (!Array.isArray(action.assert)) action.assert = []
-  if (!Array.isArray(action.cookies)) action.cookies = []
-  if (!Array.isArray(action.localstorage)) action.localstorage = []
-
-  script_info.value = node
-}
-
-// 顶部“AI脚本录入”按钮：先按旧架构的交互提供入口（后续可接真正的AI生成/录入流程）
-const ai_script_input = () => {
-  // 默认新增一个 AI 步骤并选中它
-  add_script({ type: 19, name: 'AI 步骤' })
-  const last = script_list.value?.[script_list.value.length - 1]
-  if (last) web_script_click(last)
-  ElMessage.success('已添加 AI 步骤，请在右侧填写脚本内容')
-}
-
-const save_web_script_handler = async (id: any) => {
-  const res: any = await save_web_script({
-    id,
-    script: script_list.value,
-  })
-  if (res.code === 200) {
-    ElMessage.success(res.message || '保存成功')
-  } else {
-    ElMessage.error(res.message || '保存失败，请重试')
-  }
-}
-
-const Delete_row = (list: any, data: any) => {
-  list.forEach((item: any, index: any) => {
-    if (item.name === data.name) {
-      list.splice(index, 1)
-    } else if (item.children.length > 0) {
-      Delete_row(item.children, data)
-    }
-  })
-  return false
-}
-
-const copy_row = (list: any, data: any) => {
-  const new_string = 'copy'
-  const new_data = {
-    name: `${data.name}-${new_string}`,
-    type: data.type,
-    status: true,
-    children: [],
-    action: data.action,
-  }
-  list.push(new_data)
-}
-
-const element_select_list = ref<any>([])
-const element_select = async () => {
-  const res: any = await get_element_select({})
-  element_select_list.value = res.data
-}
-
-const file_name = ref<any>(null)
-const file_url = ref<any>(null)
-const upload_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-
-const call_back = (fileMap: any) => {
-  ElMessage.success('上传文件成功（占位实现）')
-  file_url.value = fileMap.file_url
-  file_name.value = fileMap.filename
-}
-
-const file_script_path = ref<any>('')
-const call_back_1 = (fileMap: any) => {
-  file_script_path.value = `${fileMap.file_url}/${fileMap.filename}`
-}
-
-const add_file = (action: any) => {
-  action.input = file_script_path.value
-}
-
-const pid = ref<any>(null)
-const upload_file = (data: any) => {
-  pid.value = data.id
-  upload_koiDialogRef.value?.koiOpen()
-  title.value = '上传文件'
-}
-
-const upload_file_confirm = async () => {
-  const res: any = await input_element({
-    file_url: file_url.value,
-    file_name: file_name.value,
-    pid: pid.value,
-  })
-  if (res.code === 200) {
-    upload_koiDialogRef.value?.koiQuickClose(res.message || '上传成功')
-    await get_web_menu()
-  } else {
-    ElMessage.error('上传失败，请重试')
-  }
-}
-
-const upload_file_cancel = () => {
-  upload_koiDialogRef.value?.koiQuickClose('取消上传')
-}
-
-const run_script_form = ref<any>({
-  task_name: '',
-  browser: [],
-  script: [],
-  width: 1920,
-  height: 1080,
-  browser_type: 1,
-})
-const run_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const result_id = ref<any>('')
-
-const run_script = (item: any) => {
-  run_script_form.value.script = []
-  run_koiDialogRef.value?.koiOpen()
-  title.value = '请配置调试信息'
-  const script = {
-    id: item.id,
-    name: item.name,
-    type: item.type,
-  }
-  run_script_form.value.script.push(script)
-}
-
-const run_browsers = ref<any>([])
-const run_browser_active = ref<any>('')
-const res_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-
-const run_script_confirm = async () => {
-  if (run_script_form.value.script.length === 0) {
-    ElMessage.error('请选择脚本')
-    return
-  }
-  if (!run_script_form.value.task_name) {
-    ElMessage.error('请输入任务名称')
-    return
-  }
-  if (run_script_form.value.browser.length === 0) {
-    ElMessage.error('请选择浏览器')
-    return
-  }
-  if (run_script_form.value.browser.length > 1) {
-    ElMessage.error('抱歉，由于资源有限，单次仅支持一个浏览器执行')
-    return
-  }
-
-  run_browsers.value = []
-  result_id.value = String(Date.now())
-  run_script_form.value.result_id = result_id.value
-  await run_browser_show()
-  run_browser_active.value = run_script_form.value.browser[0]
-  title.value = `正在执行：${run_script_form.value.task_name}`
-  res_koiDialogRef.value?.koiOpen()
-  await startPolling()
-  const res: any = await run_web_script(run_script_form.value)
-  if (res.code === 10001) {
-    ElMessage.error(res.message || '执行失败')
-    res_koiDialogRef.value?.koiQuickClose(res.message)
-    stopPolling()
-  }
-}
-
-const run_browser_show = () => {
-  run_browsers.value = []
-  run_script_form.value.browser.forEach((item: any) => {
-    browser_list.value.forEach((browser: any) => {
-      if (browser.value === item) {
-        run_browsers.value.push({
-          name: browser.name,
-          value: browser.value,
-        })
-      }
-    })
-  })
-}
-
-const interval = ref<any>(null)
-
-const startPolling = async () => {
-  if (interval.value) return
-  interval.value = setInterval(get_run_result, 2000)
-}
-
-const stopPolling = () => {
-  if (interval.value) {
-    clearInterval(interval.value)
-    interval.value = null
-  }
-}
-
-const change_browser = async () => {
-  loading.value = true
-  await startPolling()
-  loading.value = false
-}
-
-const get_run_result = async () => {
-  run_type.value = '正在执行'
-  await get_result()
-  await get_result_log()
-}
-
-const web_result = ref<any>([])
-const web_result_log = ref<any>([])
-const run_type = ref<any>('')
-const run_count = ref<any>(0)
-const run_fail = ref<any>(0)
-const start_time = ref<any>('')
-const end_time = ref<any>('')
-const pre_video = ref<any>('')
-const img_show = ref<any>(false)
-const pre_img = ref<any>('')
-const trace = ref<any>('')
-
-const formatTime = (t: string) => t ? t.replace('T', ' ').slice(0, 19) : '-'
-
-const get_result = async () => {
-  const res: any = await get_web_result({
-    result_id: result_id.value,
-    browser: run_browser_active.value,
-  })
-  web_result.value = res.data
-  run_count.value = web_result.value.length
-  if (web_result.value.length > 0) {
-    start_time.value = formatTime(web_result.value[web_result.value.length - 1].create_time)
-  }
-  let fail = 0
-  web_result.value.forEach((item: any) => {
-    if (item.status === 0) {
-      fail += 1
-    }
-    if (item.name === '执行结束') {
-      stopPolling()
-      run_count.value -= 1
-      run_type.value = '执行结束'
-      end_time.value = formatTime(item.create_time)
-      pre_video.value = item.video
-      trace.value = item.trace
-    }
-  })
-  run_fail.value = fail
-}
-
-const get_result_log = async () => {
-  const res: any = await get_web_result_log({
-    result_id: result_id.value,
-    browser: run_browser_active.value,
-  })
-  web_result_log.value = res.data
-}
-
-const getIcon = (status: any) => (status === 1 ? 'Check' : 'Close')
-const colors = (status: any) => (status === 1 ? '#0bbd87' : '#d70e0e')
-const get_colors = (status: any) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e')
-const get_log_style = (data: any) => {
-  if (data.includes('失败')) {
-    return 'color: #d70e0e'
-  }
-  if (data.includes('补救')) {
-    return 'color: #1605ef'
-  }
-  return ''
-}
-
-const pre_view = (img: any) => {
-  pre_img.value = [img]
-  img_show.value = true
-}
-
-const close_img = () => {
-  img_show.value = false
-}
-
-const view_video = () => {
-  if (pre_video.value) window.open(pre_video.value)
-}
-
-const run_script_cancel = () => {
-  run_koiDialogRef.value?.koiQuickClose('取消调试')
-}
-
-const batch_run_script = () => {
-  run_script_form.value.script = []
-  run_koiDialogRef.value?.koiOpen()
-  title.value = '请配置调试信息'
-  run_script_form.value.script = select_list.value
-}
-
-const download_report = () => {
-  if (trace.value) window.open(trace.value)
-  view_trace()
-}
-
-const view_trace = () => {
-  window.open('https://trace.playwright.dev/')
-}
-
-onMounted(() => {
-  get_web_menu()
-  element_select()
-})
-</script>
-
 <template>
   <div>
     <div style="width: 100%; display: flex; gap: 8px; align-items: flex-start">
@@ -1718,7 +998,7 @@ onMounted(() => {
           </el-tabs>
         </div>
 
-        <!-- 各种对话框：新增/重命名/上传/运行结果等 -->
+
         <KoiDialog
           ref="add_koiDialogRef"
           :title="title"
@@ -1913,6 +1193,726 @@ onMounted(() => {
     </div>
   </div>
 </template>
+<script setup lang="ts">
+import { onMounted, ref, watch, computed } from 'vue'
+import { ElTree, ElMessage, ElMessageBox } from 'element-plus'
+import {
+  DocumentCopy,
+  Delete,
+  HomeFilled,
+  Folder,
+  ChromeFilled,
+  ArrowDown,
+  MoreFilled,
+  CirclePlus,
+  Edit,
+  Upload,
+  Remove,
+} from '@element-plus/icons-vue'
+import KoiDialog from '/@/components/koi/KoiDialog.vue'
+import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue'
+import {
+  web_menu,
+  get_web_script,
+  menu_script_list,
+  run_web_script,
+  get_web_result,
+  get_web_result_log,
+  add_web_menu,
+  del_web_menu,
+  rename_web_menu,
+  save_web_script,
+  input_element,
+  get_element_select,
+} from '/@/api/v1/web_management'
+
+// 数据表格加载页面动画
+const loading = ref(false)
+const filterText = ref<any>('')
+const treeRef = ref<InstanceType<typeof ElTree>>()
+const tree_data = ref<any>()
+const defaultProps = {
+  children: 'children',
+  label: 'name',
+}
+// 当前页面的脚本数据 — 始终指向当前激活 tab 的 script 数组
+const script_list = computed<any[]>(() => {
+  const active = tab_list.value.find((t: any) => t.name === tab_active.value)
+  return active?.content?.script ?? []
+})
+const script_info = ref<any>({
+  name: '',
+  type: 0,
+  status: true,
+  children: [],
+  action: {
+    type: 1,
+    locator: 1,
+    locator_select: 1,
+    target_locator: 1,
+    target_locator_select: 1,
+    target_type: 1,
+    up_type: 1,
+    sway_type: 1,
+    before_wait: 1,
+    after_wait: 1,
+    timeout: 15,
+    input: '',
+    element: '',
+    target: '',
+    assert: [],
+    cookies: [],
+    localstorage: [],
+    role: 'button',
+    element_id: null,
+    target_id: '',
+  },
+})
+const table_list = ref<any>([])
+const tab_active = ref('')
+const tab_list = ref<any>([])
+const add_menu_form = ref<any>({})
+const icon_style = ref<any>('padding-right: 5px; padding-left: 5px; padding-top: 4px;')
+const locator_list = ref<any>([
+  { name: '定位器', value: 1 },
+  { name: '选择器', value: 2 },
+])
+const locator_selects = ref<any>([
+  { label: 'id', value: 1 },
+  { label: 'text', value: 2 },
+  { label: 'label', value: 3 },
+  { label: 'title', value: 4 },
+  { label: 'placeholder', value: 5 },
+  { label: 'alt', value: 6 },
+  { label: 'role', value: 7 },
+])
+const role_list = ref<any>([
+  { label: 'button', value: 'button' },
+  { label: 'link', value: 'link' },
+  { label: 'tab', value: 'tab' },
+  { label: 'tabpanel', value: 'tabpanel' },
+  { label: 'textbox', value: 'textbox' },
+  { label: 'checkbox', value: 'checkbox' },
+  { label: 'radio', value: 'radio' },
+  { label: 'combobox', value: 'combobox' },
+  { label: 'listbox', value: 'listbox' },
+  { label: 'menu', value: 'menu' },
+  { label: 'menuitem', value: 'menuitem' },
+  { label: 'alert', value: 'alert' },
+  { label: 'status', value: 'status' },
+  { label: 'progressbar', value: 'progressbar' },
+  { label: 'spinbutton', value: 'spinbutton' },
+  { label: 'heading', value: 'heading' },
+  { label: 'tree', value: 'tree' },
+  { label: 'treeitem', value: 'treeitem' },
+])
+const browser_list = ref<any>([
+  { name: 'Chrome', value: 1 },
+  { name: 'Firefox', value: 2 },
+  { name: 'Edge', value: 3 },
+  { name: 'Safari', value: 4 },
+])
+
+// web目录过滤
+watch(filterText, (val) => {
+  treeRef.value?.filter(val)
+})
+
+const filterNode = (value: string, data: any): boolean => {
+  if (!value) return true
+  return data.name.includes(value)
+}
+
+const element_select_change = (selection: any) => {
+  console.log(selection)
+}
+
+const get_web_menu = async () => {
+  try {
+    loading.value = true
+    const res: any = await web_menu({})
+    tree_data.value = res.data
+  } catch {
+    ElMessage.error('数据查询失败，请刷新重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const web_menu_click = async (node: any) => {
+  try {
+    if (node.type === 1) {
+      const res: any = await menu_script_list({ id: node.id })
+      table_list.value = res.data
+      await addTab(node, res.data)
+    } else if (node.type === 2) {
+      const res: any = await get_web_script({ id: node.id })
+      script_info.value = res.data.script[0]
+      await addTab(node, res.data)
+    }
+  } catch {
+    ElMessage.error('数据查询失败，请刷新重试')
+  }
+}
+
+const addTab = async (node: any, target: any) => {
+  const newTabName = node.name
+  const index = tab_list.value.findIndex((item: any) => item.title === newTabName)
+  if (index === -1) {
+    tab_list.value.push({
+      title: newTabName,
+      name: newTabName,
+      content: target,
+      id: node.id,
+      type: node.type,
+    })
+  }
+  tab_active.value = node.name
+}
+
+const removeTab = (targetName: string) => {
+  const tabs = tab_list.value
+  let activeName = tab_active.value
+  if (activeName === targetName) {
+    tab_list.value.forEach((tab: any, index: any) => {
+      if (tab.name === targetName) {
+        const nextTab = tabs[index + 1] || tabs[index - 1]
+        if (nextTab) {
+          activeName = nextTab.name
+        }
+      }
+    })
+  }
+  tab_active.value = activeName
+  tab_list.value = tabs.filter((tab: any) => tab.name !== targetName)
+}
+
+const select_list = ref<any>([])
+const handleSelectionChange = (selection: any) => {
+  select_list.value = selection.sort((a: any, b: any) => a.step - b.step)
+}
+
+const menu_form = ref<any>({
+  name: '',
+  id: null,
+})
+const title = ref<string>('')
+const add_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const rename_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+
+const add_menu = (data: any) => {
+  title.value = '新增子菜单'
+  add_koiDialogRef.value?.koiOpen()
+  menu_form.value = data
+}
+
+const check_children = (data: any, menu: any) => {
+  if ('children' in data) {
+    data.children.push(menu)
+  } else {
+    data.children = []
+    data.children.push(menu)
+  }
+}
+
+const add_menu_confirm = async () => {
+  try {
+    add_menu_form.value.pid = menu_form.value.id
+    const res: any = await add_web_menu(add_menu_form.value)
+    await check_children(menu_form.value, res.data)
+    add_koiDialogRef.value?.koiQuickClose(res.message)
+  } catch {
+    ElMessage.error('保存失败，请重试')
+  } finally {
+    add_menu_form.value = {}
+  }
+}
+
+const add_menu_cancel = () => {
+  add_koiDialogRef.value?.koiClose()
+}
+
+const rename_menu = (data: any) => {
+  title.value = '重命名'
+  rename_koiDialogRef.value?.koiOpen()
+  menu_form.value = data
+}
+
+const edit_menu_confirm = async () => {
+  try {
+    add_menu_form.value.id = menu_form.value.id
+    const res: any = await rename_web_menu(add_menu_form.value)
+    rename_koiDialogRef.value?.koiQuickClose(res.message)
+    menu_form.value.name = add_menu_form.value.name
+  } catch {
+    ElMessage.error('保存失败，请重试')
+  } finally {
+    add_menu_form.value = {}
+  }
+}
+
+const edit_menu_cancel = () => {
+  rename_koiDialogRef.value?.koiClose()
+}
+
+const on_menu_allowDrop = (moveNode: any, inNode: any, type: any) => {
+  console.log(moveNode)
+  if (inNode.data.type === 2) {
+    return type !== 'inner'
+  }
+  return type
+}
+
+const del_menu = (data: any) => {
+  ElMessageBox.confirm('您确认需要删除该目录么？', '提示', {
+    type: 'warning',
+  })
+    .then(async () => {
+      const res: any = await del_web_menu({ id: data.id, type: data.type })
+      ElMessage.success(res.message || '删除成功')
+      await get_web_menu()
+    })
+    .catch(() => {})
+}
+
+const step_style = (type: any) => {
+  if (type === 0) {
+    return 'border: 1px solid #3e7be5; border-radius: 5px; width: 93%; color: #3e7be5'
+  } else if (type === 1 || type === 2 || type === 3 || type === 4) {
+    return 'border: 1px solid #400ae6; border-radius: 5px; width: 93%; color: #400ae6'
+  } else if (type === 5 || type === 6 || type === 7) {
+    return 'border: 1px solid #ee4866; border-radius: 5px; width: 93%; color: #ee4866'
+  } else if (type === 8 || type === 9) {
+    return 'border: 1px solid #e99516; border-radius: 5px; width: 93%; color: #e99516'
+  } else if (type === 10 || type === 11) {
+    return 'border: 1px solid #ea035f; border-radius: 5px; width: 93%; color: #ea035f'
+  } else if (type === 12) {
+    return 'border: 1px solid #20a162; border-radius: 5px; width: 93%; color: #20a162'
+  }
+  return 'border: 1px solid #3e7be5; border-radius: 5px; width: 93%; color: #3e7be5'
+}
+
+const random_string = (data_length: any) => {
+  return Array.from(crypto.getRandomValues(new Uint8Array(data_length)))
+    .map((n) => n.toString(36))
+    .join('')
+}
+
+// 自动化脚本：新增步骤
+const add_script = (command: any) => {
+  const active = tab_list.value.find((t: any) => t.name === tab_active.value)
+  if (!active?.content?.script) return
+  const new_string = random_string(2)
+  active.content.script.push({
+    name: `${command.name}-${new_string}`,
+    type: command.type,
+    status: true,
+    children: [],
+    action: {
+      type: 1,
+      locator: 1,
+      locator_select: 1,
+      target_locator: 1,
+      target_locator_select: 1,
+      input: '',
+      element: '',
+      element_id: null,
+      target: '',
+      target_id: '',
+      target_type: 1,
+      assert: [],
+      up_type: 1,
+      sway_type: 1,
+      wait_time: 1,
+      before_wait: 1,
+      after_wait: 1,
+      role: 'button',
+      cookies: [],
+      localstorage: [],
+      timeout: 15,
+    },
+  })
+}
+
+const config_active = ref('first')
+const assert_list = ref<any>([
+  { name: '元素存在', value: 1 },
+  { name: '元素不存在', value: 2 },
+  { name: '文本存在', value: 3 },
+  { name: '文本不存在', value: 4 },
+  { name: '页面属性', value: 5 },
+  { name: '自定义断言', value: 6 },
+  { name: 'AI 断言', value: 7 },
+])
+const browser_assert = ref<any>([
+  { name: '网页地址', value: 1 },
+  { name: '网页标题', value: 2 },
+])
+
+const add_assert = (data: any) => {
+  data.push({
+    type: 1,
+    locator: 1,
+    locator_select: 1,
+    page_type: 1,
+    element: '',
+    role: 'button',
+  })
+}
+
+const add_cookie = (data: any) => {
+  data.push({
+    name: '',
+    value: '',
+  })
+}
+
+const del_cookie = (data: any, index: any) => {
+  data.splice(index, 1)
+}
+
+const add_localstorage = (data: any) => {
+  data.push({
+    name: '',
+    value: '',
+  })
+}
+
+const del_localstorage = (data: any, index: any) => {
+  data.splice(index, 1)
+}
+
+const del_assert = (data: any, index: any) => {
+  data.splice(index, 1)
+}
+
+const web_script_click = (node: any) => {
+
+  if (!node.action) node.action = {}
+  const action = node.action
+
+  action.type ??= 1
+  action.locator ??= 1
+  action.locator_select ??= 1
+  action.target_locator ??= 1
+  action.target_locator_select ??= 1
+  action.target_type ??= 1
+  action.up_type ??= 1
+  action.sway_type ??= 1
+  action.before_wait ??= 1
+  action.after_wait ??= 1
+  action.timeout ??= 15
+  action.input ??= ''
+  action.element ??= ''
+  action.target ??= ''
+  action.role ??= 'button'
+  action.element_id ??= null
+  action.target_id ??= ''
+
+  if (!Array.isArray(action.assert)) action.assert = []
+  if (!Array.isArray(action.cookies)) action.cookies = []
+  if (!Array.isArray(action.localstorage)) action.localstorage = []
+
+  script_info.value = node
+}
+
+// 顶部“AI脚本录入”按钮：（后续可接真正的AI生成/录入流程）
+const ai_script_input = () => {
+  // 默认新增一个 AI 步骤并选中它
+  add_script({ type: 19, name: 'AI 步骤' })
+  const last = script_list.value?.[script_list.value.length - 1]
+  if (last) web_script_click(last)
+  ElMessage.success('已添加 AI 步骤，请在右侧填写脚本内容')
+}
+
+const save_web_script_handler = async (id: any) => {
+  const res: any = await save_web_script({
+    id,
+    script: script_list.value,
+  })
+  if (res.code === 200) {
+    ElMessage.success(res.message || '保存成功')
+  } else {
+    ElMessage.error(res.message || '保存失败，请重试')
+  }
+}
+
+const Delete_row = (list: any, data: any) => {
+  list.forEach((item: any, index: any) => {
+    if (item.name === data.name) {
+      list.splice(index, 1)
+    } else if (item.children.length > 0) {
+      Delete_row(item.children, data)
+    }
+  })
+  return false
+}
+
+const copy_row = (list: any, data: any) => {
+  const new_string = 'copy'
+  const new_data = {
+    name: `${data.name}-${new_string}`,
+    type: data.type,
+    status: true,
+    children: [],
+    action: data.action,
+  }
+  list.push(new_data)
+}
+
+const element_select_list = ref<any>([])
+const element_select = async () => {
+  const res: any = await get_element_select({})
+  element_select_list.value = res.data
+}
+
+const file_name = ref<any>(null)
+const file_url = ref<any>(null)
+const upload_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+
+const call_back = (fileMap: any) => {
+  ElMessage.success('上传文件成功（占位实现）')
+  file_url.value = fileMap.file_url
+  file_name.value = fileMap.filename
+}
+
+const file_script_path = ref<any>('')
+const call_back_1 = (fileMap: any) => {
+  file_script_path.value = `${fileMap.file_url}/${fileMap.filename}`
+}
+
+const add_file = (action: any) => {
+  action.input = file_script_path.value
+}
+
+const pid = ref<any>(null)
+const upload_file = (data: any) => {
+  pid.value = data.id
+  upload_koiDialogRef.value?.koiOpen()
+  title.value = '上传文件'
+}
+
+const upload_file_confirm = async () => {
+  const res: any = await input_element({
+    file_url: file_url.value,
+    file_name: file_name.value,
+    pid: pid.value,
+  })
+  if (res.code === 200) {
+    upload_koiDialogRef.value?.koiQuickClose(res.message || '上传成功')
+    await get_web_menu()
+  } else {
+    ElMessage.error('上传失败，请重试')
+  }
+}
+
+const upload_file_cancel = () => {
+  upload_koiDialogRef.value?.koiQuickClose('取消上传')
+}
+
+const run_script_form = ref<any>({
+  task_name: '',
+  browser: [],
+  script: [],
+  width: 1920,
+  height: 1080,
+  browser_type: 1,
+})
+const run_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const result_id = ref<any>('')
+
+const run_script = (item: any) => {
+  run_script_form.value.script = []
+  run_koiDialogRef.value?.koiOpen()
+  title.value = '请配置调试信息'
+  const script = {
+    id: item.id,
+    name: item.name,
+    type: item.type,
+  }
+  run_script_form.value.script.push(script)
+}
+
+const run_browsers = ref<any>([])
+const run_browser_active = ref<any>('')
+const res_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+
+const run_script_confirm = async () => {
+  if (run_script_form.value.script.length === 0) {
+    ElMessage.error('请选择脚本')
+    return
+  }
+  if (!run_script_form.value.task_name) {
+    ElMessage.error('请输入任务名称')
+    return
+  }
+  if (run_script_form.value.browser.length === 0) {
+    ElMessage.error('请选择浏览器')
+    return
+  }
+  if (run_script_form.value.browser.length > 1) {
+    ElMessage.error('抱歉，由于资源有限，单次仅支持一个浏览器执行')
+    return
+  }
+
+  run_browsers.value = []
+  result_id.value = String(Date.now())
+  run_script_form.value.result_id = result_id.value
+  await run_browser_show()
+  run_browser_active.value = run_script_form.value.browser[0]
+  title.value = `正在执行：${run_script_form.value.task_name}`
+  res_koiDialogRef.value?.koiOpen()
+  await startPolling()
+  const res: any = await run_web_script(run_script_form.value)
+  if (res.code === 10001) {
+    ElMessage.error(res.message || '执行失败')
+    res_koiDialogRef.value?.koiQuickClose(res.message)
+    stopPolling()
+  }
+}
+
+const run_browser_show = () => {
+  run_browsers.value = []
+  run_script_form.value.browser.forEach((item: any) => {
+    browser_list.value.forEach((browser: any) => {
+      if (browser.value === item) {
+        run_browsers.value.push({
+          name: browser.name,
+          value: browser.value,
+        })
+      }
+    })
+  })
+}
+
+const interval = ref<any>(null)
+
+const startPolling = async () => {
+  if (interval.value) return
+  interval.value = setInterval(get_run_result, 2000)
+}
+
+const stopPolling = () => {
+  if (interval.value) {
+    clearInterval(interval.value)
+    interval.value = null
+  }
+}
+
+const change_browser = async () => {
+  loading.value = true
+  await startPolling()
+  loading.value = false
+}
+
+const get_run_result = async () => {
+  run_type.value = '正在执行'
+  await get_result()
+  await get_result_log()
+}
+
+const web_result = ref<any>([])
+const web_result_log = ref<any>([])
+const run_type = ref<any>('')
+const run_count = ref<any>(0)
+const run_fail = ref<any>(0)
+const start_time = ref<any>('')
+const end_time = ref<any>('')
+const pre_video = ref<any>('')
+const img_show = ref<any>(false)
+const pre_img = ref<any>('')
+const trace = ref<any>('')
+
+const formatTime = (t: string) => t ? t.replace('T', ' ').slice(0, 19) : '-'
+
+const get_result = async () => {
+  const res: any = await get_web_result({
+    result_id: result_id.value,
+    browser: run_browser_active.value,
+  })
+  web_result.value = res.data
+  run_count.value = web_result.value.length
+  if (web_result.value.length > 0) {
+    start_time.value = formatTime(web_result.value[web_result.value.length - 1].create_time)
+  }
+  let fail = 0
+  web_result.value.forEach((item: any) => {
+    if (item.status === 0) {
+      fail += 1
+    }
+    if (item.name === '执行结束') {
+      stopPolling()
+      run_count.value -= 1
+      run_type.value = '执行结束'
+      end_time.value = formatTime(item.create_time)
+      pre_video.value = item.video
+      trace.value = item.trace
+    }
+  })
+  run_fail.value = fail
+}
+
+const get_result_log = async () => {
+  const res: any = await get_web_result_log({
+    result_id: result_id.value,
+    browser: run_browser_active.value,
+  })
+  web_result_log.value = res.data
+}
+
+const getIcon = (status: any) => (status === 1 ? 'Check' : 'Close')
+const colors = (status: any) => (status === 1 ? '#0bbd87' : '#d70e0e')
+const get_colors = (status: any) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e')
+const get_log_style = (data: any) => {
+  if (data.includes('失败')) {
+    return 'color: #d70e0e'
+  }
+  if (data.includes('补救')) {
+    return 'color: #1605ef'
+  }
+  return ''
+}
+
+const pre_view = (img: any) => {
+  pre_img.value = [img]
+  img_show.value = true
+}
+
+const close_img = () => {
+  img_show.value = false
+}
+
+const view_video = () => {
+  if (pre_video.value) window.open(pre_video.value)
+}
+
+const run_script_cancel = () => {
+  run_koiDialogRef.value?.koiQuickClose('取消调试')
+}
+
+const batch_run_script = () => {
+  run_script_form.value.script = []
+  run_koiDialogRef.value?.koiOpen()
+  title.value = '请配置调试信息'
+  run_script_form.value.script = select_list.value
+}
+
+const download_report = () => {
+  if (trace.value) window.open(trace.value)
+  view_trace()
+}
+
+const view_trace = () => {
+  window.open('https://trace.playwright.dev/')
+}
+
+onMounted(() => {
+  get_web_menu()
+  element_select()
+})
+</script>
+
+
 
 <style lang="scss" scoped>
 /* 脚本信息区域 */

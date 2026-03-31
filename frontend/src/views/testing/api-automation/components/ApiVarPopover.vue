@@ -1,3 +1,60 @@
+<template>
+	<div class="api-var-popover">
+		<el-form :inline="true">
+			<el-form-item label="名称">
+				<el-input v-model="searchParams.search.name__contains" placeholder="请输入名称" clearable style="width: 160px" />
+			</el-form-item>
+			<el-form-item>
+				<el-button type="primary" @click="get_var">搜索</el-button>
+				<el-button @click="reset_search">重置</el-button>
+				<el-button type="success" @click="openAdd">添加变量</el-button>
+			</el-form-item>
+		</el-form>
+		<el-table :data="var_list" border stripe size="small" max-height="320">
+			<el-table-column prop="name" label="变量名" width="120" />
+			<el-table-column prop="value" label="变量值" show-overflow-tooltip />
+			<el-table-column label="更新时间" width="160">
+				<template #default="{ row }">{{ formatTime(row.update_time || row.creation_date || row.created_at) }}</template>
+			</el-table-column>
+			<el-table-column prop="username" label="最后更新人" width="100" />
+			<el-table-column label="操作" width="120" fixed="right">
+				<template #default="{ row }">
+					<el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
+					<el-button type="danger" link size="small" @click="Del_var(row)">删除</el-button>
+				</template>
+			</el-table-column>
+		</el-table>
+		<el-pagination
+			small
+			layout="total, prev, pager, next"
+			:total="total"
+			:page-size="searchParams.pageSize"
+			:current-page="searchParams.currentPage"
+			@current-change="(p: number) => { searchParams.currentPage = p; get_var(); }"
+		/>
+		<el-dialog v-model="addDialog" :title="title" width="400px" destroy-on-close>
+			<el-form :model="add_form" label-width="80px">
+				<el-form-item label="变量名"><el-input v-model="add_form.name" placeholder="请输入变量名" /></el-form-item>
+				<el-form-item label="变量值"><el-input v-model="add_form.value" type="textarea" :rows="3" placeholder="请输入变量值" /></el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="addDialog = false">取消</el-button>
+				<el-button type="primary" @click="add_confirm">确定</el-button>
+			</template>
+		</el-dialog>
+		<el-dialog v-model="editDialog" :title="title" width="400px" destroy-on-close>
+			<el-form :model="add_form" label-width="80px">
+				<el-form-item label="变量名"><el-input v-model="add_form.name" placeholder="请输入变量名" /></el-form-item>
+				<el-form-item label="变量值"><el-input v-model="add_form.value" type="textarea" :rows="3" placeholder="请输入变量值" /></el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="editDialog = false">取消</el-button>
+				<el-button type="primary" @click="edit_confirm">确定</el-button>
+			</template>
+		</el-dialog>
+	</div>
+</template>
+
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -67,63 +124,6 @@ const Del_var = async (row: any) => {
 
 onMounted(() => get_var());
 </script>
-
-<template>
-	<div class="api-var-popover">
-		<el-form :inline="true">
-			<el-form-item label="名称">
-				<el-input v-model="searchParams.search.name__contains" placeholder="请输入名称" clearable style="width: 160px" />
-			</el-form-item>
-			<el-form-item>
-				<el-button type="primary" @click="get_var">搜索</el-button>
-				<el-button @click="reset_search">重置</el-button>
-				<el-button type="success" @click="openAdd">添加变量</el-button>
-			</el-form-item>
-		</el-form>
-		<el-table :data="var_list" border stripe size="small" max-height="320">
-			<el-table-column prop="name" label="变量名" width="120" />
-			<el-table-column prop="value" label="变量值" show-overflow-tooltip />
-			<el-table-column label="更新时间" width="160">
-				<template #default="{ row }">{{ formatTime(row.update_time || row.creation_date || row.created_at) }}</template>
-			</el-table-column>
-			<el-table-column prop="username" label="最后更新人" width="100" />
-			<el-table-column label="操作" width="120" fixed="right">
-				<template #default="{ row }">
-					<el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
-					<el-button type="danger" link size="small" @click="Del_var(row)">删除</el-button>
-				</template>
-			</el-table-column>
-		</el-table>
-		<el-pagination
-			small
-			layout="total, prev, pager, next"
-			:total="total"
-			:page-size="searchParams.pageSize"
-			:current-page="searchParams.currentPage"
-			@current-change="(p: number) => { searchParams.currentPage = p; get_var(); }"
-		/>
-		<el-dialog v-model="addDialog" :title="title" width="400px" destroy-on-close>
-			<el-form :model="add_form" label-width="80px">
-				<el-form-item label="变量名"><el-input v-model="add_form.name" placeholder="请输入变量名" /></el-form-item>
-				<el-form-item label="变量值"><el-input v-model="add_form.value" type="textarea" :rows="3" placeholder="请输入变量值" /></el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="addDialog = false">取消</el-button>
-				<el-button type="primary" @click="add_confirm">确定</el-button>
-			</template>
-		</el-dialog>
-		<el-dialog v-model="editDialog" :title="title" width="400px" destroy-on-close>
-			<el-form :model="add_form" label-width="80px">
-				<el-form-item label="变量名"><el-input v-model="add_form.name" placeholder="请输入变量名" /></el-form-item>
-				<el-form-item label="变量值"><el-input v-model="add_form.value" type="textarea" :rows="3" placeholder="请输入变量值" /></el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="editDialog = false">取消</el-button>
-				<el-button type="primary" @click="edit_confirm">确定</el-button>
-			</template>
-		</el-dialog>
-	</div>
-</template>
 
 <style scoped>
 .api-var-popover { padding: 5px; }

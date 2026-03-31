@@ -1,4 +1,4 @@
-# AI助手模块 - 业务逻辑层
+# -*- coding: utf-8 -*-
 
 import json
 import httpx
@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc, asc
 from sqlalchemy.orm import selectinload
-
 from app.corelibs.logger import logger
 from app.exceptions.exceptions import MyBaseException
 from .model import AIAssistantConfig, AIConversation, AIMessage

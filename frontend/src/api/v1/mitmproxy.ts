@@ -1,6 +1,5 @@
 /**
  * mitmproxy 抓包模块接口
- * 对应后端 /api/v1/mitmproxy/*
  */
 import request from '/@/utils/request';
 

@@ -1,6 +1,5 @@
 """
-UI自动化模块 - 同步执行引擎
-使用同步 Playwright 避免 Windows asyncio subprocess 问题
+UI自动化模块 - 同步执行引擎使用同步 Playwright 避免 Windows asyncio subprocess 问题
 """
 import time
 import logging

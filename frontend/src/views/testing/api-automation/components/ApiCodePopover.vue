@@ -1,3 +1,58 @@
+<template>
+	<div class="api-code-popover">
+		<el-form :inline="true">
+			<el-form-item label="名称">
+				<el-input v-model="searchParams.search.name__contains" placeholder="名称" clearable style="width: 120px" />
+			</el-form-item>
+			<el-form-item label="编码">
+				<el-input v-model="searchParams.search.code__contains" placeholder="编码" clearable style="width: 120px" />
+			</el-form-item>
+			<el-form-item>
+				<el-button type="primary" @click="get_code">搜索</el-button>
+				<el-button @click="reset_search">重置</el-button>
+				<el-button type="success" @click="openAdd">添加错误码</el-button>
+			</el-form-item>
+		</el-form>
+		<el-table :data="code_list" border stripe size="small" max-height="280">
+			<el-table-column prop="name" label="名称" width="120" />
+			<el-table-column prop="code" label="错误码" show-overflow-tooltip />
+			<el-table-column label="操作" width="120" fixed="right">
+				<template #default="{ row }">
+					<el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
+					<el-button type="danger" link size="small" @click="Del_code(row)">删除</el-button>
+				</template>
+			</el-table-column>
+		</el-table>
+		<el-pagination
+			small
+			layout="total, prev, pager, next"
+			:total="total"
+			:page-size="searchParams.pageSize"
+			:current-page="searchParams.currentPage"
+			@current-change="(p: number) => { searchParams.currentPage = p; get_code(); }"
+		/>
+		<el-dialog v-model="addDialog" :title="title" width="400px" destroy-on-close>
+			<el-form :model="add_form" label-width="80px">
+				<el-form-item label="名称"><el-input v-model="add_form.name" placeholder="请输入名称" /></el-form-item>
+				<el-form-item label="错误码"><el-input v-model="add_form.code" placeholder="请输入错误码" /></el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="addDialog = false">取消</el-button>
+				<el-button type="primary" @click="add_confirm">确定</el-button>
+			</template>
+		</el-dialog>
+		<el-dialog v-model="editDialog" :title="title" width="400px" destroy-on-close>
+			<el-form :model="add_form" label-width="80px">
+				<el-form-item label="名称"><el-input v-model="add_form.name" placeholder="请输入名称" /></el-form-item>
+				<el-form-item label="错误码"><el-input v-model="add_form.code" placeholder="请输入错误码" /></el-form-item>
+			</el-form>
+			<template #footer>
+				<el-button @click="editDialog = false">取消</el-button>
+				<el-button type="primary" @click="edit_confirm">确定</el-button>
+			</template>
+		</el-dialog>
+	</div>
+</template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -60,61 +115,7 @@ const Del_code = async (row: any) => {
 onMounted(() => get_code());
 </script>
 
-<template>
-	<div class="api-code-popover">
-		<el-form :inline="true">
-			<el-form-item label="名称">
-				<el-input v-model="searchParams.search.name__contains" placeholder="名称" clearable style="width: 120px" />
-			</el-form-item>
-			<el-form-item label="编码">
-				<el-input v-model="searchParams.search.code__contains" placeholder="编码" clearable style="width: 120px" />
-			</el-form-item>
-			<el-form-item>
-				<el-button type="primary" @click="get_code">搜索</el-button>
-				<el-button @click="reset_search">重置</el-button>
-				<el-button type="success" @click="openAdd">添加错误码</el-button>
-			</el-form-item>
-		</el-form>
-		<el-table :data="code_list" border stripe size="small" max-height="280">
-			<el-table-column prop="name" label="名称" width="120" />
-			<el-table-column prop="code" label="错误码" show-overflow-tooltip />
-			<el-table-column label="操作" width="120" fixed="right">
-				<template #default="{ row }">
-					<el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
-					<el-button type="danger" link size="small" @click="Del_code(row)">删除</el-button>
-				</template>
-			</el-table-column>
-		</el-table>
-		<el-pagination
-			small
-			layout="total, prev, pager, next"
-			:total="total"
-			:page-size="searchParams.pageSize"
-			:current-page="searchParams.currentPage"
-			@current-change="(p: number) => { searchParams.currentPage = p; get_code(); }"
-		/>
-		<el-dialog v-model="addDialog" :title="title" width="400px" destroy-on-close>
-			<el-form :model="add_form" label-width="80px">
-				<el-form-item label="名称"><el-input v-model="add_form.name" placeholder="请输入名称" /></el-form-item>
-				<el-form-item label="错误码"><el-input v-model="add_form.code" placeholder="请输入错误码" /></el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="addDialog = false">取消</el-button>
-				<el-button type="primary" @click="add_confirm">确定</el-button>
-			</template>
-		</el-dialog>
-		<el-dialog v-model="editDialog" :title="title" width="400px" destroy-on-close>
-			<el-form :model="add_form" label-width="80px">
-				<el-form-item label="名称"><el-input v-model="add_form.name" placeholder="请输入名称" /></el-form-item>
-				<el-form-item label="错误码"><el-input v-model="add_form.code" placeholder="请输入错误码" /></el-form-item>
-			</el-form>
-			<template #footer>
-				<el-button @click="editDialog = false">取消</el-button>
-				<el-button type="primary" @click="edit_confirm">确定</el-button>
-			</template>
-		</el-dialog>
-	</div>
-</template>
+
 
 <style scoped>
 .api-code-popover { padding: 5px; }

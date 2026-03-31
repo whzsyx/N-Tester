@@ -123,13 +123,38 @@ const {isRequestRoutes} = themeConfig.value;
 			if (routesList.value.length === 0 && !isGet.value) {
 				if (isRequestRoutes) {
 					// 后端控制路由：路由数据初始化，防止刷新时丢失
-					await initBackEndControlRoutes();
-					// 解决刷新时，一直跳 404 页面问题，关联问题 No match found for location with path 'xxx'
-					// to.query 防止页面刷新时，普通路由带参数时，参数丢失。动态路由（xxx/:id/:name"）isDynamic 无需处理
-					next({path: to.path, query: to.query});
+					try {
+						await initBackEndControlRoutes();
+						// 确保路由初始化完成后再进行导航
+						// 使用 nextTick 确保 DOM 更新完成
+						await new Promise(resolve => setTimeout(resolve, 100));
+						// 检查目标路由是否已注册
+						const targetRoute = router.resolve(to.path);
+						if (targetRoute.matched.length > 0) {
+							next({path: to.path, query: to.query});
+						} else {
+							// 如果路由仍未找到，尝试导航到首页
+							console.warn(`路由未找到: ${to.path}，重定向到首页`);
+							next('/home');
+						}
+					} catch (error) {
+						console.error('路由初始化失败:', error);
+						next('/home');
+					}
 				} else {
-					await initFrontEndControlRoutes();
-					next({path: to.path, query: to.query});
+					try {
+						await initFrontEndControlRoutes();
+						await new Promise(resolve => setTimeout(resolve, 100));
+						const targetRoute = router.resolve(to.path);
+						if (targetRoute.matched.length > 0) {
+							next({path: to.path, query: to.query});
+						} else {
+							next('/home');
+						}
+					} catch (error) {
+						console.error('前端路由初始化失败:', error);
+						next('/home');
+					}
 				}
 			} else {
 				next();

@@ -1,5 +1,5 @@
 """
-API测试模块 - 业务逻辑层
+API测试模块业务逻辑层
 """
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -612,7 +612,7 @@ class APITestSuiteService:
         
         # 如果提供了request_ids，更新关联关系
         if request_ids is not None:
-            # 删除旧的关联
+
             await api_test_suite_request_crud.delete_by_suite_id(
                 db=db,
                 test_suite_id=test_suite_id,

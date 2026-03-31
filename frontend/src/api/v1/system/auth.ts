@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 认证API - 新架构
+ * 认证API
  */
 export function useAuthApi() {
   return {

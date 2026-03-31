@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 字典管理API - 新架构
+ * 字典管理API
  */
 
 // ==================== 字典类型 ====================
@@ -179,8 +179,7 @@ export function useDictDataApi() {
 }
 
 
-// ==================== 兼容旧API ====================
-// 为了兼容旧的lookup页面，提供useDictApi别名
+
 export function useDictApi() {
   // 返回一个空对象，避免报错
   // 如果需要使用lookup功能，请使用useDictTypeApi或useDictDataApi

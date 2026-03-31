@@ -1,7 +1,5 @@
 """
 云真机模块 - 控制器
-处理设备管理、远程控制、APP安装等相关API请求
-迁移自 l-tester/views/app/device_view.py
 """
 import os
 from fastapi import APIRouter, Depends, Request
@@ -72,7 +70,7 @@ async def device_info_list(
     """获取设备详细信息"""
     try:
         body = await body_to_json(request)
-        # 对齐旧架构：支持 search + currentPage/pageSize 的分页结构
+        
         page = int((body or {}).get("currentPage") or 1)
         page_size = int((body or {}).get("pageSize") or 24)
         search = (body or {}).get("search") or {}
@@ -312,7 +310,7 @@ async def edit_device(
     """编辑设备"""
     try:
         data = await body_to_json(request)
-        device_id = data.pop("id")  # 从数据中取出设备ID
+        device_id = data.pop("id") 
         result = await DeviceService.edit_device(db, device_id, data, current_user_id)
         
         if result["success"]:

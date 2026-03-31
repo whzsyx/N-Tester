@@ -1,5 +1,3 @@
-// 1:1 迁移自 l-vue-ui/src/api/api_app/img.ts
-// 映射到新后端 /api/v1/app_management/*（后端将补齐 img_* 端点）
 import axios from '@/utils/axios.ts';
 
 enum API {

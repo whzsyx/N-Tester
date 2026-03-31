@@ -1,5 +1,5 @@
 """
-APP管理模块 - 业务逻辑服务
+APP管理模块业务逻辑服务
 """
 from typing import List, Optional, Dict, Any
 import asyncio
@@ -12,7 +12,6 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, delete
 from sqlalchemy.orm.attributes import flag_modified
-
 from app.api.v1.cloud_device.model import AppDevice
 from app.api.v1.system.file.service import FileService
 
@@ -30,7 +29,7 @@ from .executor import run_appium_process
 class AppManagementService:
     """APP管理服务"""
 
-    # 迁移阶段：用于 pid_status 快速定位（单进程内有效；最终应替换为可持久化/可分布式的执行器）
+    # 用于 pid_status 快速定位（单进程内有效；最终应替换为可持久化/可分布式的执行器）
     _pid_index: Dict[int, Dict[str, str]] = {}
     _proc_index: Dict[int, multiprocessing.Process] = {}
 
@@ -74,7 +73,6 @@ class AppManagementService:
     @staticmethod
     async def get_app_menu(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
         """获取APP脚本菜单树"""
-        # 按旧系统行为：默认根目录需要在数据库中存在（否则无法“新建子菜单”）
         # 若该用户尚未创建根目录，则自动补一条 type=0 的根节点记录。
         root_row = (
             await db.execute(
@@ -89,22 +87,6 @@ class AppManagementService:
         if not root_row:
             root_row = AppMenuModel(name="根目录", pid=0, type=0, user_id=user_id)
             db.add(root_row)
-            await db.commit()
-
-        # 默认菜单：根目录下默认创建一个“APP自动化”文件夹（type=1）
-        default_folder = (
-            await db.execute(
-                select(AppMenuModel).where(
-                    AppMenuModel.user_id == user_id,
-                    AppMenuModel.enabled_flag == 1,
-                    AppMenuModel.type == 1,
-                    AppMenuModel.pid == int(root_row.id),
-                    AppMenuModel.name == "APP自动化",
-                )
-            )
-        ).scalar_one_or_none()
-        if not default_folder:
-            db.add(AppMenuModel(name="APP自动化", pid=int(root_row.id), type=1, user_id=user_id))
             await db.commit()
 
         result = await db.execute(
@@ -125,14 +107,87 @@ class AppManagementService:
             else:
                 roots.append(node_map[n["id"]])
 
-        # 返回数据库根节点（type=0/pid=0），确保“新建子菜单”pid 指向真实 id
+       
         root_node = node_map.get(int(root_row.id))
         if not root_node:
-            # 极端情况下（刚插入后本次查询未包含），兜底返回一个虚拟根
+          
             return [{"id": int(root_row.id), "name": root_row.name, "pid": 0, "type": 0, "children": roots}]
 
-        # 只保留根节点作为顶层
+        
         return [root_node]
+    @staticmethod
+    async def recover_root_menu(db: AsyncSession, user_id: int) -> Dict[str, Any]:
+        """恢复被软删除的根目录"""
+        # 查找被软删除的根目录
+        soft_deleted_root = (
+            await db.execute(
+                select(AppMenuModel).where(
+                    AppMenuModel.user_id == user_id,
+                    AppMenuModel.enabled_flag == 0,
+                    AppMenuModel.type == 0,
+                    AppMenuModel.pid == 0,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if soft_deleted_root:
+            # 恢复根目录
+            await db.execute(
+                update(AppMenuModel)
+                .where(AppMenuModel.id == soft_deleted_root.id)
+                .values(enabled_flag=1)
+            )
+
+            # 恢复相关的脚本记录
+            await db.execute(
+                update(AppScriptModel)
+                .where(AppScriptModel.menu_id == soft_deleted_root.id)
+                .values(enabled_flag=1)
+            )
+
+            await db.commit()
+            return {"success": True, "message": "根目录已恢复", "recovered": True}
+        else:
+            # 检查是否已经存在启用的根目录
+            existing_root = (
+                await db.execute(
+                    select(AppMenuModel).where(
+                        AppMenuModel.user_id == user_id,
+                        AppMenuModel.enabled_flag == 1,
+                        AppMenuModel.type == 0,
+                        AppMenuModel.pid == 0,
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if existing_root:
+                return {"success": True, "message": "根目录已存在", "recovered": False}
+            
+            # 没有找到软删除的根目录，创建新的
+            root_row = AppMenuModel(name="根目录", pid=0, type=0, user_id=user_id)
+            db.add(root_row)
+            await db.flush()
+
+            # 检查是否已存在APP自动化文件夹
+            existing_app_folder = (
+                await db.execute(
+                    select(AppMenuModel).where(
+                        AppMenuModel.user_id == user_id,
+                        AppMenuModel.name == "APP自动化",
+                        AppMenuModel.pid == int(root_row.id),
+                        AppMenuModel.type == 1,
+                        AppMenuModel.enabled_flag == 1,
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if not existing_app_folder:
+                # 创建默认的APP自动化文件夹
+                db.add(AppMenuModel(name="APP自动化", pid=int(root_row.id), type=1, user_id=user_id))
+            
+            await db.commit()
+            return {"success": True, "message": "根目录已创建", "recovered": False}
+
     
     @staticmethod
     async def get_app_script(db: AsyncSession, menu_id: int, user_id: int) -> Optional[Dict[str, Any]]:
@@ -144,7 +199,7 @@ class AppManagementService:
         )
         row = result.scalar_one_or_none()
         if not row:
-            # 对齐旧行为：脚本不存在时返回空脚本结构
+         
             return {"id": None, "menu_id": menu_id, "script": []}
         return {"id": row.id, "menu_id": row.menu_id, "script": row.script or []}
     
@@ -166,7 +221,7 @@ class AppManagementService:
 
     @staticmethod
     async def menu_script_list(db: AsyncSession, pid: int, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /menu_script_list：查询 pid 下的菜单列表"""
+        """查询 pid 下的菜单列表"""
         result = await db.execute(
             select(AppMenuModel).where(
                 AppMenuModel.pid == pid, AppMenuModel.user_id == user_id, AppMenuModel.enabled_flag == 1
@@ -177,7 +232,7 @@ class AppManagementService:
 
     @staticmethod
     async def get_script_list(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /get_script_list：查询 type=2 的脚本菜单"""
+        """查询 type=2 的脚本菜单"""
         result = await db.execute(
             select(AppMenuModel).where(
                 AppMenuModel.type == 2, AppMenuModel.user_id == user_id, AppMenuModel.enabled_flag == 1
@@ -188,7 +243,7 @@ class AppManagementService:
 
     @staticmethod
     async def view_script_list(db: AsyncSession, menu_id: int, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /view_script_list：返回脚本内容列表"""
+        """返回脚本内容列表"""
         row = (
             await db.execute(
                 select(AppScriptModel).where(
@@ -200,7 +255,7 @@ class AppManagementService:
 
     @staticmethod
     async def _resolve_img_field(db: AsyncSession, ref: Any) -> Any:
-        """对齐旧 get_img_address：将 [menu_id, img_id] 解析为可给 Airtest Template 使用的路径"""
+        """解析为可给 Airtest Template 使用的路径"""
         if ref is None:
             return None
         if isinstance(ref, (list, tuple)) and len(ref) >= 2:
@@ -222,7 +277,7 @@ class AppManagementService:
 
     @staticmethod
     async def resolve_script_steps(db: AsyncSession, steps: List[Dict[str, Any]], user_id: int) -> List[Dict[str, Any]]:
-        """执行前解析脚本里引用的图像库 id（对齐旧 app_common.get_img_address）"""
+        """执行前解析脚本里引用的图像库 id"""
         _ = user_id  # 预留：可按菜单归属做强校验
         resolved: List[Dict[str, Any]] = []
         type_need = {0, 2, 3, 4, 5}
@@ -246,7 +301,7 @@ class AppManagementService:
     
     @staticmethod
     async def execute_app_script(db: AsyncSession, script_config: Dict[str, Any], device_id: str, user_id: int) -> Dict[str, Any]:
-        """执行单个APP脚本（子进程跑 Airtest，对齐旧 l-tester run_script）"""
+        """执行单个APP脚本（子进程跑 Airtest"""
         menu_id = int(script_config["id"])
         task_name = str(script_config.get("task_name") or "APP自动化任务")
         result_id = str(script_config.get("result_id") or str(int(time.time() * 1000)))
@@ -255,7 +310,7 @@ class AppManagementService:
         version = str(script_config.get("version") or "")
         channel_id = str(script_config.get("channel_id") or "")
 
-        # 标记设备使用中（对齐旧逻辑）
+        # 标记设备使用中
         for d in device_list:
             deviceid = d.get("deviceid")
             if deviceid:
@@ -369,7 +424,7 @@ class AppManagementService:
         user_id: int,
         run_options: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """执行APP脚本集（按旧逻辑：每个脚本菜单保留独立 id 块顺序执行）"""
+        """执行APP脚本集"""
         ro = run_options or {}
         result_id = str(ro.get("result_id") or int(time.time() * 1000))
         task_name = str(ro.get("task_name") or "APP自动化任务")
@@ -515,28 +570,75 @@ class AppManagementService:
         menu = AppMenuModel(name=name, pid=pid, type=mtype, user_id=user_id)
         db.add(menu)
         await db.flush()
-        # 对齐旧：创建对应脚本占位
+        
         db.add(AppScriptModel(menu_id=menu.id, script=[], user_id=user_id))
         await db.commit()
         return {"id": menu.id, "name": name, "pid": pid, "type": mtype}
     
     @staticmethod
     async def delete_app_menu(db: AsyncSession, menu_id: int, user_id: int) -> bool:
-        """删除APP菜单"""
-        # 若存在子菜单，阻止删除（对齐旧 del_fail 行为）
-        child_count = await db.execute(
-            select(func.count()).select_from(AppMenuModel).where(AppMenuModel.pid == menu_id, AppMenuModel.user_id == user_id)
+        """删除APP菜单 - 硬删除（递归删除子节点）"""
+        try:
+            # 检查是否为根目录
+            menu_row = (
+                await db.execute(
+                    select(AppMenuModel).where(
+                        AppMenuModel.id == menu_id, 
+                        AppMenuModel.user_id == user_id,
+                        AppMenuModel.enabled_flag == 1
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if not menu_row:
+                return False
+                
+            # 防止删除根目录
+            if menu_row.type == 0:
+                raise ValueError("根目录不能删除")
+            
+            # 递归删除所有子节点
+            await AppManagementService._delete_menu_recursive(db, menu_id, user_id)
+            
+            await db.commit()
+            return True
+        except Exception as e:
+            await db.rollback()
+            raise e
+    
+    @staticmethod
+    async def _delete_menu_recursive(db: AsyncSession, menu_id: int, user_id: int):
+        """递归删除菜单及其所有子节点"""
+        # 查找所有子节点
+        child_menus = await db.execute(
+            select(AppMenuModel).where(
+                AppMenuModel.pid == menu_id, 
+                AppMenuModel.user_id == user_id,
+                AppMenuModel.enabled_flag == 1
+            )
         )
-        if int(child_count.scalar() or 0) > 0:
-            return False
+        child_list = child_menus.scalars().all()
+        
+        # 递归删除每个子节点
+        for child in child_list:
+            await AppManagementService._delete_menu_recursive(db, child.id, user_id)
+        
+        # 删除当前节点的脚本记录
         await db.execute(
-            update(AppMenuModel).where(AppMenuModel.id == menu_id, AppMenuModel.user_id == user_id).values(enabled_flag=0)
+            delete(AppScriptModel).where(
+                AppScriptModel.menu_id == menu_id, 
+                AppScriptModel.user_id == user_id
+            )
         )
-        await db.execute(
-            update(AppScriptModel).where(AppScriptModel.menu_id == menu_id, AppScriptModel.user_id == user_id).values(enabled_flag=0)
+        
+        # 删除当前节点
+        result = await db.execute(
+            delete(AppMenuModel).where(
+                AppMenuModel.id == menu_id, 
+                AppMenuModel.user_id == user_id
+            )
         )
-        await db.commit()
-        return True
+        print(f"删除菜单 {menu_id}, 影响行数: {result.rowcount}")  # 调试日志
     
     @staticmethod
     async def rename_app_menu(db: AsyncSession, menu_id: int, new_name: str, user_id: int) -> Dict[str, Any]:
@@ -549,7 +651,7 @@ class AppManagementService:
     
     @staticmethod
     async def get_app_result(db: AsyncSession, result_id: str, user_id: int) -> Dict[str, Any]:
-        """获取APP执行结果（任务汇总行，对应 app_result_lists）"""
+        """获取APP执行"""
         result = await db.execute(
             select(AppResultListModel).where(AppResultListModel.result_id == result_id, AppResultListModel.user_id == user_id)
         )
@@ -571,7 +673,7 @@ class AppManagementService:
     async def get_app_result_steps_for_device(
         db: AsyncSession, result_id: str, device: str, user_id: int
     ) -> List[Dict[str, Any]]:
-        """对齐旧 /get_app_result：单设备步骤结果列表（order_by -id）"""
+        """单设备步骤结果列表（order_by -id）"""
         result = await db.execute(
             select(AppResultModel)
             .where(
@@ -604,7 +706,7 @@ class AppManagementService:
 
     @staticmethod
     async def get_app_result_detail(db: AsyncSession, result_id: str, user_id: int) -> Dict[str, Any]:
-        """对齐旧 /get_app_result_detail：返回汇总详情 + 设备状态/统计"""
+        """get_app_result_detail：返回汇总详情 + 设备状态/统计"""
         row = (
             await db.execute(
                 select(AppResultListModel).where(
@@ -630,7 +732,7 @@ class AppManagementService:
         for d in data["device_list"]:
             deviceid = d.get("deviceid")
             s = device_dict.get(deviceid)
-            # 兼容历史数据：旧数据可能只在 script_status 中存 pid/name，不在 device_list 中存
+            
             if s:
                 if d.get("pid") is None and s.get("pid") is not None:
                     d["pid"] = s.get("pid")
@@ -662,7 +764,7 @@ class AppManagementService:
     async def get_result_detail(
         db: AsyncSession, result_id: str, device: str, user_id: int
     ) -> Dict[str, Any]:
-        """对齐旧 /get_result_detail：单设备在 script_status 中的汇总（用于实时监控顶部统计）"""
+        """get_result_detail：单设备在 script_status 中的汇总（用于实时监控顶部统计）"""
         row = (
             await db.execute(
                 select(AppResultListModel).where(
@@ -699,7 +801,7 @@ class AppManagementService:
 
     @staticmethod
     async def get_result_list(db: AsyncSession, result_id: str, menu_id: int, device: str, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /get_result_list：返回单设备单脚本的结果记录"""
+        """get_result_list：返回单设备单脚本的结果记录"""
         result = await db.execute(
             select(AppResultModel)
             .where(
@@ -733,7 +835,7 @@ class AppManagementService:
 
     @staticmethod
     async def app_correction(db: AsyncSession, result_id: str, device: str, user_id: int) -> None:
-        """对齐旧 /app_correction：将失败(0)置为成功(1)"""
+        """app_correction：将失败(0)置为成功(1)"""
         await db.execute(
             update(AppResultModel)
             .where(
@@ -748,7 +850,7 @@ class AppManagementService:
 
     @staticmethod
     async def app_menu_select(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /app_menu_select：返回 type=1 的菜单 id/name"""
+        """app_menu_select：返回 type=1 的菜单 id/name"""
         result = await db.execute(
             select(AppMenuModel).where(
                 AppMenuModel.type == 1, AppMenuModel.user_id == user_id, AppMenuModel.enabled_flag == 1
@@ -759,9 +861,7 @@ class AppManagementService:
 
     @staticmethod
     async def get_process(db: AsyncSession, device_list: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """对齐旧 /get_process：检查进程是否存在（基于持久化 pid 判断）"""
-        # 旧前端依赖：res.data.status !== "stop" 代表可以进入实时页
-        # 新架构需要依赖结果表中持久化的 pid（device_list[].pid）
+        """get_process：检查进程是否存在（基于持久化 pid 判断）"""
         running = False
         for d in device_list or []:
             pid = d.get("pid")
@@ -789,7 +889,7 @@ class AppManagementService:
 
     @staticmethod
     async def img_list(db: AsyncSession, page: int, page_size: int, search: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """对齐旧 /img_list：分页查询图像库（仅当前用户名下脚本菜单下的图片，按 menu_id 与 img_select 一致隔离）"""
+        """img_list：分页查询图像库（仅当前用户名下脚本菜单下的图片，按 menu_id 与 img_select 一致隔离）"""
         owned_menus = select(AppMenuModel.id).where(
             AppMenuModel.user_id == user_id,
             AppMenuModel.enabled_flag == 1,
@@ -830,7 +930,7 @@ class AppManagementService:
 
     @staticmethod
     async def img_select(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        """对齐旧 /img_select：返回级联选择数据"""
+        """返回级联选择数据"""
         menus = (
             await db.execute(
                 select(AppMenuModel).where(
@@ -921,7 +1021,7 @@ class AppManagementService:
     
     @staticmethod
     async def send_app_warn(db: AsyncSession, result_id: str, user_id: int) -> None:
-        """对齐旧 app_common.send_app_warn：有失败步骤时按频次发通知 27（app_error_report）"""
+        """有失败步骤时按频次发通知 27（app_error_report）"""
         from app.api.v1.api_automation.service import ApiAutomationService
 
         row = (
@@ -982,7 +1082,7 @@ class AppManagementService:
         pid: Optional[int] = None,
         deviceid: Optional[str] = None,
     ) -> bool:
-        """停止APP执行进程；传 pid+deviceid 时对齐旧 stop_process（写结束日志、追加 script_status、通知）"""
+        """停止APP执行进程；传 pid+deviceid 时对齐 stop_process（写结束日志、追加 script_status、通知）"""
         from app.api.v1.api_automation.service import ApiAutomationService
         from .airtest_common import get_performance
 
@@ -1171,12 +1271,12 @@ class AppManagementService:
     @staticmethod
     async def get_process_status(db: AsyncSession, result_id: str, user_id: int) -> Dict[str, Any]:
         """获取APP进程状态"""
-        # 旧逻辑基于 psutil PID，这里迁移阶段统一返回 stop
+    
         return {"status": "stop"}
 
     @staticmethod
     def pause_app_worker(pid: int) -> bool:
-        """对齐旧 pause_process：优先 psutil.suspend，失败再用 POSIX SIGSTOP"""
+        """优先 psutil.suspend，失败再用 POSIX SIGSTOP"""
         import signal
 
         try:
@@ -1195,7 +1295,7 @@ class AppManagementService:
 
     @staticmethod
     def resume_app_worker(pid: int) -> bool:
-        """对齐旧 resume_process：优先 psutil.resume，失败再用 POSIX SIGCONT"""
+        """psutil.resume，失败再用 POSIX SIGCONT"""
         import signal
 
         try:

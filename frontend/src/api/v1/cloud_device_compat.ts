@@ -1,10 +1,5 @@
-/**
- * 兼容旧版 APP管理相关的 device API
- * 旧前端路径：/api/device/*
- * 新后端路径：/api/v1/cloud_device/*
- */
-import request from '/@/utils/request';
 
+import request from '/@/utils/request';
 export const get_device_list = (data: any) => request.post('/v1/cloud_device/device_list', data);
 export const devices_install = (data: any) => request.post('/v1/cloud_device/device_install', data);
 export const devices_uninstall = (data: any) => request.post('/v1/cloud_device/device_uninstall', data);

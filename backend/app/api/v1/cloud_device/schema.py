@@ -1,6 +1,5 @@
 """
-云真机模块 - 数据验证模式
-迁移自 l-tester 项目的数据结构
+云真机模块数据验证模式
 """
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel

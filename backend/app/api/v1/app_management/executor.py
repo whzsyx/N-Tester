@@ -5,12 +5,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 import cv2
 import numpy as np
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
-
 from app.db.sqlalchemy import async_session
 from app.api.v1.cloud_device.model import AppDevice
 from .model import AppResultModel, AppResultListModel
@@ -156,7 +154,7 @@ async def _update_summary(
 
 
 async def _release_device(deviceid: str, user_id: int) -> None:
-    """执行完成后释放设备：对齐旧架构“执行结束自动置空闲”"""
+    """执行完成后释放设备：“执行结束自动置空闲”"""
     async with async_session() as db:
         await db.execute(
             update(AppDevice)

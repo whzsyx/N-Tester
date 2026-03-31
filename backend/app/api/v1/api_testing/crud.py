@@ -1,5 +1,5 @@
 """
-API测试模块 - CRUD操作
+API测试模块
 """
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession

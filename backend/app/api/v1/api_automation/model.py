@@ -1,5 +1,5 @@
 """
-接口自动化模块 - 数据模型
+接口自动化模块
 """
 
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger, Float

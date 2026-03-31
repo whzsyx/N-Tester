@@ -1,12 +1,3 @@
-<script setup lang="ts">
-import { ref } from 'vue';
-import ApiProject from './api_project.vue';
-import ApiScript from './api_script.vue';
-import ApiResultList from './api_result_list.vue';
-
-const active = ref<'manage' | 'scene' | 'result'>('manage');
-</script>
-
 <template>
 	<div class="api-automation-tabs">
 		<el-tabs v-model="active" type="border-card">
@@ -22,6 +13,16 @@ const active = ref<'manage' | 'scene' | 'result'>('manage');
 		</el-tabs>
 	</div>
 </template>
+<script setup lang="ts">
+import { ref } from 'vue';
+import ApiProject from './api_project.vue';
+import ApiScript from './api_script.vue';
+import ApiResultList from './api_result_list.vue';
+
+const active = ref<'manage' | 'scene' | 'result'>('manage');
+</script>
+
+
 
 <style scoped>
 .api-automation-tabs {

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import signal
 from typing import Optional
-
 from app.corelibs.logger import init_logger, logger
 from app.db import get_redis_pool
 from app.db.sqlalchemy import async_session

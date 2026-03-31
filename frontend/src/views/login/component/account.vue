@@ -141,7 +141,7 @@ const onSignIn = async () => {
     state.loading.signIn = true;
     useUserApi().signIn({username: state.ruleForm.userName, password: state.ruleForm.password})
         .then(async res => {
-          // 新API返回access_token，兼容旧的token字段
+
           const token = res.data.access_token || res.data.token;
           Session.set('token', token);
           // 如果有refresh_token，也保存

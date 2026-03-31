@@ -1,3 +1,311 @@
+<template>
+    <div>
+        <el-card class="box-card">
+            <div style="margin-bottom: 10px;">
+                <el-radio-group v-model="device_type" @change="debouncedGetDeviceList">
+                    <el-button type="primary" icon="Refresh" plain @click="getDeviceList" style="margin-right: 10px;">刷新状态</el-button>
+                    <el-radio label="" disabled>手机品牌：</el-radio>
+                    <el-radio label="">所有设备</el-radio>
+                    <el-radio label="HUAWEI">华为</el-radio>
+                    <el-radio label="XIAOMI">小米</el-radio>
+                    <el-radio label="OPPO">OPPO</el-radio>
+                    <el-radio label="HONOR">荣耀</el-radio>
+                    <el-radio label="vivo">Vivo</el-radio>
+                    <el-radio label="OnePlus">一加</el-radio>
+                    <el-radio label="samsung">三星</el-radio>
+                    <el-radio label="google">Google</el-radio>
+                    <el-radio label="iOS">iPhone</el-radio>
+                </el-radio-group>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <el-radio-group v-model="device_version" @change="debouncedGetDeviceList">
+                    <el-button type="success" icon="Plus" plain @click="Add_device" style="margin-right: 10px;">添加设备</el-button>
+                    <el-radio label="" disabled>系统版本：</el-radio>
+                    <el-radio label="">所有版本</el-radio>
+                    <el-radio label="16">16</el-radio>
+                    <el-radio label="15">15</el-radio>
+                    <el-radio label="14">14</el-radio>
+                    <el-radio label="13">13</el-radio>
+                    <el-radio label="12">12</el-radio>
+                    <el-radio label="11">11</el-radio>
+                    <el-radio label="10">10</el-radio>
+                </el-radio-group>
+            </div>
+            <div>
+                <el-radio-group v-model="device_status" @change="debouncedGetDeviceList">
+                    <el-radio label="" disabled>设备状态：</el-radio>
+                    <el-radio label="">所有状态</el-radio>
+                    <el-radio :label="1">空闲</el-radio>
+                    <el-radio :label="2">使用中</el-radio>
+                    <el-radio :label="3">离线</el-radio>
+                </el-radio-group>
+            </div>
+        </el-card>
+
+        <el-card class="box-card mt-10px">
+            <el-row :gutter="8">
+                <el-col :span="3" v-for="(item, index) in device_list" :key="index" style="padding-bottom: 5px;">
+                    <div class="device-card-wrapper">
+                        <div class="device-image-container">
+                            <el-badge v-if="item.device_status == 1" value="空闲" class="item" type="success" :offset="[-130, 5]">
+                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
+                            </el-badge>
+                            <el-badge v-if="item.device_status == 2" value="使用中" class="item" type="danger" :offset="[-140, 5]">
+                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
+                            </el-badge>
+                            <el-badge v-if="item.device_status == 3" value="离线" class="item" type="info" :offset="[-130, 5]">
+                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
+                            </el-badge>
+                        </div>
+                        <div class="device-info">
+                            <div class="device-name">{{ item.device_name }}</div>
+                            <div class="device-phone">{{ item.device_info?.phone }}</div>
+                        </div>
+                        <div class="device-actions">
+                            <el-popover placement="top-start" :width="200" trigger="hover">
+                                <template #default>
+                                    <el-descriptions :title="item.device_name" column="1">
+                                        <el-descriptions-item label="手机卡:">{{ item.device_info?.phone }}</el-descriptions-item>
+                                        <el-descriptions-item label="系统版本:">{{ item.device_version }}</el-descriptions-item>
+                                        <el-descriptions-item label="CPU:">{{ item.device_info?.cpu }}</el-descriptions-item>
+                                        <el-descriptions-item label="内存:">{{ item.device_info?.memory }}</el-descriptions-item>
+                                        <el-descriptions-item label="运行内存:">{{ item.device_info?.running_memory }}</el-descriptions-item>
+                                        <el-descriptions-item label="电池:">{{ item.device_info?.battery }}</el-descriptions-item>
+                                        <el-descriptions-item label="分辨率:">{{ item.device_info?.display }}</el-descriptions-item>
+                                        <el-descriptions-item label="屏幕尺寸:">{{ item.device_info?.screen }}</el-descriptions-item>
+                                    </el-descriptions>
+                                </template>
+                                <template #reference>
+                                    <el-button type="text" size="small">
+                                        <el-icon><View /></el-icon>
+                                        设备信息
+                                    </el-button>
+                                </template>
+                            </el-popover>
+                            <el-button v-if="item.device_status == 1" type="text" size="small" @click="use_phone(item)">
+                                <el-icon><Pointer /></el-icon>
+                                立即使用
+                            </el-button>
+                            <el-button v-if="item.device_status != 1" disabled type="text" size="small">
+                                <el-icon><Pointer /></el-icon>
+                                立即使用
+                            </el-button>
+                        </div>
+                        <!-- 添加引导小图标 - 进度条样式 -->
+                        <div class="device-progress-bar">
+                            <div class="progress-line"></div>
+                        </div>
+                    </div>
+                </el-col>
+            </el-row>
+            <div class="h-5px"></div>
+            <el-pagination 
+                v-model:current-page="searchParams.currentPage" 
+                v-model:page-size="searchParams.pageSize" 
+                :total="total" 
+                :page-sizes="[24, 50, 100]" 
+                layout="total, sizes, prev, pager, next, jumper" 
+                @size-change="handlePageChange" 
+                @current-change="handlePageChange" 
+            />
+        </el-card>
+
+        <el-dialog v-model="useDialogVisible" :title="title" width="94%" :before-close="useDialogBeforeClose" destroy-on-close>
+            <div class="cloud-use-dialog-body">
+                <div class="cloud-use-dialog-left">
+                    <iframe :src="device_url" style="width: 97%; height: 730px" />
+                </div>
+                <div class="cloud-use-dialog-right">
+                    <el-tabs v-model="use_active" type="card" @tab-click="tab_click">
+                        <el-tab-pane label="安装APP" name="install">
+                            <div>
+                                <div class="flex justify-center" style="margin-bottom: 10px;">
+                                    <KoiUploadFiles
+                                        v-model="apk_path"
+                                        :acceptType="'.apk,.aab'"
+                                        :acceptTypes="'.apk, .aab'"
+                                        :file-name="apk_path"
+                                        @file-success="call_back"
+                                    />
+                                </div>
+                                <el-table border :data="install_history" empty-text="暂时没有数据">
+                                    <el-table-column label="序号" type="index" width="50"></el-table-column>
+                                    <el-table-column label="设备名称" prop="device_name" width="120"></el-table-column>
+                                    <el-table-column label="包体名称" prop="apk_name"></el-table-column>
+                                    <el-table-column label="安装时间" prop="create_time" width="140"></el-table-column>
+                                    <el-table-column label="操作" width="100">
+                                        <template #default="{ row }">
+                                            <el-button type="text" @click="install_app(row)">重新安装</el-button>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </div>
+                        </el-tab-pane>
+                        <el-tab-pane label="设备终端" name="first">
+                            <iframe :src="shell_url" style="width: 98%; height: 650px" />
+                        </el-tab-pane>
+
+                        <el-tab-pane label="文件列表" name="second">
+                            <iframe :src="file_url" style="width: 100%; height: 650px" />
+                        </el-tab-pane>
+
+                        <el-tab-pane label="设备抓包" name="third">
+                            <div>
+                                <el-table border :data="mitmproxy_log" empty-text="暂时没有数据哟🌻">
+                                    <el-table-column label="" align="center" width="30px">
+                                        <template #default="{ row }">
+                                            <div v-if="row.status === 1" style="color: #0bbd87">
+                                                <el-icon><CircleCheck /></el-icon>
+                                            </div>
+                                            <div v-else style="color: #d70e0e">
+                                                <el-icon><CircleClose /></el-icon>
+                                            </div>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="URL" prop="url" align="left" width="435px" :show-overflow-tooltip="true" />
+                                    <el-table-column label="响应码" align="center" width="90px">
+                                        <template #default="{ row }">
+                                            <el-tag v-if="row.response_body?.code === 200" type="success">{{ row.response_body?.code }}</el-tag>
+                                            <el-tag v-else type="danger">{{ row.response_body?.code }}</el-tag>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="接口响应数据" align="left" width="220px" :show-overflow-tooltip="true">
+                                        <template #default="{ row }">
+                                            {{ row.response_body }}
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="请求时间" prop="create_time" :show-overflow-tooltip="true" width="160px" />
+                                    <el-table-column label="操作" align="center" width="90px">
+                                        <template #default="{ row }">
+                                            <el-button type="success" plain @click="mitmproxy_log_detail(row)">详情</el-button>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                                <div class="h-10px"></div>
+                                <el-pagination
+                                    background
+                                    v-model:current-page="mitmproxy_log_searchParams.currentPage"
+                                    v-model:page-size="mitmproxy_log_searchParams.pageSize"
+                                    v-show="mitmproxy_log_total > 0"
+                                    :page-sizes="[18]"
+                                    layout="total, sizes, prev, pager, next, jumper"
+                                    :total="mitmproxy_log_total"
+                                    @size-change="mitmproxy_log_list"
+                                    @current-change="mitmproxy_log_list"
+                                />
+                            </div>
+                        </el-tab-pane>
+
+                        <el-tab-pane label="设备性能" name="fourth">
+                            <div id="chart" class="echarts" style="width: 100%; height: 600px"></div>
+                        </el-tab-pane>
+
+                        <el-tab-pane label="使用记录" name="sixth">
+                            <el-table border :data="device_log" empty-text="暂时没有数据哟🌻">
+                                <el-table-column label="序号" type="index"></el-table-column>
+                                <el-table-column label="开始时间" prop="start_time"></el-table-column>
+                                <el-table-column label="结束时间" prop="end_time"></el-table-column>
+                            </el-table>
+                        </el-tab-pane>
+                    </el-tabs>
+                </div>
+            </div>
+            <template #footer>
+                <el-button @click="stop_phone">停止使用</el-button>
+            </template>
+        </el-dialog>
+
+        <el-dialog
+            v-model="mitmproxy_detail_visible"
+            title="请求详情"
+            width="1000px"
+            :close-on-click-modal="false"
+            destroy-on-close
+        >
+            <div style="color: rgb(18 31 205);">
+                <div>URL：{{ mitmproxy_api_details.url }}</div>
+                <div>
+                    请求方法：{{ mitmproxy_api_details.method }} --- 响应时长：{{
+                        mitmproxy_api_details.res_time + ' ms'
+                    }}
+                </div>
+            </div>
+
+            <el-tabs style="margin-top: 10px;">
+                <el-tab-pane label="Request Headers">
+                    <vue-json-pretty
+                        v-model:data="mitmproxy_api_details.request_headers"
+                        :height="250"
+                        :showIcon="true"
+                        :showLine="true"
+                        :virtual="true"
+                        :showSelectController="true"
+                    />
+                </el-tab-pane>
+                <el-tab-pane label="Request Body">
+                    <vue-json-pretty
+                        v-model:data="mitmproxy_api_details.request_body"
+                        :height="250"
+                        :showIcon="true"
+                        :showLine="true"
+                        :virtual="true"
+                        :showSelectController="true"
+                    />
+                </el-tab-pane>
+                <el-tab-pane label="Response Headers">
+                    <vue-json-pretty
+                        v-model:data="mitmproxy_api_details.response_headers"
+                        :height="250"
+                        :showIcon="true"
+                        :showLine="true"
+                        :virtual="true"
+                        :showSelectController="true"
+                    />
+                </el-tab-pane>
+                <el-tab-pane label="Response Body">
+                    <vue-json-pretty
+                        v-model:data="mitmproxy_api_details.response_body"
+                        :height="250"
+                        :showIcon="true"
+                        :showLine="true"
+                        :virtual="true"
+                        :showSelectController="true"
+                    />
+                </el-tab-pane>
+            </el-tabs>
+        </el-dialog>
+
+        <el-dialog v-model="addDeviceDialogVisible" :title="title" width="700px" destroy-on-close>
+            <el-form :model="add_device_form" label-width="100px">
+                <el-form-item label="设备名称">
+                    <el-input v-model="add_device_form.device_name" />
+                </el-form-item>
+                <el-form-item label="设备类型">
+                    <el-input v-model="add_device_form.device_type" placeholder="如: Android, iOS" />
+                </el-form-item>
+                <el-form-item label="设备版本">
+                    <el-input v-model="add_device_form.device_version" placeholder="如: 13.0" />
+                </el-form-item>
+                <el-form-item label="设备ID">
+                    <el-input v-model="add_device_form.device_id" placeholder="设备唯一标识" />
+                </el-form-item>
+                <el-form-item label="设备图片">
+                    <el-input v-model="add_device_form.file_path" placeholder="请输入图片路径" />
+                </el-form-item>
+                <el-form-item label="设备信息">
+                    <el-input v-model="device_info_json" type="textarea" :rows="6" placeholder="请输入设备信息JSON" />
+                </el-form-item>
+                <el-form-item label="设备描述">
+                    <el-input v-model="add_device_form.device_description" type="textarea" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="add_device_cancel">取消</el-button>
+                <el-button type="primary" @click="add_device_confirm">确定</el-button>
+            </template>
+        </el-dialog>
+    </div>
+</template>
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { device_info_list, use_device, stop_device, get_device_log, get_history_list, device_install_app, direct_install_app, add_device, device_performance, sync_stf_devices } from '/@/api/v1/cloud_device';
@@ -150,7 +458,7 @@ const buildShellUrlFromStream = (streamUrl: string, udid: string) => {
     if (base) {
         return `${base}/#!action=shell&udid=${encodeURIComponent(udid)}`;
     }
-    // fallback：尽量替换 action
+
     return streamUrl.replace(/#!action=stream/, '#!action=shell');
 };
 
@@ -205,7 +513,7 @@ const stop_device_bg = async () => {
 };
 
 // =========================
-// mitmproxy 抓包相关（迁移旧架构）
+// mitmproxy 抓包相关
 // =========================
 const mitmproxy_log_list = async () => {
     try {
@@ -537,7 +845,7 @@ const getEcharts = async () => {
 };
 
 onMounted(async () => {
-    // 抓包 result_id：旧架构在进入页面时生成一个全局 result_id
+
     result_id.value = String(Date.now());
     try {
         // 进入页面先同步 STF 设备池，保证无需手工添加也能展示
@@ -549,314 +857,7 @@ onMounted(async () => {
 });
 </script>
 
-<template>
-    <div>
-        <el-card class="box-card">
-            <div style="margin-bottom: 10px;">
-                <el-radio-group v-model="device_type" @change="debouncedGetDeviceList">
-                    <el-button type="primary" icon="Refresh" plain @click="getDeviceList" style="margin-right: 10px;">刷新状态</el-button>
-                    <el-radio label="" disabled>手机品牌：</el-radio>
-                    <el-radio label="">所有设备</el-radio>
-                    <el-radio label="HUAWEI">华为</el-radio>
-                    <el-radio label="XIAOMI">小米</el-radio>
-                    <el-radio label="OPPO">OPPO</el-radio>
-                    <el-radio label="HONOR">荣耀</el-radio>
-                    <el-radio label="vivo">Vivo</el-radio>
-                    <el-radio label="OnePlus">一加</el-radio>
-                    <el-radio label="samsung">三星</el-radio>
-                    <el-radio label="google">Google</el-radio>
-                    <el-radio label="iOS">iPhone</el-radio>
-                </el-radio-group>
-            </div>
-            <div style="margin-bottom: 10px;">
-                <el-radio-group v-model="device_version" @change="debouncedGetDeviceList">
-                    <el-button type="success" icon="Plus" plain @click="Add_device" style="margin-right: 10px;">添加设备</el-button>
-                    <el-radio label="" disabled>系统版本：</el-radio>
-                    <el-radio label="">所有版本</el-radio>
-                    <el-radio label="16">16</el-radio>
-                    <el-radio label="15">15</el-radio>
-                    <el-radio label="14">14</el-radio>
-                    <el-radio label="13">13</el-radio>
-                    <el-radio label="12">12</el-radio>
-                    <el-radio label="11">11</el-radio>
-                    <el-radio label="10">10</el-radio>
-                </el-radio-group>
-            </div>
-            <div>
-                <el-radio-group v-model="device_status" @change="debouncedGetDeviceList">
-                    <el-radio label="" disabled>设备状态：</el-radio>
-                    <el-radio label="">所有状态</el-radio>
-                    <el-radio :label="1">空闲</el-radio>
-                    <el-radio :label="2">使用中</el-radio>
-                    <el-radio :label="3">离线</el-radio>
-                </el-radio-group>
-            </div>
-        </el-card>
 
-        <el-card class="box-card mt-10px">
-            <el-row :gutter="8">
-                <el-col :span="3" v-for="(item, index) in device_list" :key="index" style="padding-bottom: 5px;">
-                    <div class="device-card-wrapper">
-                        <div class="device-image-container">
-                            <el-badge v-if="item.device_status == 1" value="空闲" class="item" type="success" :offset="[-130, 5]">
-                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
-                            </el-badge>
-                            <el-badge v-if="item.device_status == 2" value="使用中" class="item" type="danger" :offset="[-140, 5]">
-                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
-                            </el-badge>
-                            <el-badge v-if="item.device_status == 3" value="离线" class="item" type="info" :offset="[-130, 5]">
-                                <el-image :src="getDeviceImage(item)" style="width: 120px; height: 120px;" />
-                            </el-badge>
-                        </div>
-                        <div class="device-info">
-                            <div class="device-name">{{ item.device_name }}</div>
-                            <div class="device-phone">{{ item.device_info?.phone }}</div>
-                        </div>
-                        <div class="device-actions">
-                            <el-popover placement="top-start" :width="200" trigger="hover">
-                                <template #default>
-                                    <el-descriptions :title="item.device_name" column="1">
-                                        <el-descriptions-item label="手机卡:">{{ item.device_info?.phone }}</el-descriptions-item>
-                                        <el-descriptions-item label="系统版本:">{{ item.device_version }}</el-descriptions-item>
-                                        <el-descriptions-item label="CPU:">{{ item.device_info?.cpu }}</el-descriptions-item>
-                                        <el-descriptions-item label="内存:">{{ item.device_info?.memory }}</el-descriptions-item>
-                                        <el-descriptions-item label="运行内存:">{{ item.device_info?.running_memory }}</el-descriptions-item>
-                                        <el-descriptions-item label="电池:">{{ item.device_info?.battery }}</el-descriptions-item>
-                                        <el-descriptions-item label="分辨率:">{{ item.device_info?.display }}</el-descriptions-item>
-                                        <el-descriptions-item label="屏幕尺寸:">{{ item.device_info?.screen }}</el-descriptions-item>
-                                    </el-descriptions>
-                                </template>
-                                <template #reference>
-                                    <el-button type="text" size="small">
-                                        <el-icon><View /></el-icon>
-                                        设备信息
-                                    </el-button>
-                                </template>
-                            </el-popover>
-                            <el-button v-if="item.device_status == 1" type="text" size="small" @click="use_phone(item)">
-                                <el-icon><Pointer /></el-icon>
-                                立即使用
-                            </el-button>
-                            <el-button v-if="item.device_status != 1" disabled type="text" size="small">
-                                <el-icon><Pointer /></el-icon>
-                                立即使用
-                            </el-button>
-                        </div>
-                        <!-- 添加引导小图标 - 进度条样式 -->
-                        <div class="device-progress-bar">
-                            <div class="progress-line"></div>
-                        </div>
-                    </div>
-                </el-col>
-            </el-row>
-            <div class="h-5px"></div>
-            <el-pagination 
-                v-model:current-page="searchParams.currentPage" 
-                v-model:page-size="searchParams.pageSize" 
-                :total="total" 
-                :page-sizes="[24, 50, 100]" 
-                layout="total, sizes, prev, pager, next, jumper" 
-                @size-change="handlePageChange" 
-                @current-change="handlePageChange" 
-            />
-        </el-card>
-
-        <el-dialog v-model="useDialogVisible" :title="title" width="94%" :before-close="useDialogBeforeClose" destroy-on-close>
-            <div class="cloud-use-dialog-body">
-                <div class="cloud-use-dialog-left">
-                    <iframe :src="device_url" style="width: 97%; height: 730px" />
-                </div>
-                <div class="cloud-use-dialog-right">
-                    <el-tabs v-model="use_active" type="card" @tab-click="tab_click">
-                        <el-tab-pane label="安装APP" name="install">
-                            <div>
-                                <div class="flex justify-center" style="margin-bottom: 10px;">
-                                    <KoiUploadFiles
-                                        v-model="apk_path"
-                                        :acceptType="'.apk,.aab'"
-                                        :acceptTypes="'.apk, .aab'"
-                                        :file-name="apk_path"
-                                        @file-success="call_back"
-                                    />
-                                </div>
-                                <el-table border :data="install_history" empty-text="暂时没有数据">
-                                    <el-table-column label="序号" type="index" width="50"></el-table-column>
-                                    <el-table-column label="设备名称" prop="device_name" width="120"></el-table-column>
-                                    <el-table-column label="包体名称" prop="apk_name"></el-table-column>
-                                    <el-table-column label="安装时间" prop="create_time" width="140"></el-table-column>
-                                    <el-table-column label="操作" width="100">
-                                        <template #default="{ row }">
-                                            <el-button type="text" @click="install_app(row)">重新安装</el-button>
-                                        </template>
-                                    </el-table-column>
-                                </el-table>
-                            </div>
-                        </el-tab-pane>
-                        <el-tab-pane label="设备终端" name="first">
-                            <iframe :src="shell_url" style="width: 98%; height: 650px" />
-                        </el-tab-pane>
-
-                        <el-tab-pane label="文件列表" name="second">
-                            <iframe :src="file_url" style="width: 100%; height: 650px" />
-                        </el-tab-pane>
-
-                        <el-tab-pane label="设备抓包" name="third">
-                            <div>
-                                <el-table border :data="mitmproxy_log" empty-text="暂时没有数据哟🌻">
-                                    <el-table-column label="" align="center" width="30px">
-                                        <template #default="{ row }">
-                                            <div v-if="row.status === 1" style="color: #0bbd87">
-                                                <el-icon><CircleCheck /></el-icon>
-                                            </div>
-                                            <div v-else style="color: #d70e0e">
-                                                <el-icon><CircleClose /></el-icon>
-                                            </div>
-                                        </template>
-                                    </el-table-column>
-                                    <el-table-column label="URL" prop="url" align="left" width="435px" :show-overflow-tooltip="true" />
-                                    <el-table-column label="响应码" align="center" width="90px">
-                                        <template #default="{ row }">
-                                            <el-tag v-if="row.response_body?.code === 200" type="success">{{ row.response_body?.code }}</el-tag>
-                                            <el-tag v-else type="danger">{{ row.response_body?.code }}</el-tag>
-                                        </template>
-                                    </el-table-column>
-                                    <el-table-column label="接口响应数据" align="left" width="220px" :show-overflow-tooltip="true">
-                                        <template #default="{ row }">
-                                            {{ row.response_body }}
-                                        </template>
-                                    </el-table-column>
-                                    <el-table-column label="请求时间" prop="create_time" :show-overflow-tooltip="true" width="160px" />
-                                    <el-table-column label="操作" align="center" width="90px">
-                                        <template #default="{ row }">
-                                            <el-button type="success" plain @click="mitmproxy_log_detail(row)">详情</el-button>
-                                        </template>
-                                    </el-table-column>
-                                </el-table>
-                                <div class="h-10px"></div>
-                                <el-pagination
-                                    background
-                                    v-model:current-page="mitmproxy_log_searchParams.currentPage"
-                                    v-model:page-size="mitmproxy_log_searchParams.pageSize"
-                                    v-show="mitmproxy_log_total > 0"
-                                    :page-sizes="[18]"
-                                    layout="total, sizes, prev, pager, next, jumper"
-                                    :total="mitmproxy_log_total"
-                                    @size-change="mitmproxy_log_list"
-                                    @current-change="mitmproxy_log_list"
-                                />
-                            </div>
-                        </el-tab-pane>
-
-                        <el-tab-pane label="设备性能" name="fourth">
-                            <div id="chart" class="echarts" style="width: 100%; height: 600px"></div>
-                        </el-tab-pane>
-
-                        <el-tab-pane label="使用记录" name="sixth">
-                            <el-table border :data="device_log" empty-text="暂时没有数据哟🌻">
-                                <el-table-column label="序号" type="index"></el-table-column>
-                                <el-table-column label="开始时间" prop="start_time"></el-table-column>
-                                <el-table-column label="结束时间" prop="end_time"></el-table-column>
-                            </el-table>
-                        </el-tab-pane>
-                    </el-tabs>
-                </div>
-            </div>
-            <template #footer>
-                <el-button @click="stop_phone">停止使用</el-button>
-            </template>
-        </el-dialog>
-
-        <el-dialog
-            v-model="mitmproxy_detail_visible"
-            title="请求详情"
-            width="1000px"
-            :close-on-click-modal="false"
-            destroy-on-close
-        >
-            <div style="color: rgb(18 31 205);">
-                <div>URL：{{ mitmproxy_api_details.url }}</div>
-                <div>
-                    请求方法：{{ mitmproxy_api_details.method }} --- 响应时长：{{
-                        mitmproxy_api_details.res_time + ' ms'
-                    }}
-                </div>
-            </div>
-
-            <el-tabs style="margin-top: 10px;">
-                <el-tab-pane label="Request Headers">
-                    <vue-json-pretty
-                        v-model:data="mitmproxy_api_details.request_headers"
-                        :height="250"
-                        :showIcon="true"
-                        :showLine="true"
-                        :virtual="true"
-                        :showSelectController="true"
-                    />
-                </el-tab-pane>
-                <el-tab-pane label="Request Body">
-                    <vue-json-pretty
-                        v-model:data="mitmproxy_api_details.request_body"
-                        :height="250"
-                        :showIcon="true"
-                        :showLine="true"
-                        :virtual="true"
-                        :showSelectController="true"
-                    />
-                </el-tab-pane>
-                <el-tab-pane label="Response Headers">
-                    <vue-json-pretty
-                        v-model:data="mitmproxy_api_details.response_headers"
-                        :height="250"
-                        :showIcon="true"
-                        :showLine="true"
-                        :virtual="true"
-                        :showSelectController="true"
-                    />
-                </el-tab-pane>
-                <el-tab-pane label="Response Body">
-                    <vue-json-pretty
-                        v-model:data="mitmproxy_api_details.response_body"
-                        :height="250"
-                        :showIcon="true"
-                        :showLine="true"
-                        :virtual="true"
-                        :showSelectController="true"
-                    />
-                </el-tab-pane>
-            </el-tabs>
-        </el-dialog>
-
-        <el-dialog v-model="addDeviceDialogVisible" :title="title" width="700px" destroy-on-close>
-            <el-form :model="add_device_form" label-width="100px">
-                <el-form-item label="设备名称">
-                    <el-input v-model="add_device_form.device_name" />
-                </el-form-item>
-                <el-form-item label="设备类型">
-                    <el-input v-model="add_device_form.device_type" placeholder="如: Android, iOS" />
-                </el-form-item>
-                <el-form-item label="设备版本">
-                    <el-input v-model="add_device_form.device_version" placeholder="如: 13.0" />
-                </el-form-item>
-                <el-form-item label="设备ID">
-                    <el-input v-model="add_device_form.device_id" placeholder="设备唯一标识" />
-                </el-form-item>
-                <el-form-item label="设备图片">
-                    <el-input v-model="add_device_form.file_path" placeholder="请输入图片路径" />
-                </el-form-item>
-                <el-form-item label="设备信息">
-                    <el-input v-model="device_info_json" type="textarea" :rows="6" placeholder="请输入设备信息JSON" />
-                </el-form-item>
-                <el-form-item label="设备描述">
-                    <el-input v-model="add_device_form.device_description" type="textarea" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="add_device_cancel">取消</el-button>
-                <el-button type="primary" @click="add_device_confirm">确定</el-button>
-            </template>
-        </el-dialog>
-    </div>
-</template>
 
 <style scoped>
 .box-card { 
@@ -881,7 +882,7 @@ onMounted(async () => {
     justify-content: center; 
 }
 
-/* 设备卡片容器 - 移除Element Plus卡片的滑动条 */
+
 .device-card-wrapper {
     background: #fff;
     border: 1px solid #ebeef5;
@@ -959,7 +960,7 @@ onMounted(async () => {
     border-radius: 0 0 4px 4px;
 }
 
-/* 云手机弹窗：自适应左右布局，避免手机机型导致右侧大片空白 */
+
 .cloud-use-dialog-body {
     display: flex;
     width: 100%;

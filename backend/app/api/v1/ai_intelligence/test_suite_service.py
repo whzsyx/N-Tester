@@ -298,7 +298,7 @@ class AITestSuiteService:
             
             # 更新模块关联
             if suite_data.modules is not None:
-                # 删除旧的模块关联
+
                 delete_stmt = delete(AITestSuiteModuleModel).where(
                     AITestSuiteModuleModel.suite_id == suite_id
                 )

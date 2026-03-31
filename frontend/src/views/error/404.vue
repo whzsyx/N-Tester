@@ -1,99 +1,81 @@
 <template>
-  <div class="error layout-padding">
-    <div class="layout-padding-auto layout-padding-view">
-      <div class="error-flex">
-        <div class="left">
-          <div class="left-item">
-            <div class="left-item-animation left-item-num">404</div>
-            <div class="left-item-animation left-item-title">地址输入错误，请重新输入地址 😓</div>
-            <div class="left-item-animation left-item-msg"></div>
-            <div class="left-item-animation left-item-btn">
-              <el-button type="primary" size="default" round @click="onGoHome">返回首页</el-button>
-            </div>
-          </div>
-        </div>
-        <div class="right">
-          <img :src="Image404"/>
-        </div>
+  <div class="error-page">
+    <div class="error-content">
+      <div class="error-icon">
+        <el-icon size="120" color="#409eff">
+          <DocumentDelete />
+        </el-icon>
+      </div>
+      <h1 class="error-title">404</h1>
+      <p class="error-message">页面未找到</p>
+      <p class="error-description">抱歉，您访问的页面不存在或组件加载失败</p>
+      <div class="error-actions">
+        <el-button type="primary" @click="goHome">返回首页</el-button>
+        <el-button @click="goBack">返回上页</el-button>
       </div>
     </div>
   </div>
 </template>
 
-<script setup lang="ts" name="notFound">
-import {useRouter} from 'vue-router';
-import Image404 from "/@/assets/error/404.svg"
+<script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { DocumentDelete } from '@element-plus/icons-vue';
 
-// 定义变量内容
 const router = useRouter();
 
-// 返回首页
-const onGoHome = () => {
-  router.push('/');
+const goHome = () => {
+  router.push('/home');
+};
+
+const goBack = () => {
+  router.go(-1);
 };
 </script>
 
 <style scoped lang="scss">
-.error {
-  height: 100%;
+.error-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
 
-  .error-flex {
-    margin: auto;
-    display: flex;
-    height: 350px;
-    width: 900px;
+.error-content {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+}
 
-    .left {
-      flex: 1;
-      height: 100%;
-      align-items: center;
-      display: flex;
+.error-icon {
+  margin-bottom: 20px;
+}
 
-      .left-item {
-        .left-item-animation {
-          opacity: 0;
-          animation-name: error-num;
-          animation-duration: 0.5s;
-          animation-fill-mode: forwards;
-        }
+.error-title {
+  font-size: 72px;
+  font-weight: bold;
+  color: #409eff;
+  margin: 0 0 20px 0;
+}
 
-        .left-item-num {
-          color: var(--el-color-info);
-          font-size: 55px;
-        }
+.error-message {
+  font-size: 24px;
+  color: #303133;
+  margin: 0 0 10px 0;
+}
 
-        .left-item-title {
-          font-size: 20px;
-          color: var(--el-text-color-primary);
-          margin: 15px 0 5px 0;
-          animation-delay: 0.1s;
-        }
+.error-description {
+  font-size: 16px;
+  color: #606266;
+  margin: 0 0 30px 0;
+}
 
-        .left-item-msg {
-          color: var(--el-text-color-secondary);
-          font-size: 12px;
-          margin-bottom: 30px;
-          animation-delay: 0.2s;
-        }
-
-        .left-item-btn {
-          animation-delay: 0.2s;
-        }
-      }
-    }
-
-    .right {
-      flex: 1;
-      opacity: 0;
-      animation-name: error-img;
-      animation-duration: 2s;
-      animation-fill-mode: forwards;
-
-      img {
-        width: 100%;
-        height: 100%;
-      }
-    }
-  }
+.error-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
 }
 </style>

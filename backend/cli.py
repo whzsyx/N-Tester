@@ -401,7 +401,7 @@ def downgrade() -> None:
                 typer.echo("已取消")
                 raise typer.Exit()
             
-            # 清理旧的迁移文件
+
             versions_dir = os.path.join(os.path.dirname(__file__), "app", "alembic", "versions")
             if os.path.exists(versions_dir):
                 import glob

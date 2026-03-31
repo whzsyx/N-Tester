@@ -1,14 +1,12 @@
-# AI助手模块 - 控制器层
+# -*- coding: utf-8 -*-
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.sqlalchemy import get_db
 from app.core.dependencies import get_current_user_id
 from app.common.response import success_response, error_response
 from app.corelibs.logger import logger
-
 from .service import AssistantConfigService, ConversationService, MessageService, DifyService, StatisticsService
 from .schema import (
     AssistantConfigCreate, AssistantConfigUpdate, AssistantConfigResponse,

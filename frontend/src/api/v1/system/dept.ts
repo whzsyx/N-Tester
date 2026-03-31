@@ -1,7 +1,7 @@
 import request from '/@/utils/request';
 
 /**
- * 部门管理API - 新架构
+ * 部门管理API
  */
 export function useDeptApi() {
   return {

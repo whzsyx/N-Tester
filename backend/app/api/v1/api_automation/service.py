@@ -1,5 +1,5 @@
 """
-接口自动化模块 - 业务逻辑服务
+接口自动化模块
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ class ApiAutomationService:
         body: Any,
     ) -> Tuple[bool, str]:
         """
-        对齐旧 jsonpath_value：
+        对齐jsonpath_value：
         - res_type: 1=响应体, 2=header(请求头), 3=body(请求体), 4=res['header'](响应头)
         - expr: jsonpath 表达式
         """
@@ -1336,7 +1336,7 @@ class ApiAutomationService:
             try:
                 t = int(op.get("type") or 0)
                 if t == 1:
-                    # 对齐旧 pre_request：通过菜单(type=3)定位 Api，再走 pre_request_api（不执行 before）
+                   
                     api_id_list = op.get("api_id") or []
                     menu_id = int(api_id_list[-1]) if api_id_list else 0
                     if not menu_id:
