@@ -16,12 +16,20 @@ logger = logging.getLogger(__name__)
 # 禁用browser-use遥测
 os.environ['ANONYMIZED_TELEMETRY'] = 'false'
 
-# Windows平台修复：设置事件循环策略
+# Windows平台修复：设置事件循环策略和环境变量
 if sys.platform == 'win32':
+    # 设置环境变量
+    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '0'  # 使用系统浏览器
+    os.environ['BROWSER_USE_WINDOWS_COMPAT'] = 'true'
+    
     # 在Windows上使用ProactorEventLoop以支持子进程
     try:
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        logger.info("已设置Windows ProactorEventLoop策略以支持浏览器子进程")
+        # 检查当前事件循环策略
+        current_policy = asyncio.get_event_loop_policy()
+        if not isinstance(current_policy, asyncio.WindowsProactorEventLoopPolicy):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            logger.info("已设置Windows ProactorEventLoop策略以支持浏览器子进程")
+        
     except Exception as e:
         logger.warning(f"设置Windows事件循环策略失败: {e}")
 
@@ -29,6 +37,7 @@ try:
     from langchain_openai import ChatOpenAI
     from browser_use import Agent, Controller
     from browser_use.browser.profile import BrowserProfile
+    from browser_use.browser.browser import Browser
     BROWSER_USE_AVAILABLE = True
 except ImportError:
     BROWSER_USE_AVAILABLE = False
@@ -158,18 +167,118 @@ class BrowserUseService:
         try:
             logger.info(f"开始执行Browser-use任务: {task[:100]}...")
             
+            # Windows兼容性检查
+            if sys.platform == 'win32':
+                # 检查是否在正确的事件循环中
+                try:
+                    loop = asyncio.get_running_loop()
+                    if not isinstance(loop, asyncio.ProactorEventLoop):
+                        logger.warning("当前不是ProactorEventLoop，Browser-use可能无法正常工作")
+                except Exception as e:
+                    logger.warning(f"事件循环检查失败: {e}")
+                
+                # 设置Windows环境变量
+                os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '0'  # 使用系统浏览器
+                os.environ['BROWSER_USE_WINDOWS_COMPAT'] = 'true'
+            
+            # 创建浏览器配置
+            browser_config = {
+                'headless': headless,
+                'disable_security': True,  # 禁用安全限制以提高兼容性
+                'keep_open': False,
+            }
+            
+            # Windows特殊配置
+            if sys.platform == 'win32':
+                # 尝试使用系统Chrome
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    r"C:\Users\{}\AppData\Local\Google\Chrome\Application\chrome.exe".format(os.getenv('USERNAME', '')),
+                ]
+                
+                chrome_path = None
+                for path in chrome_paths:
+                    if os.path.exists(path):
+                        chrome_path = path
+                        break
+                
+                if chrome_path:
+                    logger.info(f"找到系统Chrome: {chrome_path}")
+                    browser_config.update({
+                        'executable_path': chrome_path,
+                        'use_persistent_context': False,
+                        'disable_extensions': True,
+                        'disable_dev_shm_usage': True,
+                        'args': [
+                            '--no-sandbox',
+                            '--disable-dev-shm-usage',
+                            '--disable-gpu',
+                            '--remote-debugging-port=9222',
+                        ]
+                    })
+                else:
+                    logger.warning("未找到系统Chrome，将使用默认配置")
+            
             # 创建Controller和Agent
             controller = Controller()
-            agent = Agent(
-                task=task,
-                llm=self.llm,
-                controller=controller,
-                max_actions_per_step=10
-            )
+            
+            # Windows下尝试不同的Agent创建方式
+            if sys.platform == 'win32':
+                try:
+                    # 方式1：使用自定义浏览器配置
+                    from browser_use.browser.browser import Browser
+                    from browser_use.browser.context import BrowserContext
+                    
+                    # 创建自定义浏览器实例
+                    browser = Browser(
+                        headless=headless,
+                        browser_type='chromium'
+                    )
+                    
+                    agent = Agent(
+                        task=task,
+                        llm=self.llm,
+                        controller=controller,
+                        max_actions_per_step=10,
+                        browser=browser
+                    )
+                    logger.info("使用自定义浏览器配置创建Agent")
+                    
+                except Exception as e:
+                    logger.warning(f"自定义浏览器配置失败: {e}，尝试默认配置")
+                    # 方式2：使用默认配置
+                    agent = Agent(
+                        task=task,
+                        llm=self.llm,
+                        controller=controller,
+                        max_actions_per_step=10
+                    )
+            else:
+                # 非Windows系统使用默认配置
+                agent = Agent(
+                    task=task,
+                    llm=self.llm,
+                    controller=controller,
+                    max_actions_per_step=10
+                )
             
             # 执行任务
             start_time = datetime.now()
-            history = await agent.run(max_steps=max_steps)
+            
+            # Windows下使用超时机制防止无限等待
+            if sys.platform == 'win32':
+                timeout = max_steps * 30  # 每步最多30秒
+                try:
+                    history = await asyncio.wait_for(
+                        agent.run(max_steps=max_steps), 
+                        timeout=timeout
+                    )
+                except asyncio.TimeoutError:
+                    raise Exception(f"任务执行超时（{timeout}秒），可能是Windows兼容性问题")
+            else:
+                history = await agent.run(max_steps=max_steps)
+            
             duration = (datetime.now() - start_time).total_seconds()
             
             logger.info(f"Browser-use任务执行完成，耗时: {duration}s")
@@ -202,6 +311,15 @@ class BrowserUseService:
             
             result['status'] = 'completed'
             logger.info(f"Browser-use任务成功完成，共{len(result['steps'])}步")
+            
+        except NotImplementedError as e:
+            # Windows子进程问题的特殊处理
+            error_msg = f"Windows环境下Browser-use子进程启动失败: {str(e)}"
+            logger.error(f"Windows兼容性错误: {error_msg}")
+            result['status'] = 'failed'
+            result['error'] = error_msg
+            result['logs'].append(f"[Windows兼容性错误] {error_msg}")
+            result['logs'].append("这是Browser-use在Windows环境下的已知问题，需要特殊配置或使用WSL")
             
         except Exception as e:
             logger.error(f"Browser-use任务执行失败: {str(e)}", exc_info=True)
@@ -262,7 +380,56 @@ class BrowserUseService:
     @staticmethod
     def is_available() -> bool:
         """检查Browser-use是否可用"""
-        return BROWSER_USE_AVAILABLE
+        if not BROWSER_USE_AVAILABLE:
+            return False
+        
+        # Windows兼容性检查
+        if sys.platform == 'win32':
+            try:
+                # 检查是否可以创建子进程
+                import subprocess
+                subprocess.run(['echo', 'test'], capture_output=True, timeout=5)
+                return True
+            except Exception:
+                logger.warning("Windows环境下子进程创建测试失败，Browser-use可能无法正常工作")
+                return False
+        
+        return True
+    
+    @staticmethod
+    def get_compatibility_info() -> Dict[str, Any]:
+        """获取兼容性信息"""
+        info = {
+            'platform': sys.platform,
+            'browser_use_available': BROWSER_USE_AVAILABLE,
+            'subprocess_support': False,
+            'event_loop_policy': None,
+            'recommendations': []
+        }
+        
+        # 检查子进程支持
+        try:
+            import subprocess
+            subprocess.run(['echo', 'test'], capture_output=True, timeout=5)
+            info['subprocess_support'] = True
+        except Exception:
+            info['subprocess_support'] = False
+        
+        # 检查事件循环策略
+        try:
+            policy = asyncio.get_event_loop_policy()
+            info['event_loop_policy'] = type(policy).__name__
+        except Exception:
+            info['event_loop_policy'] = 'unknown'
+        
+        # 生成建议
+        if sys.platform == 'win32':
+            if not info['subprocess_support']:
+                info['recommendations'].append("Windows环境下子进程支持有限，建议使用Linux环境")
+            if info['event_loop_policy'] != 'WindowsProactorEventLoopPolicy':
+                info['recommendations'].append("建议使用ProactorEventLoop策略")
+        
+        return info
     
     @staticmethod
     def get_required_packages() -> List[str]:

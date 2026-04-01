@@ -354,8 +354,11 @@ const handleDelete = (row: any) => {
       await projectApi.delete(row.id);
       ElMessage.success('删除成功');
       handleQuery();
-    } catch (error) {
+    } catch (error: any) {
       console.error('删除失败:', error);
+      // 显示后端返回的错误信息
+      const errorMessage = error?.response?.data?.message || error?.message || '删除失败';
+      ElMessage.error(errorMessage);
     }
   });
 };

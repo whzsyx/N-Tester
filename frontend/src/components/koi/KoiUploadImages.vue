@@ -61,9 +61,9 @@ interface IUploadImagesProps {
 	height?: string;
 	width?: string;
 	borderRadius?: string;
-	// 兼容旧版：把图片归属到某个 app_menu_id
+
 	app_menu_id?: any;
-	/** 为 true 时不在选文件时请求后端，仅本地预览；由父组件在「确定」时统一上传（对齐旧架构，避免列表刷新等误触发上传） */
+
 	deferCommit?: boolean;
 }
 

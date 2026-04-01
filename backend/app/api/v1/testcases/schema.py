@@ -148,8 +148,8 @@ class TestCaseOutSchema(TestCaseBaseSchema, TimestampSchema):
     author_name: Optional[str] = None
     assignee_name: Optional[str] = None
     module_name: Optional[str] = None
-    creation_date: datetime
-    updation_date: datetime
+    creation_date: Optional[datetime] = None
+    updation_date: Optional[datetime] = None
     steps: Optional[List[TestCaseStepOutSchema]] = []
     version_ids: Optional[List[int]] = []
 

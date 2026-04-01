@@ -262,7 +262,7 @@ class RequestExecutor:
         
         # 执行前置操作
         if request.pre_request_script:
-            # 兼容旧版本：如果是字符串，转换为操作列表
+
             if isinstance(request.pre_request_script, str):
                 operations = [{'type': 'script', 'script': request.pre_request_script, 'enabled': True}]
             else:
@@ -487,7 +487,7 @@ class RequestExecutor:
         
         # 执行后置操作
         if request.post_request_script and not error_message:
-            # 兼容旧版本：如果是字符串，转换为操作列表
+ 
             if isinstance(request.post_request_script, str):
                 operations = [{'type': 'script', 'script': request.post_request_script, 'enabled': True}]
             else:

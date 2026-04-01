@@ -345,37 +345,37 @@
     </div>
     </div>
 
-    <!-- 新增菜单对话框 -->
-    <el-dialog v-model="dialogVisible" :title="title" width="400px" ref="add_koiDialogRef">
-    <el-form :model="add_menu_form" label-width="80px">
-      <el-form-item label="菜单名称">
-        <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
-      </el-form-item>
-      <el-form-item label="菜单类型">
-        <el-select v-model="add_menu_form.type" placeholder="请选择类型">
-          <el-option label="文件夹" :value="1" />
-          <el-option label="脚本" :value="2" />
-        </el-select>
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="add_menu_cancel">取消</el-button>
-      <el-button type="primary" @click="add_menu_confirm">确定</el-button>
-    </template>
-  </el-dialog>
+      <!-- 新增菜单对话框 -->
+      <el-dialog v-model="dialogVisible" :title="title" width="400px" ref="add_koiDialogRef">
+        <el-form :model="add_menu_form" label-width="80px">
+          <el-form-item label="菜单名称">
+            <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
+          </el-form-item>
+          <el-form-item label="菜单类型">
+            <el-select v-model="add_menu_form.type" placeholder="请选择类型">
+              <el-option label="文件夹" :value="1" />
+              <el-option label="脚本" :value="2" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="add_menu_cancel">取消</el-button>
+          <el-button type="primary" @click="add_menu_confirm">确定</el-button>
+        </template>
+      </el-dialog>
 
-  <!-- 重命名对话框 -->
-  <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" ref="rename_koiDialogRef">
-    <el-form :model="add_menu_form" label-width="80px">
-      <el-form-item label="菜单名称">
-        <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="edit_menu_cancel">取消</el-button>
-      <el-button type="primary" @click="edit_menu_confirm">确定</el-button>
-    </template>
-    </el-dialog>
+      <!-- 重命名对话框 -->
+      <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" ref="rename_koiDialogRef">
+        <el-form :model="add_menu_form" label-width="80px">
+          <el-form-item label="菜单名称">
+            <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="edit_menu_cancel">取消</el-button>
+          <el-button type="primary" @click="edit_menu_confirm">确定</el-button>
+        </template>
+      </el-dialog>
   </div>
 </template>
 <script setup lang="ts">

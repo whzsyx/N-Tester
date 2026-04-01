@@ -115,7 +115,7 @@ export function useFileApi() {
       });
     },
     
-    // 兼容旧API：上传文件
+    // API：上传文件
     uploadFile: (data: FormData) => {
       return request({
         url: '/v1/system/file/upload',
@@ -127,7 +127,7 @@ export function useFileApi() {
       });
     },
     
-    // 兼容旧API：获取文件列表
+    // API：获取文件列表
     getFileList: (params?: any) => {
       // 转换参数格式
       const transformedParams = {
@@ -147,7 +147,7 @@ export function useFileApi() {
       });
     },
     
-    // 兼容旧API：删除文件
+    // API：删除文件
     deleteFile: (id: number) => {
       return request({
         url: `/v1/system/file/${id}`,
@@ -155,7 +155,7 @@ export function useFileApi() {
       });
     },
     
-    // 兼容旧API：下载文件
+    // API：下载文件
     downloadFile: (id: number) => {
       // 直接返回下载URL
       return `/api/v1/system/file/${id}/download`;

@@ -1,17 +1,32 @@
 <template>
   <div class="scheduler-page">
-    <KoiCard>
-      <!-- 搜索区域 -->
-      <el-form :inline="true" :model="queryParams" class="scheduler-search">
-        <el-form-item label="任务名称">
+    <el-card class="box-card">
+      <template #header>
+        <div class="card-header">
+          <span>任务调度管理</span>
+          <el-button 
+            type="primary" 
+            @click="handleAdd"
+            v-auth="'scheduler:task:add'"
+          >
+            <el-icon><Plus /></el-icon>
+            新增任务
+          </el-button>
+        </div>
+      </template>
+
+      <!-- 搜索表单 -->
+      <el-form :model="queryParams" ref="queryRef" :inline="true" class="search-form">
+        <el-form-item label="任务名称" prop="name">
           <el-input
             v-model="queryParams.name"
             placeholder="请输入任务名称"
             clearable
             style="width: 200px"
+            @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="任务类型">
+        <el-form-item label="任务类型" prop="type">
           <el-select
             v-model="queryParams.type"
             placeholder="请选择任务类型"
@@ -23,7 +38,7 @@
             <el-option :value="3" label="API自动化" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item label="状态" prop="status">
           <el-select
             v-model="queryParams.status"
             placeholder="请选择状态"
@@ -36,33 +51,31 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
+            <el-icon><Search /></el-icon>
             搜索
           </el-button>
           <el-button @click="resetQuery">
+            <el-icon><Refresh /></el-icon>
             重置
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="success" @click="handleAdd" v-auth="'scheduler:task:add'">
-            新增任务
           </el-button>
         </el-form-item>
       </el-form>
 
-      <!-- 任务表格 -->
+      <!-- 数据表格 -->
       <el-table
         v-loading="loading"
         :data="taskList"
-        border
-        style="width: 100%"
+        row-key="id"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column prop="name" label="任务名称" min-width="160" />
         <el-table-column label="任务类型" width="120" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.type === 1" type="success">APP自动化</el-tag>
-            <el-tag v-else-if="scope.row.type === 2" type="warning">WEB自动化</el-tag>
-            <el-tag v-else-if="scope.row.type === 3" type="info">API自动化</el-tag>
+            <el-tag v-if="scope.row.type === 1" type="success" size="small">APP自动化</el-tag>
+            <el-tag v-else-if="scope.row.type === 2" type="warning" size="small">WEB自动化</el-tag>
+            <el-tag v-else-if="scope.row.type === 3" type="info" size="small">API自动化</el-tag>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -72,9 +85,8 @@
               v-model="scope.row.status"
               :active-value="1"
               :inactive-value="0"
-              active-text="启用"
-              inactive-text="停用"
-              disabled
+              @change="handleStatusChange(scope.row)"
+              v-auth="'scheduler:task:edit'"
             />
           </template>
         </el-table-column>
@@ -85,10 +97,10 @@
           align="center"
         >
           <template #default="scope">
-            <el-tag v-if="scope.row.next_run_at" type="primary">
+            <el-tag v-if="scope.row.next_run_at" type="primary" size="small">
               {{ scope.row.next_run_at }}
             </el-tag>
-            <el-tag v-else type="info">-</el-tag>
+            <el-tag v-else type="info" size="small">-</el-tag>
           </template>
         </el-table-column>
         <el-table-column
@@ -102,63 +114,57 @@
           label="创建时间"
           min-width="160"
           align="center"
-        />
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        >
           <template #default="scope">
-            <el-button
-              type="primary"
-              size="small"
-              plain
-              @click="handleEdit(scope.row)"
-              v-auth="'scheduler:task:edit'"
-            >
-              编辑
-            </el-button>
-            <el-button
-              type="danger"
-              size="small"
-              plain
-              @click="handleDelete(scope.row)"
-              v-auth="'scheduler:task:delete'"
-            >
-              删除
-            </el-button>
+            <span>{{ formatDateTime(scope.row.creation_date) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="140" class-name="small-padding fixed-width">
+          <template #default="scope">
+            <div class="button-group">
+              <el-button
+                type="primary"
+                size="small"
+                @click="handleEdit(scope.row)"
+                v-auth="'scheduler:task:edit'"
+              >
+                编辑
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                @click="handleDelete(scope.row)"
+                v-auth="'scheduler:task:delete'"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="scheduler-pagination">
-        <el-pagination
-          v-show="total > 0"
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          v-model:current-page="queryParams.page"
-          v-model:page-size="queryParams.size"
-          :page-sizes="[10, 20, 50]"
-          @size-change="getList"
-          @current-change="getList"
-        />
-      </div>
+      <el-pagination
+        v-show="total > 0"
+        :total="total"
+        v-model:current-page="queryParams.page"
+        v-model:page-size="queryParams.size"
+        @size-change="getList"
+        @current-change="getList"
+        layout="total, sizes, prev, pager, next, jumper"
+        :page-sizes="[10, 20, 50, 100]"
+      />
+    </el-card>
 
-      <!-- 新增/编辑任务对话框（表单骨架，后续继续细化字段） -->
-      <KoiDialog
-        ref="taskDialogRef"
-        :title="dialogTitle"
-        :height="520"
-        width="50%"
-        @koi-confirm="submitForm"
-        @koi-cancel="cancelForm"
-      >
-        <template #content>
-          <div>
-            <el-form
-              ref="taskFormRef"
-              :model="form"
-              label-width="100px"
-              class="scheduler-form"
-            >
+      <!-- 新增/编辑任务对话框 -->
+      <el-dialog :title="dialogTitle" v-model="dialogVisible" width="50%" append-to-body>
+        <el-form
+          ref="taskFormRef"
+          :model="form"
+          :rules="rules"
+          label-width="100px"
+          class="scheduler-form"
+        >
               <el-form-item label="任务名称">
                 <el-input
                   v-model="form.name"
@@ -416,26 +422,33 @@
                 </el-select>
               </el-form-item>
             </el-form>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button type="primary" @click="submitForm">确 定</el-button>
+            <el-button @click="cancelForm">取 消</el-button>
           </div>
         </template>
-      </KoiDialog>
-    </KoiCard>
+      </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import KoiCard from '/@/components/koi/KoiCard.vue';
-import KoiDialog from '/@/components/koi/KoiDialog.vue';
+import { Plus, Search, Refresh, Edit, Delete } from '@element-plus/icons-vue';
 import type { FormInstance } from 'element-plus';
 import { taskSchedulerApi, type SchedulerTask } from '/@/api/v1/task_scheduler';
 import { device_list } from '/@/api/v1/cloud_device';
 import { get_api_script_list, api_env, params_select } from '/@/api/v1/api_automation';
+import { formatDateTime } from '/@/utils/formatTime';
 
 const loading = ref(false);
 const taskList = ref<SchedulerTask[]>([]);
 const total = ref(0);
+const dialogVisible = ref(false);
+const ids = ref<number[]>([]);
+const single = ref(true);
+const multiple = ref(true);
 
 const queryParams = reactive({
   page: 1,
@@ -504,6 +517,16 @@ const form = reactive<{
     notice_id: null,
   },
 });
+
+// 表单验证规则
+const rules = {
+  name: [
+    { required: true, message: '任务名称不能为空', trigger: 'blur' }
+  ],
+  type: [
+    { required: true, message: '任务类型不能为空', trigger: 'change' }
+  ]
+};
 
 // 下拉选项数据
 const deviceList = ref<any[]>([]);
@@ -656,6 +679,34 @@ const resetForm = () => {
   }
 };
 
+// 多选框选中数据
+const handleSelectionChange = (selection: SchedulerTask[]) => {
+  ids.value = selection.map(item => item.id);
+  single.value = selection.length !== 1;
+  multiple.value = !selection.length;
+};
+
+// 状态修改
+const handleStatusChange = async (row: SchedulerTask) => {
+  const text = row.status ? '启用' : '停用';
+  try {
+    await ElMessageBox.confirm(`确认要${text}该任务吗？`);
+    await taskSchedulerApi.updateTask({
+      task_id: row.id,
+      status: row.status,
+    });
+    ElMessage.success(`${text}成功`);
+  } catch (error: any) {
+    row.status = row.status ? 0 : 1;
+    console.error(`${text}任务失败:`, error);
+    if (error?.message) {
+      ElMessage.error(error.message);
+    } else {
+      ElMessage.error(`${text}失败`);
+    }
+  }
+};
+
 const handleAdd = () => {
   resetForm();
   dialogTitle.value = '新增定时任务';
@@ -668,7 +719,7 @@ const handleAdd = () => {
     loadApiParams(),
     loadNotices(),
   ]);
-  taskDialogRef.value?.koiOpen();
+  dialogVisible.value = true;
 };
 
 const handleEdit = (row: SchedulerTask) => {
@@ -691,7 +742,7 @@ const handleEdit = (row: SchedulerTask) => {
     loadApiParams(),
     loadNotices(),
   ]);
-  taskDialogRef.value?.koiOpen();
+  dialogVisible.value = true;
 };
 
 const handleDelete = async (row: SchedulerTask) => {
@@ -708,7 +759,12 @@ const handleDelete = async (row: SchedulerTask) => {
 };
 
 const submitForm = async () => {
+  if (!taskFormRef.value) return;
+  
   try {
+    // 先进行表单验证
+    await taskFormRef.value.validate();
+    
     if (!form.name) {
       ElMessage.error('请填写任务名称');
       return;
@@ -718,7 +774,7 @@ const submitForm = async () => {
       return;
     }
 
-    // 兼容旧后端：设备需要转换为 device_list 结构
+
     const payload: any = {
       name: form.name,
       type: form.type,
@@ -747,7 +803,7 @@ const submitForm = async () => {
       ElMessage.success('新增成功');
     }
 
-    taskDialogRef.value?.koiQuickClose('操作成功');
+    dialogVisible.value = false;
     getList();
   } catch (error) {
     console.error(error);
@@ -756,7 +812,8 @@ const submitForm = async () => {
 };
 
 const cancelForm = () => {
-  taskDialogRef.value?.koiQuickClose('已取消');
+  dialogVisible.value = false;
+  resetForm();
 };
 
 onMounted(() => {
@@ -766,16 +823,64 @@ onMounted(() => {
 
 <style scoped>
 .scheduler-page {
-  padding: 16px;
+  padding: 20px;
 }
 
-.scheduler-search {
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-form {
   margin-bottom: 16px;
 }
 
-.scheduler-pagination {
-  margin-top: 16px;
+.dialog-footer {
   text-align: right;
+}
+
+.button-group {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.button-group .el-button {
+  margin: 0;
+}
+
+/* 修复表单验证样式 */
+:deep(.el-form-item.is-required .el-form-item__label:before) {
+  content: '*';
+  color: #f56c6c;
+  margin-right: 4px;
+  position: static;
+  display: inline;
+  font-weight: normal;
+}
+
+:deep(.el-form-item__label) {
+  position: relative;
+  display: inline-block;
+}
+
+:deep(.el-form-item__error) {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  font-size: 12px;
+  color: #f56c6c;
+  line-height: 1;
+  padding-top: 4px;
+  z-index: 1;
+}
+
+/* 确保表单项有足够的底部间距来显示错误信息 */
+:deep(.el-form-item) {
+  margin-bottom: 22px;
 }
 </style>
 

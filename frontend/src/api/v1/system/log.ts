@@ -118,7 +118,7 @@ export function useLogApi() {
       });
     },
     
-    // 兼容旧API：获取登录日志列表
+    // API：获取登录日志列表
     getList: (data?: any) => {
       return request({
         url: '/v1/system/log/login',
@@ -127,7 +127,7 @@ export function useLogApi() {
       });
     },
     
-    // 兼容旧API：删除登录日志
+    // API：删除登录日志
     deleted: (data?: any) => {
       if (data?.id) {
         return request({

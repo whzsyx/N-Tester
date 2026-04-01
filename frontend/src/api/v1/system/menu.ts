@@ -91,7 +91,7 @@ export function useMenuApi() {
       });
     },
     
-    // 兼容旧API：获取所有菜单（嵌套格式）
+    // API：获取所有菜单（嵌套格式）
     getAllMenus: () => {
       return request({
         url: '/v1/system/menu/tree',
@@ -99,7 +99,7 @@ export function useMenuApi() {
       });
     },
     
-    // 兼容旧API：获取所有菜单（平铺格式）
+    // API：获取所有菜单（平铺格式）
     allMenu: (data?: any) => {
       return request({
         url: '/v1/system/menu',
@@ -108,7 +108,7 @@ export function useMenuApi() {
       });
     },
     
-    // 兼容旧API：保存或更新
+    // API：保存或更新
     saveOrUpdate: (data?: any) => {
       if (data?.id) {
         const { id, ...updateData } = data;
@@ -126,7 +126,7 @@ export function useMenuApi() {
       }
     },
     
-    // 兼容旧API：删除
+    // API：删除
     deleted: (data?: any) => {
       if (data?.id) {
         return request({

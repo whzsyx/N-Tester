@@ -2757,7 +2757,7 @@ class ApiAutomationService:
             "notice": {"notice_id": [25], "status": 1},
             "description": "",
         }
-        # 旧逻辑 user_id=1
+    
         return await TaskSchedulerService.create_task(db, task_data, user_id=1)
 
     @staticmethod

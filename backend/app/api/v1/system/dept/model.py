@@ -2,7 +2,7 @@
 部门数据模型
 """
 
-from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy import Column, String, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.base_model import BaseModel
 # 导入关联表（避免重复定义）
@@ -20,7 +20,7 @@ class DeptModel(BaseModel):
     parent_id = Column(Integer, nullable=True, default=0, comment="父部门ID（0表示顶级部门）")
     ancestors = Column(String(500), nullable=True, comment="祖级列表（逗号分隔）")
     
-    leader_id = Column(Integer, ForeignKey('sys_user.id'), nullable=True, comment="负责人ID")
+    leader_id = Column(BigInteger, ForeignKey('sys_user.id', use_alter=True, name='fk_dept_leader'), nullable=True, comment="负责人ID")
     phone = Column(String(20), nullable=True, comment="联系电话")
     email = Column(String(100), nullable=True, comment="邮箱")
     

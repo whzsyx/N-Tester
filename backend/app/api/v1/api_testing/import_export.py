@@ -128,7 +128,7 @@ class ImportExportService:
         api_project = await api_project_crud.create_crud(data=project_data)
         
         # 导入集合（需要处理父子关系）
-        collection_id_map = {}  # 旧ID -> 新ID映射
+        collection_id_map = {}  
         collections_data = import_data.get('collections', [])
         
         # 先导入没有父级的集合

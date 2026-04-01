@@ -2,7 +2,7 @@
 项目管理数据模型
 """
 
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, JSON, Boolean, Index, BigInteger
+from sqlalchemy import Column, String, Text, Integer, JSON, Boolean, Index, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -20,12 +20,12 @@ class ProjectModel(Base):
     name = Column(String(200), nullable=False, comment="项目名称")
     description = Column(Text, comment="项目描述")
     status = Column(String(20), default="active", comment="状态: active/paused/completed/archived")
-    owner_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="负责人ID")
+    owner_id = Column(BigInteger, ForeignKey("sys_user.id", use_alter=True, name="fk_project_owner"), nullable=False, comment="负责人ID")
     
-    # 关系
-    owner = relationship("UserModel", foreign_keys=[owner_id])
-    members = relationship("ProjectMemberModel", back_populates="project", cascade="all, delete-orphan")
-    environments = relationship("ProjectEnvironmentModel", back_populates="project", cascade="all, delete-orphan")
+    # 关系定义
+    members = relationship("ProjectMemberModel", back_populates="project", lazy="select")
+    environments = relationship("ProjectEnvironmentModel", back_populates="project", lazy="select")
+    owner = relationship("app.api.v1.system.user.model.UserModel", foreign_keys=[owner_id], lazy="select")
 
 
 class ProjectMemberModel(Base):
@@ -38,13 +38,13 @@ class ProjectMemberModel(Base):
         {'comment': '项目成员表', 'mysql_charset': 'utf8mb4'}
     )
     
-    project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, comment="项目ID")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="用户ID")
+    project_id = Column(BigInteger, ForeignKey("projects.id", use_alter=True, name="fk_pm_project"), nullable=False, comment="项目ID")
+    user_id = Column(BigInteger, ForeignKey("sys_user.id", use_alter=True, name="fk_pm_user"), nullable=False, comment="用户ID")
     role = Column(String(20), default="tester", comment="角色: owner/admin/developer/tester/viewer")
     
-    # 关系
+    # 关系定义
     project = relationship("ProjectModel", back_populates="members")
-    user = relationship("UserModel")
+    user = relationship("app.api.v1.system.user.model.UserModel", foreign_keys=[user_id])
 
 
 class ProjectEnvironmentModel(Base):
@@ -56,12 +56,12 @@ class ProjectEnvironmentModel(Base):
         {'comment': '项目环境表', 'mysql_charset': 'utf8mb4'}
     )
     
-    project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, comment="项目ID")
+    project_id = Column(BigInteger, ForeignKey("projects.id", use_alter=True, name="fk_pe_project"), nullable=False, comment="项目ID")
     name = Column(String(100), nullable=False, comment="环境名称")
     base_url = Column(String(500), comment="基础URL")
     description = Column(Text, comment="环境描述")
     variables = Column(JSON, comment="环境变量")
     is_default = Column(Boolean, default=False, comment="是否默认")
     
-    # 关系
+    # 关系定义
     project = relationship("ProjectModel", back_populates="environments")

@@ -253,6 +253,15 @@ class TestCaseVersionCRUD(BaseCRUD[TestCaseVersionModel]):
         for association in associations:
             await self.db.delete(association)
         await self.db.commit()
+    
+    async def delete_by_testcase_crud(self, testcase_id: int) -> None:
+        """删除测试用例的所有版本关联"""
+        stmt = select(self.model).where(self.model.test_case_id == testcase_id)
+        result = await self.db.execute(stmt)
+        associations = result.scalars().all()
+        for association in associations:
+            await self.db.delete(association)
+        await self.db.commit()
 
 
 

@@ -5,6 +5,7 @@
 from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.api.v1.projects.crud import ProjectCRUD, ProjectMemberCRUD, ProjectEnvironmentCRUD
 from app.api.v1.projects.schema import (
@@ -175,7 +176,67 @@ class ProjectService:
         # 检查权限（只有owner可以删除）
         await cls._check_project_permission(project_id, current_user_id, ["owner"], db)
         
+        # 获取项目信息
         crud = ProjectCRUD(db)
+        project = await crud.get_by_id_crud(project_id)
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="项目不存在"
+            )
+        
+        # 检查项目成员
+        from .crud import ProjectMemberCRUD
+        member_crud = ProjectMemberCRUD(db)
+        from .model import ProjectMemberModel
+        
+        # 获取所有项目成员
+        stmt = select(ProjectMemberModel).where(
+            ProjectMemberModel.project_id == project_id,
+            ProjectMemberModel.enabled_flag == 1
+        )
+        result = await db.execute(stmt)
+        members = result.scalars().all()
+        
+        # 如果有成员，检查是否只有项目负责人一个成员
+        if members:
+            if len(members) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"项目还有 {len(members)} 个成员，请先移除其他成员后再删除项目"
+                )
+            elif len(members) == 1:
+                # 检查唯一的成员是否是项目负责人
+                only_member = members[0]
+                if only_member.user_id != project.owner_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="项目还有其他成员，请先移除后再删除项目"
+                    )
+        
+        # 检查项目是否有环境
+        from .crud import ProjectEnvironmentCRUD
+        env_crud = ProjectEnvironmentCRUD(db)
+        from .model import ProjectEnvironmentModel
+        
+        # 统计项目环境数量
+        stmt = select(func.count(ProjectEnvironmentModel.id)).where(
+            ProjectEnvironmentModel.project_id == project_id,
+            ProjectEnvironmentModel.enabled_flag == 1
+        )
+        result = await db.execute(stmt)
+        env_count = result.scalar()
+        
+        if env_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"项目还有 {env_count} 个环境，请先删除所有环境后再删除项目"
+            )
+        
+        # 如果只有项目负责人一个成员，先删除成员记录
+        if members and len(members) == 1 and members[0].user_id == project.owner_id:
+            await member_crud.delete_crud([members[0].id])
+        
         await crud.delete_crud([project_id])
     
     # ========== 项目成员管理 ==========

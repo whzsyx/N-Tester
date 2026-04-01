@@ -97,7 +97,7 @@ async def check_menu_permission(
     current_user = Depends(get_current_user)
 ):
     """
-    检查用户是否有指定的菜单权限（兼容旧版本）
+    检查用户是否有指定的菜单权限
     
     Args:
         permission: 权限标识
@@ -134,7 +134,7 @@ async def check_menu_permission(
 
 def require_permission(permission: str):
     """
-    权限装饰器工厂（兼容旧版本）
+    权限装饰器工厂
     
     Args:
         permission: 需要的权限标识

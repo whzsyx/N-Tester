@@ -192,7 +192,7 @@ def _write_history(
 
 def build_trigger(time_config: dict[str, Any]):
     """
-    兼容旧架构 `views/task/task_common.py` 的 time JSON 结构：
+  
 
     - type=1: DateTrigger，key: run_time
     - type=2: IntervalTrigger，key: interval(分钟)

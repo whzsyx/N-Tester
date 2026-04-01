@@ -2,7 +2,7 @@
 角色数据模型
 """
 
-from sqlalchemy import Column, Integer, String, Text, Table, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Table, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.base_model import BaseModel
 
@@ -10,16 +10,16 @@ from app.core.base_model import BaseModel
 role_menu = Table(
     'sys_role_menu',
     BaseModel.metadata,
-    Column('role_id', Integer, ForeignKey('sys_role.id', ondelete='CASCADE'), primary_key=True),
-    Column('menu_id', Integer, ForeignKey('sys_menu.id', ondelete='CASCADE'), primary_key=True),
+    Column('role_id', BigInteger, ForeignKey('sys_role.id', ondelete='CASCADE'), primary_key=True),
+    Column('menu_id', BigInteger, ForeignKey('sys_menu.id', ondelete='CASCADE'), primary_key=True),
 )
 
 # 角色-部门关联表（自定义数据权限）
 role_dept = Table(
     'sys_role_dept',
     BaseModel.metadata,
-    Column('role_id', Integer, ForeignKey('sys_role.id', ondelete='CASCADE'), primary_key=True),
-    Column('dept_id', Integer, ForeignKey('sys_dept.id', ondelete='CASCADE'), primary_key=True),
+    Column('role_id', BigInteger, ForeignKey('sys_role.id', ondelete='CASCADE'), primary_key=True),
+    Column('dept_id', BigInteger, ForeignKey('sys_dept.id', ondelete='CASCADE'), primary_key=True),
 )
 
 # 用户-角色关联表（导入避免重复定义）

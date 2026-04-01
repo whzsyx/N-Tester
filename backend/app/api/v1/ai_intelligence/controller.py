@@ -8,6 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -405,7 +406,7 @@ async def get_ai_model_configs(
                 'max_tokens': config.max_tokens,
                 'temperature': config.temperature,
                 'top_p': config.top_p,
-                'is_active': config.is_active,
+                'is_active': bool(config.is_active),
                 'llm_config_id': config.llm_config_id,
                 'creation_date': config.creation_date.isoformat() if config.creation_date else None,
                 'updation_date': config.updation_date.isoformat() if config.updation_date else None
@@ -441,7 +442,7 @@ async def create_ai_model_config(
             'max_tokens': config.max_tokens,
             'temperature': config.temperature,
             'top_p': config.top_p,
-            'is_active': config.is_active,
+            'is_active': bool(config.is_active),
             'llm_config_id': config.llm_config_id,
             'creation_date': config.creation_date.isoformat() if config.creation_date else None,
             'updation_date': config.updation_date.isoformat() if config.updation_date else None
@@ -479,7 +480,7 @@ async def get_ai_model_config(
             'max_tokens': config.max_tokens,
             'temperature': config.temperature,
             'top_p': config.top_p,
-            'is_active': config.is_active,
+            'is_active': bool(config.is_active),
             'llm_config_id': config.llm_config_id,
             'creation_date': config.creation_date.isoformat() if config.creation_date else None,
             'updation_date': config.updation_date.isoformat() if config.updation_date else None
@@ -517,7 +518,7 @@ async def update_ai_model_config(
             'max_tokens': config.max_tokens,
             'temperature': config.temperature,
             'top_p': config.top_p,
-            'is_active': config.is_active,
+            'is_active': bool(config.is_active),
             'llm_config_id': config.llm_config_id,
             'creation_date': config.creation_date.isoformat() if config.creation_date else None,
             'updation_date': config.updation_date.isoformat() if config.updation_date else None
@@ -2353,15 +2354,26 @@ async def start_generation_task(task_id: str):
             
             logger.info(f"开始生成任务: {task_id}, 输出模式: {task.output_mode}")
             
-            # 记录Writer模型配置信息
-            if task.writer_model_config:
-                logger.info(f"Writer模型配置: ID={task.writer_model_config.id}, "
-                          f"名称={task.writer_model_config.name}, "
-                          f"模型={task.writer_model_config.model_name}, "
-                          f"Base URL={task.writer_model_config.base_url}, "
-                          f"API Key前缀={task.writer_model_config.api_key[:10] if task.writer_model_config.api_key else 'None'}")
+            # 查询Writer模型配置信息
+            writer_model_config = None
+            if task.writer_model_config_id:
+                from .model import AIModelConfigModel
+                writer_config_stmt = select(AIModelConfigModel).where(
+                    AIModelConfigModel.id == task.writer_model_config_id
+                )
+                writer_config_result = await db.execute(writer_config_stmt)
+                writer_model_config = writer_config_result.scalar_one_or_none()
+                
+                if writer_model_config:
+                    logger.info(f"Writer模型配置: ID={writer_model_config.id}, "
+                              f"名称={writer_model_config.name}, "
+                              f"模型={writer_model_config.model_name}, "
+                              f"Base URL={writer_model_config.base_url}, "
+                              f"API Key前缀={writer_model_config.api_key[:10] if writer_model_config.api_key else 'None'}")
+                else:
+                    logger.error(f"Writer模型配置不存在: writer_model_config_id={task.writer_model_config_id}")
             else:
-                logger.error(f"Writer模型配置未加载: writer_model_config_id={task.writer_model_config_id}")
+                logger.warning(f"未配置Writer模型: writer_model_config_id为空")
             
             # 定义流式回调函数
             async def stream_callback(chunk: str):
@@ -2413,18 +2425,10 @@ async def start_generation_task(task_id: str):
                     else:
                         logger.info(f"重新获取任务后，generated_test_cases长度: {len(task.generated_test_cases)}")
                     
-                    # 确保关联对象已加载
-                    if not task.reviewer_model_config:
-                        logger.error(f"Reviewer模型配置未加载: reviewer_model_config_id={task.reviewer_model_config_id}")
-                        raise Exception("Reviewer模型配置未加载")
+                    # 查询Reviewer模型配置和提示词配置
+                    from .model import AIModelConfigModel, PromptConfigModel
                     
-                    if not task.reviewer_prompt_config:
-                        logger.error(f"Reviewer提示词配置未加载: reviewer_prompt_config_id={task.reviewer_prompt_config_id}")
-                        raise Exception("Reviewer提示词配置未加载")
-                    
-                    # 直接从数据库重新查询Reviewer模型配置，确保API Key正确
-                    from sqlalchemy import select
-                    from .model import AIModelConfigModel
+                    # 查询Reviewer模型配置
                     reviewer_config_stmt = select(AIModelConfigModel).where(
                         AIModelConfigModel.id == task.reviewer_model_config_id
                     )
@@ -2434,6 +2438,16 @@ async def start_generation_task(task_id: str):
                     if not reviewer_model_config:
                         raise Exception(f"Reviewer模型配置不存在: ID={task.reviewer_model_config_id}")
                     
+                    # 查询Reviewer提示词配置
+                    reviewer_prompt_stmt = select(PromptConfigModel).where(
+                        PromptConfigModel.id == task.reviewer_prompt_config_id
+                    )
+                    reviewer_prompt_result = await db.execute(reviewer_prompt_stmt)
+                    reviewer_prompt_config = reviewer_prompt_result.scalar_one_or_none()
+                    
+                    if not reviewer_prompt_config:
+                        raise Exception(f"Reviewer提示词配置不存在: ID={task.reviewer_prompt_config_id}")
+                    
                     # 记录Reviewer配置信息
                     logger.info(f"Reviewer模型配置: ID={reviewer_model_config.id}, "
                               f"名称={reviewer_model_config.name}, "
@@ -2441,7 +2455,7 @@ async def start_generation_task(task_id: str):
                               f"Base URL={reviewer_model_config.base_url}, "
                               f"API Key前缀={reviewer_model_config.api_key[:10] if reviewer_model_config.api_key else 'None'}")
                     
-                    reviewer_prompt = task.reviewer_prompt_config.content
+                    reviewer_prompt = reviewer_prompt_config.content
                     messages = [
                         {"role": "system", "content": reviewer_prompt},
                         {"role": "user", "content": f"请评审以下测试用例：\n\n{generated_content}"}
@@ -2475,7 +2489,7 @@ async def start_generation_task(task_id: str):
                     # 根据评审反馈优化测试用例
                     logger.info(f"根据评审反馈优化测试用例")
                     
-                    # 重新查询Writer模型配置
+                    # 重新查询Writer模型配置和提示词配置
                     writer_config_stmt = select(AIModelConfigModel).where(
                         AIModelConfigModel.id == task.writer_model_config_id
                     )
@@ -2485,8 +2499,18 @@ async def start_generation_task(task_id: str):
                     if not writer_model_config:
                         raise Exception(f"Writer模型配置不存在: ID={task.writer_model_config_id}")
                     
+                    # 查询Writer提示词配置
+                    writer_prompt_stmt = select(PromptConfigModel).where(
+                        PromptConfigModel.id == task.writer_prompt_config_id
+                    )
+                    writer_prompt_result = await db.execute(writer_prompt_stmt)
+                    writer_prompt_config = writer_prompt_result.scalar_one_or_none()
+                    
+                    if not writer_prompt_config:
+                        raise Exception(f"Writer提示词配置不存在: ID={task.writer_prompt_config_id}")
+                    
                     optimize_messages = [
-                        {"role": "system", "content": task.writer_prompt_config.content},
+                        {"role": "system", "content": writer_prompt_config.content},
                         {"role": "user", "content": f"原始测试用例：\n{generated_content}\n\n评审反馈：\n{review_feedback}\n\n请根据评审反馈优化测试用例。"}
                     ]
                     

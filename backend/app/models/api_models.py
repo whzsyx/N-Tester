@@ -17,7 +17,7 @@ class ProjectInfo(Base):
 
 
 class LegacyModuleInfo(Base):
-    """旧版模块信息表（用于兼容）"""
+    """模块信息表"""
     __tablename__ = 'legacy_module_info'
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment='模块ID')

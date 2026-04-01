@@ -20,7 +20,7 @@ async function initApplication() {
 	const namespace = `${import.meta.env.VITE_APP_NAMESPACE}`;
 	await initStores(app, { namespace })
 
-	// 兼容旧版：全局注册 koi 组件（支持 <koiCard> / <KoiCard> 等写法）
+	// 全局注册 koi 组件（支持 <koiCard> / <KoiCard> 等写法）
 	app.component('koiCard', KoiCard);
 	app.component('KoiCard', KoiCard);
 	app.component('KoiDialog', KoiDialog);

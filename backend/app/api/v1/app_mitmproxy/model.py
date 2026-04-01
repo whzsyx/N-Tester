@@ -2,7 +2,7 @@
 APP 抓包数据模型
 """
 
-from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, BigInteger
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, BigInteger
 from sqlalchemy.sql import func
 from app.models.base import Base
 
@@ -14,8 +14,8 @@ class MitmproxyApi(Base):
     __table_args__ = {"comment": "mitmproxy 抓包接口记录表"}
 
     result_id = Column(String(255), nullable=False, comment="结果ID")
-    device_id = Column(Integer, ForeignKey("app_devices.id"), nullable=False, comment="设备ID（app_devices.id）")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="用户ID")
+    device_id = Column(Integer, nullable=False, comment="设备ID（app_devices.id）")
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
 
     url = Column(Text, nullable=False, default="", comment="接口请求地址")
     method = Column(String(255), nullable=False, default="POST", comment="请求方法")

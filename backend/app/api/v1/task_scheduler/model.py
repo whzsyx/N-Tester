@@ -11,7 +11,7 @@ class SchedulerTaskModel(Base):
     __tablename__ = 'legacy_scheduler_tasks'
     
     name = Column(String(255), nullable=False, comment='任务名称')
-    # 为兼容旧架构：
+
     # 1-APP自动化, 2-Web UI自动化, 3-接口自动化
     type = Column(Integer, nullable=False, comment='任务类型: 1-APP自动化, 2-Web UI自动化, 3-接口自动化')
     status = Column(Integer, nullable=False, comment='任务状态: 0-停用, 1-启用')

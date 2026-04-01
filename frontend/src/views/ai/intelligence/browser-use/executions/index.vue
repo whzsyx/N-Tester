@@ -374,7 +374,7 @@ const getList = async () => {
     console.log('执行记录API响应:', res)
     
     if (res.code === 200) {
-      // 适配数据格式 - 支持新旧两种格式
+
       let records = []
       let totalCount = 0
       
@@ -383,7 +383,7 @@ const getList = async () => {
         records = res.data.items
         totalCount = res.data.total
       } else if (Array.isArray(res.data)) {
-        // 旧格式：直接是数组
+
         records = res.data
         totalCount = records.length
       } else if (res.data.results) {
@@ -484,7 +484,7 @@ const handleViewScreenshots = async (row: any) => {
   try {
     const res = await aiExecutionRecordApi.get(row.id)
     if (res.code === 200) {
-      // 旧API中GIF路径存储在gif_path字段
+
       if (res.data.gif_path) {
         screenshotsList.value = [{
           url: `/api/static/upload/${res.data.gif_path}`,

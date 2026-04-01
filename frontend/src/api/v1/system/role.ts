@@ -112,7 +112,7 @@ export function useRoleApi() {
       });
     },
     
-    // 兼容旧API：保存或更新
+    // API：保存或更新
     saveOrUpdate: (data?: any) => {
       if (data?.id) {
         const { id, ...updateData } = data;
@@ -130,7 +130,7 @@ export function useRoleApi() {
       }
     },
     
-    // 兼容旧API：删除
+    // API：删除
     deleted: (data?: any) => {
       if (data?.id) {
         return request({

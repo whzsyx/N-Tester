@@ -68,7 +68,7 @@ export function useDictTypeApi() {
       });
     },
     
-    // 保存或更新（兼容旧API）
+    // 保存或更新
     saveOrUpdate: (data: any) => {
       if (data.id) {
         const { id, ...updateData } = data;
@@ -158,7 +158,7 @@ export function useDictDataApi() {
       });
     },
     
-    // 保存或更新（兼容旧API）
+    // 保存或更新
     saveOrUpdate: (data: any) => {
       if (data.id) {
         const { id, ...updateData } = data;

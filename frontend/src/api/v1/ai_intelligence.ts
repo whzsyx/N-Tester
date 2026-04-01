@@ -204,7 +204,7 @@ export const figmaConfigApi = {
   // 删除Figma配置
   delete: (id: number) => request.delete(`/v1/ai_intelligence/figma-configs/${id}`),
   
-  // 提取需求（旧版，保留兼容）
+  // 提取需求
   extract: (id: number) => request.post(`/v1/ai_intelligence/figma-configs/${id}/extract`),
   
   // 带模式的提取

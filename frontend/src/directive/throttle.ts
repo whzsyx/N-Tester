@@ -1,5 +1,4 @@
 // v-throttle
-// 迁移自旧前端 l-vue-ui/src/directives/modules/throttle.ts
 import type { Directive, DirectiveBinding } from 'vue';
 
 interface ElType extends HTMLElement {

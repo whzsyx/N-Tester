@@ -139,7 +139,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：保存或更新
+    // API：保存或更新
     saveOrUpdate: (data?: any) => {
       if (data?.id) {
         const { id, ...updateData } = data;
@@ -157,7 +157,7 @@ export function useUserApi() {
       }
     },
     
-    // 兼容旧API：删除
+    // API：删除
     deleted: (data?: any) => {
       if (data?.id) {
         // 使用多个ids参数的方式，FastAPI可以正确解析
@@ -169,7 +169,7 @@ export function useUserApi() {
       throw new Error('缺少用户ID');
     },
     
-    // 兼容旧API：管理员重置密码
+    // API：管理员重置密码
     adminResetPassword: (data?: any) => {
       if (data?.id) {
         const { id } = data;
@@ -183,10 +183,10 @@ export function useUserApi() {
       throw new Error('缺少用户ID');
     },
     
-    // 兼容旧API：用户修改密码（使用changePassword代替）
-    // resetPassword 已被标准方法占用，旧代码应使用 changePassword
+    // API：用户修改密码（使用changePassword代替）
+    // resetPassword 已被标准方法占用，应使用 changePassword
     
-    // 兼容旧API：更新头像
+    // API：更新头像
     updateUserAvatar: (data?: any) => {
       return request({
         url: '/v1/system/user/avatar',
@@ -195,7 +195,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：获取用户信息
+    // API：获取用户信息
     getUserInfo: (data?: any) => {
       if (data?.id) {
         return request({
@@ -206,7 +206,7 @@ export function useUserApi() {
       throw new Error('缺少用户ID');
     },
     
-    // 兼容旧API：通过token获取菜单
+    // API：通过token获取菜单
     getMenuByToken: () => {
       return request({
         url: '/v1/system/auth/menus',
@@ -214,7 +214,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：通过token获取用户信息
+    // API：通过token获取用户信息
     getUserInfoByToken: () => {
       return request({
         url: '/v1/system/auth/userinfo',
@@ -222,7 +222,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：登录（映射到auth API）
+    // API：登录（映射到auth API）
     signIn: (data: { username: string; password: string; captcha?: string }) => {
       return request({
         url: '/v1/system/auth/login',
@@ -231,7 +231,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：登出（映射到auth API）
+    // API：登出（映射到auth API）
     signOut: () => {
       return request({
         url: '/v1/system/auth/logout',
@@ -239,7 +239,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：登录（另一个名称）
+    // API：登录（另一个名称）
     login: (data: { username: string; password: string; captcha?: string }) => {
       return request({
         url: '/v1/system/auth/login',
@@ -248,7 +248,7 @@ export function useUserApi() {
       });
     },
     
-    // 兼容旧API：登出（另一个名称）
+    // API：登出（另一个名称）
     logout: () => {
       return request({
         url: '/v1/system/auth/logout',

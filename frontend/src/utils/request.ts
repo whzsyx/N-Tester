@@ -30,7 +30,7 @@ service.interceptors.request.use(
 		if (Session.get('token')) {
 			// 新API使用Authorization: Bearer token格式
 			config.headers!['Authorization'] = `Bearer ${Session.get('token')}`;
-			// 兼容旧API的token header
+			// API的token header
 			config.headers!['token'] = `${Session.get('token')}`;
 		}
 		return config;
@@ -46,7 +46,7 @@ service.interceptors.response.use(
 	(response) => {
 		// 对响应数据做点什么
 		const res = response.data;
-		// 新API使用code: 200表示成功，旧API使用code: 0表示成功
+		// 新API使用code: 200表示成功，API使用code: 0表示成功
 		const isSuccess = res.code === 0 || res.code === 200;
 		
 		if (res.code && !isSuccess) {
@@ -71,11 +71,11 @@ service.interceptors.response.use(
 			error.code = res.code;
 			return Promise.reject(error);
 		} else {
-			// 兼容新旧API的数据格式
+			// API的数据格式
 			if (res.data) {
 				// 1. 分页数据格式转换
 				// 新API返回: { items: [], total: 10, page: 1, page_size: 10 }
-				// 旧API期望: { rows: [], rowTotal: 10 }
+				// API期望: { rows: [], rowTotal: 10 }
 				if (res.data.items !== undefined && res.data.total !== undefined) {
 					res.data.rows = res.data.items;
 					res.data.rowTotal = res.data.total;

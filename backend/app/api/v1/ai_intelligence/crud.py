@@ -6,7 +6,6 @@ AI智能化模块数据访问层
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_
-from sqlalchemy.orm import selectinload
 
 from app.core.base_crud import BaseCRUD
 from .model import (
@@ -46,7 +45,7 @@ class RequirementDocumentCRUD(BaseCRUD[RequirementDocumentModel]):
         """获取包含分析结果的需求文档"""
         stmt = select(self.model).where(
             and_(self.model.id == document_id, self.model.enabled_flag == 1)
-        ).options(selectinload(self.model.analysis))
+        )
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
@@ -61,7 +60,7 @@ class RequirementAnalysisCRUD(BaseCRUD[RequirementAnalysisModel]):
         """根据文档ID获取分析结果"""
         stmt = select(self.model).where(
             and_(self.model.document_id == document_id, self.model.enabled_flag == 1)
-        ).options(selectinload(self.model.requirements))
+        )
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
@@ -114,11 +113,6 @@ class TestCaseGenerationTaskCRUD(BaseCRUD[TestCaseGenerationTaskModel]):
         """根据任务ID获取任务"""
         stmt = select(self.model).where(
             and_(self.model.task_id == task_id, self.model.enabled_flag == 1)
-        ).options(
-            selectinload(self.model.writer_model_config),
-            selectinload(self.model.reviewer_model_config),
-            selectinload(self.model.writer_prompt_config),
-            selectinload(self.model.reviewer_prompt_config)
         )
         result = await self.db.execute(stmt)
         return result.scalars().first()

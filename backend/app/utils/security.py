@@ -294,7 +294,7 @@ def hash_password(password: str) -> str:
 
 
 def get_password_hash(password: str) -> str:
-    """加密密码（别名，兼容旧代码）"""
+    """加密密码"""
     return PasswordHandler.hash_password(password)
 
 

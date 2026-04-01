@@ -926,7 +926,7 @@ const currentLogDetail = ref<any | null>(null)
 const getList = async () => {
   loading.value = true
   try {
-    // 使用旧API获取用例列表
+    // 使用API获取用例列表
     const params: any = {
       page: queryForm.page,
       page_size: queryForm.page_size

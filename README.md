@@ -568,8 +568,10 @@ source .venv/bin/activate
 ##### 4. 安装依赖
 
 ```bash
-# 安装依赖
+# 安装依赖(linux&mac)
 pip install -r requirements
+# windows 用户
+pip install -r requirements-windows.txt
 ```
 
 ##### 5. 初始化数据库

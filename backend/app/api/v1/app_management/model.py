@@ -2,7 +2,7 @@
 APP自动化模块数据模型
 """
 
-from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger
 from sqlalchemy.sql import func
 from app.models.base import Base
 
@@ -16,7 +16,7 @@ class AppMenuModel(Base):
     name = Column(String(255), nullable=False, unique=True, comment="名称")
     pid = Column(BigInteger, nullable=False, comment="父id")
     type = Column(Integer, nullable=False, comment="类型")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="用户ID")
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
 
 
 class AppScriptModel(Base):
@@ -26,8 +26,8 @@ class AppScriptModel(Base):
     __table_args__ = {"comment": "APP自动化脚本表"}
 
     script = Column(JSON, nullable=False, comment="脚本")
-    menu_id = Column(BigInteger, ForeignKey("app_menus.id"), nullable=False, unique=True, comment="菜单ID")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="用户ID")
+    menu_id = Column(BigInteger, nullable=False, unique=True, comment="菜单ID")
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
     create_time = Column(DateTime, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
@@ -48,9 +48,9 @@ class AppResultModel(Base):
     after_img = Column(Text, nullable=True, comment="执行后截图地址")
     video = Column(Text, nullable=True, comment="视频地址")
     performance = Column(JSON, nullable=True, comment="实时性能")
-    menu_id = Column(BigInteger, ForeignKey("app_menus.id"), nullable=False, comment="菜单ID")
+    menu_id = Column(BigInteger, nullable=False, comment="菜单ID")
     create_time = Column(DateTime, server_default=func.now(), comment="执行时间")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="用户ID")
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
 
 
 class AppResultListModel(Base):
@@ -66,7 +66,7 @@ class AppResultListModel(Base):
     script_status = Column(JSON, nullable=False, comment="脚本执行情况")
     start_time = Column(DateTime, server_default=func.now(), comment="创建时间")
     end_time = Column(DateTime, nullable=True, comment="更新时间")
-    user_id = Column(BigInteger, ForeignKey("sys_user.id"), nullable=False, comment="用户ID")
+    user_id = Column(BigInteger, nullable=False, comment="用户ID")
 
 
 class AppAirtestImageModel(Base):
@@ -78,4 +78,4 @@ class AppAirtestImageModel(Base):
     file_name = Column(String(255), nullable=False, comment="图片名称")
     file_path = Column(Text, nullable=False, comment="图片地址")
     create_time = Column(DateTime, server_default=func.now(), comment="创建时间")
-    menu_id = Column(BigInteger, ForeignKey("app_menus.id"), nullable=True, comment="所属菜单")
+    menu_id = Column(BigInteger, nullable=True, comment="所属菜单")

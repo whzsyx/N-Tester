@@ -81,7 +81,7 @@ const state = reactive({
           'M': { text: '目录', type: 'success' },
           'C': { text: '菜单', type: 'primary' },
           'F': { text: '按钮', type: 'warning' },
-          // 兼容旧数据
+
           1: { text: '目录', type: 'success' },
           2: { text: '菜单', type: 'primary' },
           3: { text: '按钮', type: 'warning' },

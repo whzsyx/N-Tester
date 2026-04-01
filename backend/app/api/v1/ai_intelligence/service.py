@@ -514,7 +514,7 @@ class TestCaseGenerationTaskService:
     ) -> TestCaseGenerationTaskModel:
         """创建测试用例生成任务"""
         task_crud = TestCaseGenerationTaskCRUD(db)
-        task_dict = task_data.dict()
+        task_dict = task_data.model_dump()
         task_dict.update({
             'task_id': str(uuid.uuid4()),
             'created_by': created_by
@@ -550,7 +550,7 @@ class TestCaseGenerationTaskService:
         task = await task_crud.get_by_task_id(task_id)
         if not task:
             return None
-        return await task_crud.update_crud(task.id, update_data.dict(exclude_unset=True))
+        return await task_crud.update_crud(task.id, update_data.model_dump(exclude_unset=True))
     
     @staticmethod
     async def update_stream_buffer(db: AsyncSession, task_id: str, chunk: str) -> bool:
@@ -572,10 +572,26 @@ class TestCaseGenerationTaskService:
                 last_stream_update=datetime.now()
             )
             
-            await task_crud.update_crud(task.id, update_data.dict(exclude_unset=True))
+            await task_crud.update_crud(task.id, update_data.model_dump(exclude_unset=True))
             return True
         except Exception as e:
             logger.error(f"更新流式缓冲区失败: {e}")
+            return False
+    
+    @staticmethod
+    async def delete_task(db: AsyncSession, task_id: str) -> bool:
+        """删除任务（软删除）"""
+        try:
+            task_crud = TestCaseGenerationTaskCRUD(db)
+            task = await task_crud.get_by_task_id(task_id)
+            if not task:
+                return False
+            
+            # 软删除：设置enabled_flag为0
+            await task_crud.update_crud(task.id, {'enabled_flag': 0})
+            return True
+        except Exception as e:
+            logger.error(f"删除任务失败: {e}")
             return False
 
 
@@ -817,7 +833,37 @@ class AIModelService:
         task: TestCaseGenerationTaskModel
     ) -> str:
         """生成测试用例"""
-        writer_prompt = task.writer_prompt_config.content
+        # 查询Writer提示词配置
+        from sqlalchemy import select
+        from .model import PromptConfigModel, AIModelConfigModel
+        
+        if not task.writer_prompt_config_id:
+            raise Exception("Writer提示词配置ID未设置")
+        
+        if not task.writer_model_config_id:
+            raise Exception("Writer模型配置ID未设置")
+        
+        # 查询提示词配置
+        prompt_stmt = select(PromptConfigModel).where(
+            PromptConfigModel.id == task.writer_prompt_config_id
+        )
+        prompt_result = await db.execute(prompt_stmt)
+        writer_prompt_config = prompt_result.scalar_one_or_none()
+        
+        if not writer_prompt_config:
+            raise Exception(f"Writer提示词配置不存在: ID={task.writer_prompt_config_id}")
+        
+        # 查询模型配置
+        model_stmt = select(AIModelConfigModel).where(
+            AIModelConfigModel.id == task.writer_model_config_id
+        )
+        model_result = await db.execute(model_stmt)
+        writer_model_config = model_result.scalar_one_or_none()
+        
+        if not writer_model_config:
+            raise Exception(f"Writer模型配置不存在: ID={task.writer_model_config_id}")
+        
+        writer_prompt = writer_prompt_config.content
         
         # 构建用户提示
         user_message = (
@@ -852,7 +898,7 @@ class AIModelService:
 
         # 调用API生成测试用例
         response = await AIModelService.call_openai_compatible_api(
-            task.writer_model_config,
+            writer_model_config,
             messages
         )
 
@@ -872,7 +918,37 @@ class AIModelService:
         """
         import asyncio
         
-        writer_prompt = task.writer_prompt_config.content
+        # 查询Writer提示词配置和模型配置
+        from sqlalchemy import select
+        from .model import PromptConfigModel, AIModelConfigModel
+        
+        if not task.writer_prompt_config_id:
+            raise Exception("Writer提示词配置ID未设置")
+        
+        if not task.writer_model_config_id:
+            raise Exception("Writer模型配置ID未设置")
+        
+        # 查询提示词配置
+        prompt_stmt = select(PromptConfigModel).where(
+            PromptConfigModel.id == task.writer_prompt_config_id
+        )
+        prompt_result = await db.execute(prompt_stmt)
+        writer_prompt_config = prompt_result.scalar_one_or_none()
+        
+        if not writer_prompt_config:
+            raise Exception(f"Writer提示词配置不存在: ID={task.writer_prompt_config_id}")
+        
+        # 查询模型配置
+        model_stmt = select(AIModelConfigModel).where(
+            AIModelConfigModel.id == task.writer_model_config_id
+        )
+        model_result = await db.execute(model_stmt)
+        writer_model_config = model_result.scalar_one_or_none()
+        
+        if not writer_model_config:
+            raise Exception(f"Writer模型配置不存在: ID={task.writer_model_config_id}")
+        
+        writer_prompt = writer_prompt_config.content
 
         # 构建用户提示
         user_message = (
@@ -910,7 +986,7 @@ class AIModelService:
         try:
             # 调用非流式API获取完整内容
             response = await AIModelService.call_openai_compatible_api(
-                task.writer_model_config,
+                writer_model_config,
                 messages
             )
             

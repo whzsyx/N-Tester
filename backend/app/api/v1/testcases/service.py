@@ -204,6 +204,16 @@ class TestCaseService:
         # 检查项目权限
         await cls._check_project_member(testcase.project_id, current_user_id, db)
         
+        # 先删除关联的测试步骤
+        step_crud = TestCaseStepCRUD(db)
+        await step_crud.delete_testcase_steps_crud(testcase_id)
+        
+        # 删除用例版本关联
+        from .crud import TestCaseVersionCRUD
+        version_crud = TestCaseVersionCRUD(db)
+        await version_crud.delete_by_testcase_crud(testcase_id)
+        
+        # 最后删除测试用例
         await crud.delete_crud([testcase_id])
     
     @classmethod

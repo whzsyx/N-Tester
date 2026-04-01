@@ -1,5 +1,4 @@
 // v-debounce
-// 迁移自旧前端 l-vue-ui/src/directives/modules/debounce.ts
 import type { Directive, DirectiveBinding } from 'vue';
 
 interface ElType extends HTMLElement {

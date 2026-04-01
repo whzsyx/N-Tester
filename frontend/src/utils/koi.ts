@@ -44,7 +44,7 @@ export function MsgBox(
 	});
 }
 
-// 兼容旧版命名
+
 export const NoticeError = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'error');
 export const NoticeSuccess = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'success');
 export const koiNoticeWarning = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'warning');

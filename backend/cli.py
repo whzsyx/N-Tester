@@ -50,7 +50,7 @@ def get_alembic_config() -> Config:
 @app.command(name="revision", help="生成新的 Alembic 迁移脚本")
 def revision(
     message: Annotated[str, typer.Option("--message", "-m", help="迁移描述信息")] = "auto migration",
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev"
 ) -> None:
     """
     生成新的 Alembic 迁移脚本
@@ -59,12 +59,16 @@ def revision(
         python cli.py revision -m "add user table"
         python cli.py revision --message "update user model" --env prod
     """
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  生成 Alembic 迁移脚本")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         alembic_cfg = get_alembic_config()
@@ -92,7 +96,7 @@ def revision(
 
 @app.command(name="upgrade", help="应用最新的 Alembic 迁移")
 def upgrade(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV,
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
     revision: Annotated[str, typer.Option("--revision", "-r", help="目标版本 (默认: head)")] = "head"
 ) -> None:
     """
@@ -103,12 +107,16 @@ def upgrade(
         python cli.py upgrade --revision ae1027a6acf
         python cli.py upgrade --env prod
     """
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  应用 Alembic 迁移")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         alembic_cfg = get_alembic_config()
@@ -133,7 +141,7 @@ def upgrade(
 
 @app.command(name="downgrade", help="回滚 Alembic 迁移")
 def downgrade(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV,
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
     revision: Annotated[str, typer.Option("--revision", "-r", help="目标版本 (默认: -1)")] = "-1"
 ) -> None:
     """
@@ -144,12 +152,16 @@ def downgrade(
         python cli.py downgrade -r -2
         python cli.py downgrade --revision ae1027a6acf
     """
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  回滚 Alembic 迁移")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         alembic_cfg = get_alembic_config()
@@ -180,7 +192,7 @@ def downgrade(
 
 @app.command(name="current", help="显示当前迁移版本")
 def current(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev"
 ) -> None:
     """
     显示当前迁移版本
@@ -188,7 +200,11 @@ def current(
     示例:
         python cli.py current
     """
-    os.environ["ENVIRONMENT"] = env.value
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
+    os.environ["ENVIRONMENT"] = env
     
     try:
         alembic_cfg = get_alembic_config()
@@ -207,7 +223,7 @@ def current(
 
 @app.command(name="history", help="显示迁移历史")
 def history(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV,
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="显示详细信息")] = False
 ) -> None:
     """
@@ -217,7 +233,11 @@ def history(
         python cli.py history
         python cli.py history --verbose
     """
-    os.environ["ENVIRONMENT"] = env.value
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
+    os.environ["ENVIRONMENT"] = env
     
     try:
         alembic_cfg = get_alembic_config()
@@ -237,7 +257,7 @@ def history(
 @app.command(name="init-db", help="初始化数据库（生成并应用迁移）")
 def init_db(
     message: Annotated[str, typer.Option("--message", "-m", help="迁移描述信息")] = "initial migration",
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV,
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
     force: Annotated[bool, typer.Option("--force", "-f", help="强制重新初始化")] = False
 ) -> None:
     """
@@ -247,13 +267,19 @@ def init_db(
         python cli.py init-db
         python cli.py init-db -m "initial setup"
         python cli.py init-db --force
+        python cli.py init-db --env prod
     """
+    # 验证环境参数
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'，必须是 'dev' 或 'prod'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  初始化数据库")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         # 检查 alembic 目录是否存在
@@ -304,8 +330,76 @@ try:
     from app.models.base import Base
     target_metadata = Base.metadata
     
-    # 导入模型以便 Alembic 检测
-    from app.models import system_models, celery_beat_models, api_models
+
+    from app.models import rbac_models, celery_beat_models, api_models
+    
+    # 导入 AI 模型
+    from app.models.ai.conversation import ConversationModel
+    from app.models.ai.message import MessageModel
+    from app.models.ai.llm_config import LLMConfigModel
+    
+    # 直接导入模型模块，避免触发 controller 和 service 的导入
+    import sys
+    import os
+    backend_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    sys.path.insert(0, backend_path)
+    
+    # 导入所有模块的 model.py（只导入模块，不导入具体类）
+    # 系统模块
+    from app.api.v1.system.user import model as user_model
+    from app.api.v1.system.role import model as role_model
+    from app.api.v1.system.menu import model as menu_model
+    from app.api.v1.system.permission import model as permission_model
+    from app.api.v1.system.dept import model as dept_model
+    from app.api.v1.system.dict import model as dict_model
+    from app.api.v1.system.log import model as log_model
+    from app.api.v1.system.file import model as file_model
+    from app.api.v1.system.code_generator import model as code_gen_model
+    
+    # AI 相关模块
+    from app.api.v1.ai_intelligence import model as ai_intelligence_model
+    
+    # 项目管理模块
+    from app.api.v1.projects import model as projects_model
+    
+    # 测试用例模块
+    from app.api.v1.testcases import model as testcases_model
+    
+    # API 测试模块
+    from app.api.v1.api_testing import model as api_testing_model
+    
+    # API 自动化模块
+    from app.api.v1.api_automation import model as api_automation_model
+    
+    # UI 自动化模块
+    from app.api.v1.ui_automation import model as ui_automation_model
+    
+    # APP 管理模块
+    from app.api.v1.app_management import model as app_management_model
+    
+    # APP Mitmproxy 模块
+    from app.api.v1.app_mitmproxy import model as app_mitmproxy_model
+    
+    # Web 管理模块
+    from app.api.v1.web_management import model as web_management_model
+    
+    # 通知模块
+    from app.api.v1.notifications import model as notifications_model
+    
+    # 任务调度模块
+    from app.api.v1.task_scheduler import model as task_scheduler_model
+    
+    # 评审模块
+    from app.api.v1.reviews import model as reviews_model
+    
+    # 助手模块
+    from app.api.v1.assistant import model as assistant_model
+    
+    # 云设备模块
+    from app.api.v1.cloud_device import model as cloud_device_model
+    
+    # 数据工厂模块
+    from app.api.v1.data_factory import model as data_factory_model
     
     print(f"成功导入 {len(target_metadata.tables)} 个表")
     
@@ -315,6 +409,8 @@ except Exception as e:
     print("1. 已安装所有依赖: pip install -r requirements")
     print("2. .env 配置正确")
     print("3. 在虚拟环境中运行")
+    import traceback
+    traceback.print_exc()
     raise
 
 
@@ -483,6 +579,7 @@ def downgrade() -> None:
                 typer.echo("正在导入数据...")
                 success_count = 0
                 error_count = 0
+                errors = []
                 
                 for statement in insert_statements:
                     try:
@@ -491,7 +588,10 @@ def downgrade() -> None:
                     except Exception as e:
                         error_count += 1
                         if "Duplicate entry" not in str(e):
-                            pass  # 忽略重复数据错误
+                            # 记录非重复数据的错误
+                            table_match = re.search(r'INSERT INTO `?(\w+)`?', statement, re.IGNORECASE)
+                            table_name = table_match.group(1) if table_match else 'unknown'
+                            errors.append(f"{table_name}: {str(e)[:100]}")
                 
                 conn.commit()
                 cursor.close()
@@ -500,7 +600,13 @@ def downgrade() -> None:
                 typer.echo()
                 typer.echo(f"成功导入: {success_count} 条")
                 if error_count > 0:
-                    typer.echo(f"跳过: {error_count} 条（重复数据）")
+                    typer.echo(f"失败/跳过: {error_count} 条")
+                    if errors:
+                        typer.echo("\n错误详情:")
+                        for err in errors[:10]:  # 只显示前10个错误
+                            typer.echo(f"  - {err}")
+                        if len(errors) > 10:
+                            typer.echo(f"  ... 还有 {len(errors) - 10} 个错误")
                 typer.echo()
                 typer.echo("=" * 50)
                 typer.echo("初始数据导入完成！")
@@ -544,7 +650,7 @@ def downgrade() -> None:
 
 @app.command(name="check", help="检查数据库配置")
 def check(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev"
 ) -> None:
     """
     检查数据库配置
@@ -552,12 +658,16 @@ def check(
     示例:
         python cli.py check
     """
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  检查数据库配置")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         # 导入配置
@@ -607,7 +717,7 @@ def check(
 
 @app.command(name="seed", help="导入初始数据（种子数据）")
 def seed(
-    env: Annotated[EnvironmentEnum, typer.Option("--env", help="运行环境 (dev, prod)")] = EnvironmentEnum.DEV,
+    env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
     force: Annotated[bool, typer.Option("--force", "-f", help="强制导入（清空现有数据）")] = False
 ) -> None:
     """
@@ -617,12 +727,16 @@ def seed(
         python cli.py seed
         python cli.py seed --force
     """
+    if env not in ["dev", "prod"]:
+        typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
+        raise typer.Exit(code=1)
+    
     typer.echo("=" * 50)
     typer.echo("  导入初始数据")
     typer.echo("=" * 50)
     typer.echo()
     
-    os.environ["ENVIRONMENT"] = env.value
+    os.environ["ENVIRONMENT"] = env
     
     try:
         # 导入配置

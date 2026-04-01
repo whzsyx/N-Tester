@@ -21,7 +21,7 @@ export function directive(app: App) {
   dragDirective(app);
   // 点击外部区域
   clickOutside(app)
-  // 兼容旧版：按钮防抖/节流
+  // 兼容：按钮防抖/节流
   app.directive('debounce', debounceDirective);
   app.directive('throttle', throttleDirective);
 }

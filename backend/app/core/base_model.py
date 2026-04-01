@@ -4,7 +4,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, String
+from sqlalchemy import Column, Integer, BigInteger, DateTime, String
 from sqlalchemy.ext.declarative import declared_attr
 from app.models.base import Base
 
@@ -35,12 +35,12 @@ class AuditMixin:
     @declared_attr
     def created_by(cls):
         """创建人ID"""
-        return Column(Integer, nullable=True, comment="创建人ID")
+        return Column(BigInteger, nullable=True, comment="创建人ID")
     
     @declared_attr
     def updated_by(cls):
         """更新人ID"""
-        return Column(Integer, nullable=True, comment="更新人ID")
+        return Column(BigInteger, nullable=True, comment="更新人ID")
 
 
 class BaseModel(Base, TimestampMixin, AuditMixin):
@@ -48,7 +48,7 @@ class BaseModel(Base, TimestampMixin, AuditMixin):
     
     __abstract__ = True
     
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="主键ID")
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True, comment="主键ID")
     
     def to_dict(self):
         """转换为字典"""

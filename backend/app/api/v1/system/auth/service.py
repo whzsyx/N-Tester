@@ -365,10 +365,9 @@ class AuthService:
                                 # 生成路由name（去掉开头的/，并替换/为-）
                                 route_name = menu.path.lstrip('/').replace('/', '-') if menu.path else f'menu_{menu.id}'
                                 
-                                # 检查 hidden 字段（如果存在）
-                                is_hide = False
-                                if hasattr(menu, 'hidden') and menu.hidden is not None:
-                                    is_hide = bool(menu.hidden)
+                                # 使用 visible 字段控制菜单显示
+                                # visible=1表示显示，visible=0表示隐藏
+                                is_hide = menu.visible == 0
                                 
                                 # 转换为前端路由格式
                                 menus_dict[menu.id] = {

@@ -511,9 +511,11 @@ const handleDelete = () => {
       await projectApi.delete(projectId.value);
       ElMessage.success('删除成功');
       router.push('/projects/list');
-    } catch (error) {
+    } catch (error: any) {
       console.error('删除失败:', error);
-      ElMessage.error('删除失败');
+      // 显示后端返回的错误信息
+      const errorMessage = error?.response?.data?.message || error?.message || '删除失败';
+      ElMessage.error(errorMessage);
     }
   });
 };

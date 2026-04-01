@@ -185,7 +185,7 @@ class Configs(BaseSettings):
     APP_PUBLIC_BASE_URL: str = Field(default="", validation_alias="APP_PUBLIC_BASE_URL")
     # type=6「删除差更文件」：adb rm -rf 路径，多个用分号分隔
     APP_DEVICE_RM_PATHS: str = Field(default="", validation_alias="APP_DEVICE_RM_PATHS")
-    # 短信验证码步骤：短信正文需包含的关键字（对齐旧代码占位「识别文案」）
+    # 短信验证码步骤：短信正文需包含的关键字
     APP_SMS_BODY_KEYWORD: str = Field(default="识别文案", validation_alias="APP_SMS_BODY_KEYWORD")
     # 设为 1/true/yes 时使用 Appium+OpenCV 执行器（无需安装 airtest）
     USE_APPIUM_APP_EXECUTOR: str = Field(default="", validation_alias="USE_APPIUM_APP_EXECUTOR")
