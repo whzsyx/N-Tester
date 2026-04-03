@@ -28,7 +28,7 @@ class RunWebScriptRequest(BaseModel):
     result_id: str = Field(..., description="执行ID")
     script: List[Dict[str, Any]] = Field(..., description="脚本配置（选择的脚本菜单列表等）")
     browser: List[str] = Field(..., description="浏览器列表")
-    browser_type: int = Field(2, description="浏览器运行模式：1有头/2无头（按旧逻辑）")
+    browser_type: int = Field(2, description="浏览器运行模式：1有头/2无头")
     width: Optional[int] = Field(None, description="浏览器宽度")
     height: Optional[int] = Field(None, description="浏览器高度")
     task_name: Optional[str] = Field(None, description="任务名称")

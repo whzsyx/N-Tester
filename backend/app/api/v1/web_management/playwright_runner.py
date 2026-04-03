@@ -3,8 +3,8 @@ Web管理模块 - Playwright 执行引擎
 """
 
 from __future__ import annotations
+import asyncio
 import os
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -19,15 +19,117 @@ from .model import WebResultDetailModel, WebResultListModel
 def _playwright_base_dir() -> Path:
     return Path(app_config.BASEDIR) / app_config.STATIC_DIR / "media" / "playwright"
 
-def _get_ai_fixture():
-    try:
-        from dotenv import load_dotenv  # type: ignore
-        from autowing.playwright.async_fixture import create_async_fixture  # type: ignore
+async def _ai_action_on_page(page, cmd: str, result_id: str, browser: int) -> tuple[bool, str]:
+    """
+    使用项目内置 LLM（AIModelService）在当前 playwright page 上执行自然语言指令。
+    流程：截图 → 发给 LLM（视觉模型）→ 解析返回的操作 → 在 page 上执行。
+    """
+    import base64
+    import json as _json
+    from app.db.sqlalchemy import async_session_factory
+    from app.models.ai.llm_config import LLMConfigModel
+    from app.services.ai.ai_model_service import AIModelService
+    from sqlalchemy import select as _select
 
-        load_dotenv()
-        return create_async_fixture()
-    except Exception:
-        return None
+    # 1. 获取默认 LLM 配置
+    async with async_session_factory() as db:
+        res = await db.execute(
+            _select(LLMConfigModel).where(
+                LLMConfigModel.is_default == True,
+                LLMConfigModel.is_active == True,
+                LLMConfigModel.enabled_flag == 1,
+            )
+        )
+        llm_config = res.scalar_one_or_none()
+        if not llm_config:
+            # 没有默认配置时取第一个可用的
+            res2 = await db.execute(
+                _select(LLMConfigModel).where(
+                    LLMConfigModel.is_active == True,
+                    LLMConfigModel.enabled_flag == 1,
+                ).limit(1)
+            )
+            llm_config = res2.scalar_one_or_none()
+
+    if not llm_config:
+        return False, "AI操作失败：未找到可用的LLM配置，请在系统设置中配置AI模型"
+
+    # 2. 截取当前页面截图（base64）
+    try:
+        screenshot_bytes = await page.screenshot(type="jpeg", quality=80)
+        screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
+    except Exception as e:
+        return False, f"AI操作失败：截图异常 {str(e)}"
+
+    # 3. 构造 prompt，要求 LLM 返回结构化操作
+    system_prompt = (
+        "你是一个网页自动化助手。用户会给你一张网页截图和一个操作指令，"
+        "你需要分析截图并返回一个JSON对象，描述要执行的操作。\n"
+        "返回格式（只返回JSON，不要有其他文字）：\n"
+        '{"action": "click|fill|select|press|scroll", '
+        '"selector": "CSS选择器或空字符串", '
+        '"x": 点击的X坐标（仅click时使用，无selector时填写）, '
+        '"y": 点击的Y坐标（仅click时使用，无selector时填写）, '
+        '"value": "输入值（fill/select/press时使用）", '
+        '"description": "操作描述"}'
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{screenshot_b64}", "detail": "high"},
+                },
+                {"type": "text", "text": f"请根据截图执行以下操作：{cmd}"},
+            ],
+        }
+    ]
+
+    # 4. 调用 LLM
+    try:
+        resp = await AIModelService.call_openai_compatible_api(llm_config, messages, max_tokens=512)
+        content = resp["choices"][0]["message"]["content"].strip()
+        # 提取 JSON（兼容 LLM 在 JSON 前后加了说明文字的情况）
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start == -1 or end == 0:
+            return False, f"AI操作失败：LLM未返回有效JSON，原始回复：{content[:200]}"
+        op = _json.loads(content[start:end])
+    except Exception as e:
+        return False, f"AI操作失败：LLM调用异常 {str(e)}"
+
+    # 5. 在 page 上执行操作
+    action = op.get("action", "")
+    selector = op.get("selector", "")
+    value = op.get("value", "")
+    desc = op.get("description", cmd)
+
+    try:
+        if action == "click":
+            if selector:
+                await page.locator(selector).first.click(timeout=10000)
+            else:
+                await page.mouse.click(float(op.get("x", 0)), float(op.get("y", 0)))
+        elif action == "fill":
+            await page.locator(selector).first.fill(str(value), timeout=10000)
+        elif action == "select":
+            await page.locator(selector).first.select_option(str(value), timeout=10000)
+        elif action == "press":
+            if selector:
+                await page.locator(selector).first.press(str(value), timeout=10000)
+            else:
+                await page.keyboard.press(str(value))
+        elif action == "scroll":
+            await page.mouse.wheel(0, float(value) if value else 300)
+        else:
+            return False, f"AI操作失败：不支持的操作类型 '{action}'"
+
+        await write_log(f"AI操作执行成功：{desc}", browser, result_id)
+        return True, f"AI操作执行成功：{desc}"
+    except Exception as e:
+        return False, f"AI操作执行失败：{desc}，原因：{str(e)}"
 
 
 async def run_web_async(
@@ -36,13 +138,6 @@ async def run_web_async(
     *,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> Tuple[bool, str]:
-    """
-    执行单个浏览器任务。
-    - browser: int (1 chrome, 2 firefox, 3 edge, 4 webkit)
-    - script: List[step]
-    - result_id: str
-    - width/height: Optional[int]
-    """
     browser_type = int(data["browser"])
     script = data["script"]
     result_id = str(data["result_id"])
@@ -50,23 +145,35 @@ async def run_web_async(
     height = int(data["height"] or 1080) if data.get("height") is not None else 1080
     headless = False if int(run_browser_type) == 1 else True
 
+    # channel 仅在 Windows 本地有效（需要系统安装对应浏览器）
+    # Linux/Ubuntu 服务器上只有 playwright install 安装的浏览器，不能指定 channel
+    import platform
+    _is_linux = platform.system().lower() != "windows"
+
     launch_config = {
         1: {"browser": "chromium", "channel": "chrome"},
-        2: {"browser": "firefox", "channel": "firefox"},
+        2: {"browser": "firefox", "channel": None},
         3: {"browser": "chromium", "channel": "msedge"},
-        4: {"browser": "webkit", "channel": "webkit"},
+        4: {"browser": "webkit", "channel": None},
     }
     cfg = launch_config.get(browser_type, {"browser": "chromium", "channel": "chrome"})
+
+    # Linux 服务器：不使用 channel（依赖 playwright install 的浏览器），强制 headless
+    if _is_linux:
+        channel = None
+        headless = True
+    else:
+        channel = cfg.get("channel")
 
     base_dir = _playwright_base_dir() / result_id / str(browser_type)
     base_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         async with async_playwright() as playwright:
-            browser = await getattr(playwright, cfg["browser"]).launch(
-                channel=cfg.get("channel"),
-                headless=headless,
-            )
+            launch_kwargs = {"headless": headless}
+            if channel:
+                launch_kwargs["channel"] = channel
+            browser = await getattr(playwright, cfg["browser"]).launch(**launch_kwargs)
             context = await browser.new_context(
                 viewport={"width": width, "height": height},
                 record_video_dir=base_dir,
@@ -113,7 +220,11 @@ async def run_web_async(
 
             return ok, msg
     except Exception as e:
-        # 确保执行列表最终释放
+        # 确保执行列表最终释放，并写入错误日志
+        try:
+            await write_log(f"Playwright 启动异常: {str(e)}", browser_type, result_id)
+        except Exception:
+            pass
         async with session_factory() as session:
             l = await session.execute(
                 select(WebResultListModel).where(
@@ -138,8 +249,6 @@ async def run_script_async(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> Tuple[bool, str]:
     driver = None
-    ai_fixture = _get_ai_fixture()
-    ai = None
     for step in script:
         now_time = datetime.now()
         status = 1
@@ -167,11 +276,6 @@ async def run_script_async(
                 if action.get("cookies"):
                     await set_cookie(context, action["cookies"], browser, result_id, action.get("element") or "")
                 ok, msg, driver = await open_url(browser, action, result_id, context)
-                if ai_fixture and driver:
-                    try:
-                        ai = ai_fixture(page=driver)
-                    except Exception:
-                        ai = None
                 result = (ok, msg, driver)
             elif t == 13:
                 # 新窗口
@@ -180,11 +284,6 @@ async def run_script_async(
                 if action.get("cookies"):
                     await set_cookie(context, action["cookies"], browser, result_id, action.get("element") or "")
                 ok, msg, driver, context = await element_new_page(context, step["name"], browser, result_id, action.get("element") or "")
-                if ai_fixture and driver:
-                    try:
-                        ai = ai_fixture(page=driver)
-                    except Exception:
-                        ai = None
                 result = (ok, msg, driver)
             else:
                 ok, el = await handle_element(driver, action, result_id, browser)
@@ -221,7 +320,7 @@ async def run_script_async(
                         "page_type": action.get("target_type"),
                         "role": action.get("input"),
                     }
-                    ok_if, msg_if = await element_if(driver, step["name"], browser, result_id, if_dict, ai)
+                    ok_if, msg_if = await element_if(driver, step["name"], browser, result_id, if_dict, None)
                     result = (ok_if, msg_if, None)
                     if ok_if and step.get("children"):
                         await element_for(
@@ -232,8 +331,6 @@ async def run_script_async(
                             1,
                             step["children"],
                             context,
-                            ai,
-                            ai_fixture,
                             session_factory=session_factory,
                         )
                 elif t == 11:
@@ -247,8 +344,6 @@ async def run_script_async(
                             loop_num,
                             step["children"],
                             context,
-                            ai,
-                            ai_fixture,
                             session_factory=session_factory,
                         )
                         result = (ok_for, msg_for, None)
@@ -259,19 +354,9 @@ async def run_script_async(
                 elif t == 14:
                     ok_sw, msg_sw, driver = await element_switch_page(context, step["name"], browser, result_id, "previous", driver)
                     result = (ok_sw, msg_sw, driver)
-                    if ai_fixture and driver:
-                        try:
-                            ai = ai_fixture(page=driver)
-                        except Exception:
-                            ai = None
                 elif t == 15:
                     ok_sw, msg_sw, driver = await element_switch_page(context, step["name"], browser, result_id, "next", driver)
                     result = (ok_sw, msg_sw, driver)
-                    if ai_fixture and driver:
-                        try:
-                            ai = ai_fixture(page=driver)
-                        except Exception:
-                            ai = None
                 elif t == 16 and ok:
                     result = (await element_right_click(step["name"], browser, result_id, el)) + (None,)
                 elif t == 17:
@@ -281,16 +366,10 @@ async def run_script_async(
                     ok_up, msg_up = await element_upload_file(el, step["name"], browser, result_id, str(action.get("input") or ""))
                     result = (ok_up, msg_up, None)
                 elif t == 19:
-                    if not ai:
-                        result = (False, "AI组件不可用（缺少 autowing/dotenv 依赖）", None)
-                    else:
-                        cmd = str(action.get("element") or "")
-                        await write_log(f"开始执行AI操作：{cmd}", browser, result_id)
-                        try:
-                            r = await ai.ai_action(cmd)
-                            result = (bool(r[0]), "AI操作执行成功" if r[0] else f"AI操作执行失败，原因是：{r[1]}", None)
-                        except Exception as e:
-                            result = (False, f"AI操作执行失败，原因是：{str(e)}", None)
+                    cmd = str(action.get("element") or "")
+                    await write_log(f"开始执行AI操作：{cmd}", browser, result_id)
+                    ok_ai, msg_ai = await _ai_action_on_page(driver, cmd, result_id, browser)
+                    result = (ok_ai, msg_ai, None)
                 elif t == 20:
                     ok_rl, msg_rl = await element_reload_page(driver, step["name"], browser, result_id)
                     result = (ok_rl, msg_rl, None)
@@ -305,11 +384,6 @@ async def run_script_async(
                         driver,
                     )
                     result = (ok_cl, msg_cl, driver)
-                    if ai_fixture and driver:
-                        try:
-                            ai = ai_fixture(page=driver)
-                        except Exception:
-                            ai = None
                 else:
                     if not ok:
                         result = (False, str(el), None)
@@ -317,21 +391,8 @@ async def run_script_async(
                         result = (True, f"{step['name']}执行成功", None)
 
  
-            if not result[0] and ai and hasattr(ai, "ai_remedy"):
-                try:
-                    await write_log(f"{step['name']}：尝试AI补救中", browser, result_id)
-                    r = await ai.ai_remedy(step)
-                    if r and r[0]:
-                        result = (True, f"{step['name']}：AI补救成功", result[2])
-                        await write_log(f"{step['name']}：AI补救成功", browser, result_id)
-                except Exception as e:
-                    await write_log(f"{step['name']}：AI补救失败：{str(e)}", browser, result_id)
-
-            after_img = await playwright_screenshot(driver, browser, result_id)
-
-            # 断言
             if action.get("assert"):
-                status, assert_list = await element_assert(driver, browser, result_id, action["assert"], ai)
+                status, assert_list = await element_assert(driver, browser, result_id, action["assert"], None)
 
             await write_result(
                 step["name"],
@@ -490,7 +551,7 @@ async def open_url(browser: int, action: Dict[str, Any], result_id: str, context
     driver = await context.new_page()
     url = action.get("element") or ""
     await driver.goto(url, wait_until="networkidle")
-    time.sleep(1)
+    await driver.wait_for_timeout(1000)
     await write_log(f"网页打开成功，网页地址：{url}", browser, result_id)
     return True, f"网页打开成功，网页地址：{url}", driver
 
@@ -739,7 +800,7 @@ async def element_sway_left(driver, name: str, browser: int, result_id: str, act
 
 async def element_if(driver, name: str, browser: int, result_id: str, if_dict: Dict[str, Any], ai) -> Tuple[bool, str]:
     try:
-        status, _ = await element_assert(driver, browser, result_id, [if_dict], ai)
+        status, _ = await element_assert(driver, browser, result_id, [if_dict], None)
         if status == 1:
             msg = f"{name}：判断成功，元素存在"
             await write_log(msg, browser, result_id)
@@ -760,21 +821,16 @@ async def element_for(
     num: int,
     script: List[Dict[str, Any]],
     context,
-    ai,
-    ai_fixture,
     *,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> Tuple[bool, str]:
     try:
         for _ in range(0, int(num or 1)):
-            await for_run_script_async(
-                driver,
+            await run_script_async(
                 browser,
                 script,
                 result_id,
                 context,
-                ai,
-                ai_fixture,
                 session_factory=session_factory,
             )
         msg = f"{name}：执行成功"
@@ -784,27 +840,6 @@ async def element_for(
         msg = f"{name}：执行失败 原因是：{str(e)}"
         await write_log(msg, browser, result_id)
         return False, msg
-
-async def for_run_script_async(
-    driver,
-    browser: int,
-    script: List[Dict[str, Any]],
-    result_id: str,
-    context,
-    ai,
-    ai_fixture,
-    *,
-    session_factory: async_sessionmaker[AsyncSession],
-) -> Tuple[bool, str, Any, Any]:
-
-    ok, msg = await run_script_async(
-        browser,
-        script,
-        result_id,
-        context,
-        session_factory=session_factory,
-    )
-    return ok, msg, driver, context
 
 
 async def element_wait(driver, name: str, browser: int, result_id: str, wait_time: int) -> Tuple[bool, str]:
@@ -828,7 +863,7 @@ async def after_element_wait(driver, browser: int, result_id: str, wait_time: in
 
 async def element_new_page(context, name: str, browser: int, result_id: str, element: str):
     try:
-        time.sleep(1)
+        await asyncio.sleep(1)
         driver = await context.new_page()
         await driver.goto(element)
         msg = f"{name}：打开新窗口--{element}--成功"

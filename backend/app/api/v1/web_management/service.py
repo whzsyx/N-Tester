@@ -487,15 +487,24 @@ class WebManagementService:
         user_id: int,
     ) -> Dict[str, Any]:
         """执行Web脚本"""
+        result_id = str(script_config["result_id"])
+
+        # 只检查同一个 result_id 是否正在执行，且超过30分钟的执行视为僵尸自动忽略
+        from datetime import timedelta
+        zombie_threshold = datetime.now() - timedelta(minutes=30)
         running = await db.execute(
-            select(WebResultListModel).where(WebResultListModel.enabled_flag == 1, WebResultListModel.status == 0)
+            select(WebResultListModel).where(
+                WebResultListModel.enabled_flag == 1,
+                WebResultListModel.status == 0,
+                WebResultListModel.result_id == result_id,
+                WebResultListModel.start_time >= zombie_threshold,
+            )
         )
         if running.scalars().first():
-            raise Exception("执行失败，当前有执行任务正在队列中，请稍后执行")
+            raise Exception("执行失败，当前脚本正在执行中，请稍后再试")
 
         status, msg, script_list, browser_type = await WebManagementService.analysis_web_script(db, script_config)
 
-        result_id = str(script_config["result_id"])
         task_name = script_config.get("task_name") or ""
 
         row = WebResultListModel(
