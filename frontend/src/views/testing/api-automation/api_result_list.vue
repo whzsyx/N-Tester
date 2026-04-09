@@ -1,32 +1,37 @@
 <template>
-	<div>
-		<el-card class="box-card">
-			<div class="result-topbar">
-				<div class="result-topbar-left">
-					<span class="result-title">接口自动化 - 执行结果</span>
-				</div>
-				<div class="result-topbar-right">
-					<el-input 
-						v-model="searchParams.search.name" 
-						placeholder="请输入任务名称" 
-						clearable 
-						style="width: 300px; margin-right: 10px;"
+	<div class="result-list-container">
+		<el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
+			<el-form :inline="true" :model="searchParams.search">
+				<el-form-item label="任务名称">
+					<el-input
+						v-model="searchParams.search.name"
+						placeholder="请输入任务名称"
+						clearable
+						style="width: 220px"
 						@keyup.enter="get_script_result_list"
-					>
-						<template #append>
-							<el-button @click="get_script_result_list">搜索</el-button>
-						</template>
-					</el-input>
-					<el-button type="danger" @click="reset_search">重置</el-button>
-				</div>
-			</div>
+					/>
+				</el-form-item>
+				<el-form-item>
+					<el-button type="primary" icon="Search" @click="get_script_result_list">搜索</el-button>
+					<el-button icon="Refresh" @click="reset_search">重置</el-button>
+				</el-form-item>
+			</el-form>
 		</el-card>
 
-		<el-card class="box-card mt-10px">
-			<el-table :data="table_data" stripe>
-				<el-table-column prop="id" label="ID" width="80" />
-				<el-table-column prop="name" label="任务名称" />
-				<el-table-column prop="result.pass" label="用例详情" width="120">
+		<el-card shadow="hover" style="margin-top: 8px">
+			<el-table
+				v-loading="loading"
+				:data="table_data"
+				border
+				stripe
+				empty-text="暂无数据"
+				:fit="true"
+				table-layout="auto"
+				style="width: 100%"
+			>
+				<el-table-column type="index" label="序号" width="60" align="center" />
+				<el-table-column prop="name" label="任务名称" min-width="120" show-overflow-tooltip />
+				<el-table-column prop="result.pass" label="用例详情" width="120" align="center">
 					<template #default="{ row }">
 						<el-popover placement="top" :width="350" trigger="hover">
 							<div>
@@ -40,40 +45,77 @@
 								</el-steps>
 							</div>
 							<template #reference>
-								<el-button type="text">用例详情</el-button>
+								<el-button type="primary" size="small" plain>用例详情</el-button>
 							</template>
 						</el-popover>
 					</template>
 				</el-table-column>
-				<el-table-column label="通过率" width="200">
+				<el-table-column label="任务状态" width="110" align="center">
 					<template #default="{ row }">
-						<el-progress :percentage="row.result.percent" :color="customColors" />
+						<el-tag :type="statusMeta(row.status).tagType">{{ statusMeta(row.status).text }}</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="username" label="执行人" width="120" />
-				<el-table-column label="开始时间" width="200">
+				<el-table-column label="通过率" width="160" align="center">
+					<template #default="{ row }">
+						<el-progress :percentage="row.result?.percent ?? 0" :color="customColors" :stroke-width="10" />
+					</template>
+				</el-table-column>
+				<el-table-column label="执行人" prop="username" width="100" align="center" show-overflow-tooltip />
+				<el-table-column label="开始时间" width="170" align="center">
 					<template #default="{ row }">
 						{{ row.start_time ? String(row.start_time).replace('T', ' ') : '-' }}
 					</template>
 				</el-table-column>
-				<el-table-column label="结束时间" width="200">
+				<el-table-column label="结束时间" width="170" align="center">
 					<template #default="{ row }">
 						{{ row.end_time ? String(row.end_time).replace('T', ' ') : '-' }}
 					</template>
 				</el-table-column>
-				<el-table-column label="操作" width="150">
+				<el-table-column label="操作" width="300" align="center" fixed="right">
 					<template #default="{ row }">
-						<el-button type="primary" size="small" @click="view_report(row.result_id)">查看测试报告</el-button>
+						<span class="action-cell">
+							<el-button
+								v-if="statusMeta(row.status).isRunning"
+								type="danger"
+								size="small"
+								@click="stop_run(row.result_id)"
+							>停止</el-button>
+
+							<el-button
+								v-if="statusMeta(row.status).canViewReport"
+								type="primary"
+								size="small"
+								@click="view_report(row.result_id)"
+							>查看报告</el-button>
+
+							<el-button
+								v-if="statusMeta(row.status).canRerun"
+								type="info"
+								size="small"
+								@click="rerun(row)"
+							>重跑</el-button>
+
+							<el-button
+								v-else
+								type="info"
+								size="small"
+								disabled
+								title="执行中可先停止"
+							>重跑</el-button>
+
+							<el-button type="danger" size="small" @click="del_run(row)">删除</el-button>
+						</span>
 					</template>
 				</el-table-column>
 			</el-table>
-			
-			<div class="pagination-wrapper">
+
+			<div style="margin-top: 12px">
 				<el-pagination
+					v-show="total > 0"
+					background
 					v-model:current-page="searchParams.currentPage"
 					v-model:page-size="searchParams.pageSize"
 					:page-sizes="[10, 25, 50, 100]"
-					:background="true"
 					layout="total, sizes, prev, pager, next, jumper"
 					:total="total"
 					@size-change="get_script_result_list"
@@ -85,9 +127,19 @@
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { get_api_script_result_list } from '/@/api/v1/api_automation';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { getExecutionStatusMeta } from '/@/utils/executionStatus';
 
-const table_data = ref<any>([]);
+const {
+	get_api_script_result_list,
+	run_api_script,
+	stop_api_script_result,
+	del_api_script_result,
+} = useApiAutomationApi();
+
+const table_data = ref<any[]>([]);
+const loading = ref(false);
 const searchParams = ref({
 	currentPage: 1,
 	pageSize: 10,
@@ -100,13 +152,28 @@ const customColors = ref<any>([
 	{ color: '#81d36f', percentage: 100 },
 ]);
 const total = ref(0);
+const statusMeta = (status: number) => getExecutionStatusMeta(status);
 
 const get_script_result_list = async () => {
-	const res: any = await get_api_script_result_list(searchParams.value as any);
-	const raw = res?.data;
-	const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
-	table_data.value = list;
-	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
+	loading.value = true;
+	try {
+		const res: any = await get_api_script_result_list({
+			page: searchParams.value.currentPage,
+			pageSize: searchParams.value.pageSize,
+			search: searchParams.value.search,
+		});
+		const raw = res?.data;
+		const list = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+		table_data.value = list.map((r: any) => ({
+			...r,
+			status: r.status ?? (r.end_time ? 1 : 0),
+			result: r.result || {},
+			script: r.script || [],
+		}));
+		total.value = typeof raw?.total === 'number' ? raw.total : list.length;
+	} finally {
+		loading.value = false;
+	}
 };
 
 const reset_search = () => {
@@ -116,9 +183,58 @@ const reset_search = () => {
 	get_script_result_list();
 };
 
-const view_report = async (result_id: any) => {
-
+const view_report = (result_id: any) => {
 	window.open(`/api-automation/report?result_id=${result_id}`, '_blank');
+};
+
+const stop_run = async (result_id: number) => {
+	try {
+		await stop_api_script_result({ result_id });
+		ElMessage.success('已请求停止');
+		await get_script_result_list();
+	} catch (e: any) {
+		ElMessage.error(e?.message || '停止失败');
+	}
+};
+
+const rerun = async (row: any) => {
+	try {
+		const newId = Date.now();
+		if (!row?.config?.env_id) {
+			ElMessage.warning('无法重跑：缺少环境配置，请从场景页重新执行');
+			return;
+		}
+		await run_api_script({
+			result_id: newId,
+			name: row.name,
+			config: row.config,
+			run_list: row.script || [],
+		});
+		ElMessage.success('已发起重跑');
+		await get_script_result_list();
+	} catch (e: any) {
+		ElMessage.error(e?.message || '重跑失败');
+	}
+};
+
+const del_run = async (row: any) => {
+	try {
+		await ElMessageBox.confirm(
+			'确认删除该执行记录？若正在执行将先请求停止再删除，该操作不可恢复。',
+			'提示',
+			{
+				type: 'warning',
+				confirmButtonText: '确定',
+				cancelButtonText: '取消',
+			},
+		);
+		await del_api_script_result({ result_id: row.result_id });
+		ElMessage.success('删除成功');
+		await get_script_result_list();
+	} catch (e: any) {
+		if (e === 'cancel' || e === 'close') return;
+		ElMessage.error(e?.message || '删除失败');
+	}
 };
 
 onMounted(() => {
@@ -126,47 +242,12 @@ onMounted(() => {
 });
 </script>
 
-
-
 <style scoped>
-/* 通用样式 */
-.box-card {
-	margin-bottom: 10px;
+.result-list-container {
+	padding: 10px;
 }
 
-.mt-10px {
-	margin-top: 10px;
-}
-
-/* 结果页面样式 */
-.result-topbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-}
-
-.result-topbar-left {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-}
-
-.result-topbar-right {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-}
-
-.result-title {
-	font-size: 16px;
-	font-weight: bold;
-	color: var(--el-text-color-primary);
-}
-
-.pagination-wrapper {
-	margin-top: 20px;
-	display: flex;
-	justify-content: center;
+.action-cell {
+	white-space: nowrap;
 }
 </style>
-

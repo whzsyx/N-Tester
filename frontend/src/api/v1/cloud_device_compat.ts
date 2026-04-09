@@ -1,16 +1,51 @@
-
 import request from '/@/utils/request';
-export const get_device_list = (data: any) => request.post('/v1/cloud_device/device_list', data);
-export const devices_install = (data: any) => request.post('/v1/cloud_device/device_install', data);
-export const devices_uninstall = (data: any) => request.post('/v1/cloud_device/device_uninstall', data);
-export const device_info_list = (data: any) => request.post('/v1/cloud_device/device_info_list', data);
-export const use_device = (data: any) => request.post('/v1/cloud_device/use_device', data);
-export const stop_device = (data: any) => request.post('/v1/cloud_device/stop_device', data);
-export const get_device_log = (data: any) => request.post('/v1/cloud_device/get_device_log', data);
-export const get_history_list = (data: any) => request.post('/v1/cloud_device/get_history_list', data);
-export const device_install_app = (data: any) => request.post('/v1/cloud_device/device_install_app', data);
-export const direct_install_app = (data: any) => request.post('/v1/cloud_device/direct_install_app', data);
-export const app_view_device = (data: any) => request.post('/v1/cloud_device/app_view_device', data);
-export const add_device = (data: any) => request.post('/v1/cloud_device/add_device', data);
-export const device_performance = (data: any) => request.post('/v1/cloud_device/device_performance', data);
 
+/** 与旧版 cloud_device 接口路径一致，供兼容引用 */
+export function useCloudDeviceCompatApi() {
+  return {
+    get_device_list: (data: any) =>
+      request({ url: '/v1/cloud_device/device_list', method: 'post', data }),
+    devices_install: (data: any) =>
+      request({ url: '/v1/cloud_device/device_install', method: 'post', data }),
+    devices_uninstall: (data: any) =>
+      request({ url: '/v1/cloud_device/device_uninstall', method: 'post', data }),
+    device_info_list: (data: any) =>
+      request({ url: '/v1/cloud_device/device_info_list', method: 'post', data }),
+    use_device: (data: any) =>
+      request({ url: '/v1/cloud_device/use_device', method: 'post', data }),
+    stop_device: (data: any) =>
+      request({ url: '/v1/cloud_device/stop_device', method: 'post', data }),
+    get_device_log: (data: any) =>
+      request({ url: '/v1/cloud_device/get_device_log', method: 'post', data }),
+    get_history_list: (data: any) =>
+      request({ url: '/v1/cloud_device/get_history_list', method: 'post', data }),
+    device_install_app: (data: any) =>
+      request({ url: '/v1/cloud_device/device_install_app', method: 'post', data }),
+    direct_install_app: (data: any) =>
+      request({ url: '/v1/cloud_device/direct_install_app', method: 'post', data }),
+    app_view_device: (data: any) =>
+      request({ url: '/v1/cloud_device/app_view_device', method: 'post', data }),
+    add_device: (data: any) =>
+      request({ url: '/v1/cloud_device/add_device', method: 'post', data }),
+    device_performance: (data: any) =>
+      request({ url: '/v1/cloud_device/device_performance', method: 'post', data }),
+  };
+}
+
+export const cloudDeviceCompatApi = useCloudDeviceCompatApi();
+
+export const {
+  get_device_list,
+  devices_install,
+  devices_uninstall,
+  device_info_list,
+  use_device,
+  stop_device,
+  get_device_log,
+  get_history_list,
+  device_install_app,
+  direct_install_app,
+  app_view_device,
+  add_device,
+  device_performance,
+} = cloudDeviceCompatApi;

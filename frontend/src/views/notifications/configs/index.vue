@@ -33,11 +33,12 @@
             clearable
             style="width: 200px"
           >
-            <el-option label="飞书机器人" value="webhook_feishu" />
-            <el-option label="企业微信机器人" value="webhook_wechat" />
-            <el-option label="钉钉机器人" value="webhook_dingtalk" />
-            <el-option label="Telegram机器人" value="telegram" />
-            <el-option label="邮件推送" value="email" />
+            <el-option
+              v-for="opt in typeOptions"
+              :key="String(opt.value)"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="is_active">
@@ -204,11 +205,12 @@
             style="width: 100%"
             @change="handleTypeChange"
           >
-            <el-option label="飞书机器人" value="webhook_feishu" />
-            <el-option label="企业微信机器人" value="webhook_wechat" />
-            <el-option label="钉钉机器人" value="webhook_dingtalk" />
-            <el-option label="Telegram机器人" value="telegram" />
-            <el-option label="邮件推送" value="email" />
+            <el-option
+              v-for="opt in typeOptions"
+              :key="String(opt.value)"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
         </el-form-item>
         
@@ -413,8 +415,54 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useNotificationConfigApi, type NotificationConfig, type NotificationConfigCreate } from '/@/api/v1/notifications'
 import { formatDateTime } from '/@/utils/formatTime'
+import { useDictCache, type DictOption } from '/@/utils/dictCache'
+
+
+const NOTIFICATION_CONFIG_TYPE_DICT = 'notification_config_type'
+
+const FALLBACK_TYPE_OPTIONS: DictOption[] = [
+  { label: '飞书机器人', value: 'webhook_feishu' },
+  { label: '企业微信机器人', value: 'webhook_wechat' },
+  { label: '钉钉机器人', value: 'webhook_dingtalk' },
+  { label: 'Telegram机器人', value: 'telegram' },
+  { label: '邮件推送', value: 'email' },
+]
+
+const FALLBACK_TYPE_LABEL: Record<string, string> = {
+  webhook_feishu: '飞书',
+  webhook_wechat: '企业微信',
+  webhook_dingtalk: '钉钉',
+  telegram: 'Telegram',
+  email: '邮件',
+}
+
+const FALLBACK_TYPE_TAG: Record<string, string> = {
+  webhook_feishu: 'primary',
+  webhook_wechat: 'success',
+  webhook_dingtalk: 'info',
+  telegram: 'warning',
+  email: 'danger',
+}
+
+const TAG_TYPES = new Set(['primary', 'success', 'info', 'warning', 'danger'])
 
 const notificationConfigApi = useNotificationConfigApi()
+const { getDictOptions } = useDictCache()
+
+
+const typeOptionsSource = ref<'dict' | 'fallback'>('fallback')
+const typeOptions = ref<DictOption[]>(FALLBACK_TYPE_OPTIONS)
+
+async function loadNotificationTypeOptions() {
+  const opts = await getDictOptions(NOTIFICATION_CONFIG_TYPE_DICT)
+  if (opts.length) {
+    typeOptions.value = opts
+    typeOptionsSource.value = 'dict'
+  } else {
+    typeOptions.value = FALLBACK_TYPE_OPTIONS
+    typeOptionsSource.value = 'fallback'
+  }
+}
 
 // 响应式数据
 const loading = ref(true)
@@ -547,28 +595,21 @@ const handleSelectionChange = (selection: NotificationConfig[]) => {
   multiple.value = !selection.length
 }
 
-// 获取类型标签类型
+// 获取类型标签类型（优先字典 list_class，与 Element Plus Tag type 对齐）
 const getTypeTagType = (type: string) => {
-  const typeMap: Record<string, string> = {
-    webhook_feishu: 'primary',
-    webhook_wechat: 'success',
-    webhook_dingtalk: 'info',
-    telegram: 'warning',
-    email: 'danger'
-  }
-  return typeMap[type] || 'info'
+  const opt = typeOptions.value.find((x) => String(x.value) === String(type))
+  const lc = opt?.raw?.list_class
+  if (lc && TAG_TYPES.has(String(lc))) return String(lc)
+  return FALLBACK_TYPE_TAG[type] || 'info'
 }
 
-// 获取类型标签文本
+// 获取类型标签文本（配置字典后以 dict_label 为准；未配置时表格与改造前一致用短名称）
 const getTypeLabel = (type: string) => {
-  const typeMap: Record<string, string> = {
-    webhook_feishu: '飞书',
-    webhook_wechat: '企业微信',
-    webhook_dingtalk: '钉钉',
-    telegram: 'Telegram',
-    email: '邮件'
+  if (typeOptionsSource.value === 'dict') {
+    const opt = typeOptions.value.find((x) => String(x.value) === String(type))
+    return opt?.label ?? FALLBACK_TYPE_LABEL[type] ?? type
   }
-  return typeMap[type] || type
+  return FALLBACK_TYPE_LABEL[type] || type
 }
 
 // 状态修改
@@ -865,6 +906,7 @@ const reset = () => {
 
 // 初始化
 onMounted(() => {
+  loadNotificationTypeOptions()
   getList()
 })
 </script>

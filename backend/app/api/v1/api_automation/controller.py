@@ -1051,9 +1051,49 @@ async def get_api_script_result_list(
     """脚本执行结果汇总列表"""
     try:
         body = await body_to_json(request)
-        page = int(body.get("page") or 1)
+        page = int(body.get("page") or body.get("currentPage") or 1)
         page_size = int(body.get("pageSize") or 1000)
-        data = await ApiAutomationService.get_script_result_list(db, current_user_id, page, page_size)
+        search = (body or {}).get("search") or {}
+        search_name = str((search.get("name") or "")).strip()
+        data = await ApiAutomationService.get_script_result_list(
+            db, current_user_id, page, page_size, search_name=search_name
+        )
+        return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
+@router.post("/stop_api_script_result")
+async def stop_api_script_result(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """停止接口自动化执行（运行中任务在步骤间隙响应停止）"""
+    try:
+        body = await body_to_json(request)
+        rid = int(body["result_id"])
+        data = await ApiAutomationService.stop_api_script_result(db, rid, current_user_id)
+        if not data.get("stopped"):
+            return error_response(data.get("message") or "停止失败")
+        return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
+@router.post("/del_api_script_result")
+async def del_api_script_result(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """删除接口自动化执行记录（运行中会先请求停止）"""
+    try:
+        body = await body_to_json(request)
+        rid = int(body["result_id"])
+        data = await ApiAutomationService.delete_api_script_result(db, rid, current_user_id)
+        if not data.get("deleted"):
+            return error_response(data.get("message") or "删除失败")
         return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")

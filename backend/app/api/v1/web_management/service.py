@@ -11,7 +11,7 @@ import json
 import subprocess
 import signal
 import multiprocessing
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .model import (
@@ -38,7 +38,7 @@ async def _get_username_map(db: AsyncSession, user_ids: List[int]) -> Dict[int, 
         return {}
     try:
         res = await db.execute(
-            text("SELECT id, COALESCE(nickname, username, '') AS name FROM sys_user WHERE id IN :ids"),
+            text("SELECT id, COALESCE(username, '') AS name FROM sys_user WHERE id IN :ids"),
             {"ids": tuple(set(user_ids))},
         )
         rows = res.fetchall()
@@ -140,8 +140,32 @@ class WebManagementService:
             )
         )
         menu = result.scalar_one_or_none()
-        if menu:
-            menu.enabled_flag = 0
+        if not menu:
+            return
+
+        # 目录下仍有子节点时，不允许删除
+        child_result = await db.execute(
+            select(WebElementMenuModel.id).where(
+                WebElementMenuModel.pid == menu_id,
+                WebElementMenuModel.enabled_flag == 1,
+            ).limit(1)
+        )
+        if child_result.scalar_one_or_none() is not None:
+            raise Exception("删除失败，该菜单下仍存在子节点")
+
+        # 若误传了元素叶子节点，顺便硬删除其元素记录
+        if int(getattr(menu, "type", 0) or 0) == 2 and getattr(menu, "element_id", None):
+            await db.execute(
+                delete(WebElementModel).where(
+                    WebElementModel.id == int(menu.element_id),
+                )
+            )
+
+        await db.execute(
+            delete(WebElementMenuModel).where(
+                WebElementMenuModel.id == menu_id,
+            )
+        )
 
     @staticmethod
     async def get_element_list(
@@ -170,16 +194,32 @@ class WebManagementService:
         end = start + page_size
         page_rows = all_rows[start:end]
 
-        content = [
-            {
-                "id": r.id,
-                "name": r.name,
-                "element": r.element,
-                "menu_id": r.menu_id,
-                "creation_date": r.creation_date,
-            }
-            for r in page_rows
-        ]
+        user_ids: List[int] = []
+        for r in page_rows:
+            uid = getattr(r, "updated_by", None) or getattr(r, "created_by", None)
+            if uid:
+                user_ids.append(int(uid))
+        username_map = await _get_username_map(db, user_ids)
+
+        content = []
+        for r in page_rows:
+            uid = getattr(r, "updated_by", None) or getattr(r, "created_by", None)
+            updation_date = getattr(r, "updation_date", None)
+            if updation_date is not None and hasattr(updation_date, "strftime"):
+                update_time = updation_date.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                update_time = str(updation_date) if updation_date is not None else ""
+            content.append(
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "element": r.element,
+                    "menu_id": r.menu_id,
+                    "creation_date": r.creation_date,
+                    "update_time": update_time,
+                    "username": username_map.get(int(uid), "") if uid else "",
+                }
+            )
 
         return {
             "content": content,
@@ -251,25 +291,16 @@ class WebManagementService:
 
     @staticmethod
     async def delete_element(db: AsyncSession, *, element_id: int) -> None:
-        result = await db.execute(
-            select(WebElementModel).where(
-                WebElementModel.id == element_id,
-                WebElementModel.enabled_flag == 1,
-            )
-        )
-        elem = result.scalar_one_or_none()
-        if elem:
-            elem.enabled_flag = 0
-
-        menu_result = await db.execute(
-            select(WebElementMenuModel).where(
+        await db.execute(
+            delete(WebElementMenuModel).where(
                 WebElementMenuModel.element_id == element_id,
-                WebElementMenuModel.enabled_flag == 1,
             )
         )
-        menu = menu_result.scalar_one_or_none()
-        if menu:
-            menu.enabled_flag = 0
+        await db.execute(
+            delete(WebElementModel).where(
+                WebElementModel.id == element_id,
+            )
+        )
 
 
     @staticmethod
@@ -399,18 +430,17 @@ class WebManagementService:
         if not menu:
             return False, "菜单不存在或已删除"
 
-        menu.enabled_flag = 0
-
-
-        script_res = await db.execute(
-            select(WebScriptModel).where(
+        # 硬删除关联脚本与菜单
+        await db.execute(
+            delete(WebScriptModel).where(
                 WebScriptModel.menu_id == menu_id,
-                WebScriptModel.enabled_flag == 1,
             )
         )
-        script = script_res.scalar_one_or_none()
-        if script:
-            script.enabled_flag = 0
+        await db.execute(
+            delete(WebMenuModel).where(
+                WebMenuModel.id == menu_id,
+            )
+        )
 
         return True, "删除成功"
 
@@ -446,11 +476,20 @@ class WebManagementService:
         row = result.scalar_one_or_none()
         if not row:
             return None
+        uid = getattr(row, "updated_by", None) or getattr(row, "created_by", None)
+        username_map = await _get_username_map(db, [int(uid)] if uid else [])
+        updation_date = getattr(row, "updation_date", None)
+        if updation_date is not None and hasattr(updation_date, "strftime"):
+            update_time = updation_date.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            update_time = str(updation_date) if updation_date is not None else ""
         return {
             "id": row.id,
             "menu_id": row.menu_id,
             "script": row.script,
             "creation_date": row.creation_date,
+            "update_time": update_time,
+            "username": username_map.get(int(uid), "") if uid else "",
         }
 
     @staticmethod
@@ -783,7 +822,7 @@ class WebManagementService:
                 continue
 
      
-        row.status = 1
+        row.status = 2
         row.end_time = datetime.now()
         
         await db.commit()
@@ -1329,8 +1368,13 @@ class WebManagementService:
             )
         )
         grp = result.scalar_one_or_none()
-        if grp:
-            grp.enabled_flag = 0
+        if not grp:
+            return
+        await db.execute(
+            delete(WebGroupModel).where(
+                WebGroupModel.id == group_id,
+            )
+        )
 
     @staticmethod
     async def get_web_group_all(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:

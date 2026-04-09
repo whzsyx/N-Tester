@@ -65,8 +65,7 @@
 
         <el-table-column label="任务状态" width="110" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.status === 1" type="success">执行完成</el-tag>
-            <el-tag v-else type="warning">执行中</el-tag>
+            <el-tag :type="statusMeta(row.status).tagType">{{ statusMeta(row.status).text }}</el-tag>
           </template>
         </el-table-column>
 
@@ -90,21 +89,21 @@
           <template #default="{ row }">
             <span class="action-cell">
               <el-button
-                v-if="row.status === 0"
+                v-if="statusMeta(row.status).isRunning"
                 type="danger"
                 size="small"
                 @click="stop_run(row.result_id)"
               >停止</el-button>
 
               <el-button
-                v-if="row.status === 1"
+                v-if="statusMeta(row.status).canViewReport"
                 type="primary"
                 size="small"
                 @click="view_report(row.result_id)"
               >查看报告</el-button>
 
               <el-button
-                v-if="row.status === 1"
+                v-if="statusMeta(row.status).canRerun"
                 type="info"
                 size="small"
                 @click="rerun(row)"
@@ -149,6 +148,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWebManagementApi } from '/@/api/v1/web_management'
+import { getExecutionStatusMeta } from '/@/utils/executionStatus'
 
 const { get_web_result_list, run_web_script, stop_web_result, del_web_result } = useWebManagementApi()
 
@@ -170,6 +170,7 @@ const total = ref(0)
 
 
 const formatTime = (t: string) => t ? t.replace('T', ' ') : '-'
+const statusMeta = (status: number) => getExecutionStatusMeta(status)
 
 const result_list = async () => {
   loading.value = true

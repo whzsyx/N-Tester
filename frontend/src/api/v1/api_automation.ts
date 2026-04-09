@@ -124,6 +124,10 @@ export function useApiAutomationApi() {
     get_api_script_log: (data: { result_id: string }) => postApiAutomation('/v1/api_automation/get_api_script_log', data),
     get_api_script_report_log: (data: { result_id: string; menu_id: string }) =>
       postApiAutomation('/v1/api_automation/get_api_script_report_log', data),
+    stop_api_script_result: (data: { result_id: number }) =>
+      postApiAutomation('/v1/api_automation/stop_api_script_result', data),
+    del_api_script_result: (data: { result_id: number }) =>
+      postApiAutomation('/v1/api_automation/del_api_script_result', data),
 
     // ---------- 外部调用 ----------
     service_api_update: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/service_api_update', data),
@@ -208,6 +212,8 @@ export const {
   get_api_script_result_report_list,
   get_api_script_log,
   get_api_script_report_log,
+  stop_api_script_result,
+  del_api_script_result,
   service_api_update,
   gitlab_ci_notice,
 } = apiAutomationApi;

@@ -4,6 +4,7 @@ APP管理模块业务逻辑服务
 from typing import List, Optional, Dict, Any
 import asyncio
 import os
+import shutil
 import multiprocessing
 import psutil
 import random
@@ -992,7 +993,10 @@ class AppManagementService:
         db: AsyncSession, user_id: int, search_task_name: str = ""
     ) -> List[Dict[str, Any]]:
         """获取APP结果列表"""
-        stmt = select(AppResultListModel).where(AppResultListModel.user_id == user_id)
+        stmt = select(AppResultListModel).where(
+            AppResultListModel.user_id == user_id,
+            AppResultListModel.enabled_flag == 1,
+        )
         if search_task_name:
             stmt = stmt.where(AppResultListModel.task_name.like(f"%{search_task_name}%"))
         result = await db.execute(stmt.order_by(AppResultListModel.id.desc()))
@@ -1009,15 +1013,65 @@ class AppManagementService:
                 "start_time": r.start_time,
                 "end_time": r.end_time,
                 "username": "admin",
+                "status": 0 if r.end_time is None else 1,
             }
             ss = item.get("script_status") or []
+            if any(bool((j or {}).get("stopped")) for j in ss):
+                item["status"] = 2
             if ss:
                 p = 0.0
+                count = 0
                 for j in ss:
+                    if "percent" not in (j or {}):
+                        continue
                     p += float((j or {}).get("percent") or 0)
-                item["percent"] = round(p / len(ss), 2)
+                    count += 1
+                item["percent"] = round(p / count, 2) if count else 0
             data.append(item)
         return data
+
+    @staticmethod
+    async def delete_app_result(db: AsyncSession, result_id: str, user_id: int) -> Dict[str, Any]:
+        """删除 APP 执行汇总及明细；若仍在执行则先尝试停止进程"""
+        row = (
+            await db.execute(
+                select(AppResultListModel).where(
+                    AppResultListModel.result_id == result_id,
+                    AppResultListModel.user_id == user_id,
+                    AppResultListModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if not row:
+            return {"deleted": False, "message": "未找到执行记录"}
+        if row.end_time is None:
+            await AppManagementService.stop_app_process(db, str(result_id), user_id)
+        await db.execute(
+            delete(AppResultModel).where(
+                AppResultModel.result_id == result_id,
+                AppResultModel.user_id == user_id,
+            )
+        )
+        await db.execute(
+            delete(AppResultListModel).where(
+                AppResultListModel.result_id == result_id,
+                AppResultListModel.user_id == user_id,
+            )
+        )
+        await db.commit()
+        try:
+            from .airtest_common import get_project_root
+
+            project_root = get_project_root()
+            for rel in (
+                project_root / "media" / "app_result" / str(result_id),
+                project_root / "static" / "app_result" / str(result_id),
+            ):
+                if rel.exists():
+                    shutil.rmtree(rel, ignore_errors=True)
+        except Exception:
+            pass
+        return {"deleted": True, "message": "已删除"}
     
     @staticmethod
     async def send_app_warn(db: AsyncSession, result_id: str, user_id: int) -> None:
@@ -1207,6 +1261,7 @@ class AppManagementService:
                     "total": total,
                     "percent": percent,
                     "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "stopped": True,
                 }
             )
             row.script_status = ss
@@ -1265,6 +1320,11 @@ class AppManagementService:
                 await db.execute(
                     update(AppDevice).where(AppDevice.device_id == did, AppDevice.user_id == user_id).values(device_status=1)
                 )
+        row.end_time = datetime.now()
+        ss = list(row.script_status or [])
+        ss.append({"stopped": True, "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        row.script_status = ss
+        flag_modified(row, "script_status")
         await db.commit()
         return True
     

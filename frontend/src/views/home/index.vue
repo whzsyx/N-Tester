@@ -240,7 +240,9 @@ import { useUserStore } from '/@/stores/user';
 import { useThemeConfig } from '/@/stores/themeConfig';
 import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
-import { dashboardApi, type CoreStats, type ExecutionTrends, type DataFactoryStats, type ReviewStats, type ProjectActivity, type NotificationData, type ApiInterfaceStatsData } from '/@/api/v1/dashboard';
+import { useDashboardApi, type CoreStats, type ExecutionTrends, type DataFactoryStats, type ReviewStats, type ProjectActivity, type NotificationData, type ApiInterfaceStatsData } from '/@/api/v1/dashboard';
+
+const dashboardApi = useDashboardApi();
 import { 
   User, 
   UserFilled,

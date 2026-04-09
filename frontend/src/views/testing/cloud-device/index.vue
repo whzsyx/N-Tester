@@ -316,7 +316,15 @@ import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue';
 import devicePlaceholder from '/@/assets/device-placeholder.svg';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
-import { mitmproxy_check, mitmproxy_close_agent, mitmproxy_run_log, mitmproxy_single_start, mitmproxy_stop } from '/@/api/v1/mitmproxy';
+import { useMitmproxyApi } from '/@/api/v1/mitmproxy';
+
+const {
+  mitmproxy_check,
+  mitmproxy_close_agent,
+  mitmproxy_run_log,
+  mitmproxy_single_start,
+  mitmproxy_stop,
+} = useMitmproxyApi();
 
 const {
   device_info_list,

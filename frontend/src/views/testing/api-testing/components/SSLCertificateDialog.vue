@@ -174,7 +174,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sslCertificateApi } from '/@/api/v1/ssl_certificate'
+import { useSslCertificateApi } from '/@/api/v1/ssl_certificate'
+
+const sslCertificateApi = useSslCertificateApi()
 
 const props = defineProps<{
   modelValue: boolean

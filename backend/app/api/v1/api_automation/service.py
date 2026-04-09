@@ -4,7 +4,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
+import shutil
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,7 +17,7 @@ import uuid
 from datetime import timedelta
 from jsonpath_ng import parse as jsonpath_parse
 import yaml
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_
 
@@ -44,6 +47,20 @@ import os
 from app.api.v1.system.user.crud import UserCRUD
 from app.api.v1.task_scheduler.service import TaskSchedulerService
 from app.api.v1.task_scheduler.model import MsgNoticeModel
+
+
+async def _get_username_map(db: AsyncSession, user_ids: List[int]) -> Dict[int, str]:
+    if not user_ids:
+        return {}
+    try:
+        res = await db.execute(
+            text("SELECT id, COALESCE(username, '') AS name FROM sys_user WHERE id IN :ids"),
+            {"ids": tuple(set(user_ids))},
+        )
+        rows = res.fetchall()
+        return {r.id: (r.name or "") for r in rows}
+    except Exception:
+        return {}
 
 
 def _build_tree(items: List[Dict[str, Any]], pid_key: str = "pid", id_key: str = "id") -> List[Dict[str, Any]]:
@@ -197,6 +214,42 @@ class ApiAutomationService:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(text + "\n")
+
+    _api_script_cancel_lock = threading.Lock()
+    _api_script_cancel_ids: set[str] = set()
+
+    @staticmethod
+    def _request_cancel_api_script_result(result_id: str) -> None:
+        with ApiAutomationService._api_script_cancel_lock:
+            ApiAutomationService._api_script_cancel_ids.add(str(result_id))
+
+    @staticmethod
+    def _is_api_script_result_cancel_requested(result_id: str) -> bool:
+        with ApiAutomationService._api_script_cancel_lock:
+            return str(result_id) in ApiAutomationService._api_script_cancel_ids
+
+    @staticmethod
+    def _clear_api_script_cancel(result_id: str) -> None:
+        with ApiAutomationService._api_script_cancel_lock:
+            ApiAutomationService._api_script_cancel_ids.discard(str(result_id))
+
+    @staticmethod
+    async def _api_script_delay_seconds(result_id: str, seconds: float) -> None:
+        deadline = time.monotonic() + float(seconds)
+        while time.monotonic() < deadline:
+            if ApiAutomationService._is_api_script_result_cancel_requested(result_id):
+                return
+            await asyncio.sleep(0.2)
+
+    @staticmethod
+    def _remove_api_result_files(result_id: str) -> None:
+        try:
+            backend_root = Path(__file__).resolve().parents[4]
+            base = backend_root / app_config.STATIC_DIR / "api_results" / str(result_id)
+            if base.exists():
+                shutil.rmtree(base, ignore_errors=True)
+        except Exception:
+            pass
 
    
     @staticmethod
@@ -2707,103 +2760,121 @@ class ApiAutomationService:
         """
         result_id = str(data["result_id"])
         env_id = int(data["config"]["env_id"])
+        try:
+            # 创建汇总记录
+            summary = ApiScriptResultListModel(
+                result_id=int(result_id),
+                name=data["name"],
+                script=[],
+                config=data.get("config") or {},
+                result={},
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            db.add(summary)
+            await db.flush()
 
-        # 创建汇总记录
-        summary = ApiScriptResultListModel(
-            result_id=int(result_id),
-            name=data["name"],
-            script=[],
-            config=data.get("config") or {},
-            result={},
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(summary)
-        await db.flush()
+            all_pass = 0
+            all_fail = 0
+            total = 0
+            execution_aborted = False
 
-        all_pass = 0
-        all_fail = 0
-        total = 0
+            for case in data.get("run_list", []):
+                if ApiAutomationService._is_api_script_result_cancel_requested(result_id):
+                    execution_aborted = True
+                    break
+                case["status"] = 1
+                case["pass"] = 0
+                case["fail"] = 0
+                case_uuid = await ApiAutomationService._new_uuid()
+                case["uuid"] = case_uuid
 
-        for case in data.get("run_list", []):
-            case["status"] = 1
-            case["pass"] = 0
-            case["fail"] = 0
-            case_uuid = await ApiAutomationService._new_uuid()
-            case["uuid"] = case_uuid
+                params_id = case.get("config", {}).get("params_id")
 
-            params_id = case.get("config", {}).get("params_id")
+                for step in case.get("script", []):
+                    if ApiAutomationService._is_api_script_result_cancel_requested(result_id):
+                        execution_aborted = True
+                        break
 
-            for step in case.get("script", []):
-               
-                total = total + len(case.get("script") or [])
-                step_uuid = await ApiAutomationService._new_uuid()
-                step["uuid"] = step_uuid
+                    total = total + len(case.get("script") or [])
+                    step_uuid = await ApiAutomationService._new_uuid()
+                    step["uuid"] = step_uuid
 
-                await ApiAutomationService._write_log_line(
-                    case_uuid, result_id, f"开始执行接口-{step.get('name')}"
-                )
+                    await ApiAutomationService._write_log_line(
+                        case_uuid, result_id, f"开始执行接口-{step.get('name')}"
+                    )
 
-                success, api_req, api_res = await ApiAutomationService._execute_script_step(
-                    db=db,
-                    step=step,
-                    result_id=result_id,
-                    menu_uuid=case_uuid,
-                    env_id=env_id,
-                    params_id=params_id,
-                    user_id=user_id,
-                )
+                    success, api_req, api_res = await ApiAutomationService._execute_script_step(
+                        db=db,
+                        step=step,
+                        result_id=result_id,
+                        menu_uuid=case_uuid,
+                        env_id=env_id,
+                        params_id=params_id,
+                        user_id=user_id,
+                    )
 
-                if success:
-                    case["pass"] += 1
-                    all_pass += 1
-                else:
-                    case["status"] = 0
-                    case["fail"] += 1
-                    all_fail += 1
+                    if success:
+                        case["pass"] += 1
+                        all_pass += 1
+                    else:
+                        case["status"] = 0
+                        case["fail"] += 1
+                        all_fail += 1
 
-                await ApiAutomationService._write_log_line(
-                    case_uuid, result_id, f"接口-{step.get('name')}执行完成"
-                )
-                time.sleep(3)
+                    await ApiAutomationService._write_log_line(
+                        case_uuid, result_id, f"接口-{step.get('name')}执行完成"
+                    )
+                    await ApiAutomationService._api_script_delay_seconds(result_id, 3.0)
 
-        percent = round(all_pass / total * 100, 2) if total else 0
-        summary.script = data.get("run_list") or []
-        summary.result = {
-            "total": total,
-            "pass": all_pass,
-            "fail": all_fail,
-            "percent": percent,
-        }
-        summary.end_time = datetime.now()
-        await db.flush()
+                if execution_aborted:
+                    break
 
-        # 结束标记
-        end_row = ApiScriptResultModel(
-            name="执行结束",
-            uuid="",
-            menu_id="",
-            result_id=int(result_id),
-            status=1,
-            req={},
-            res={},
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(end_row)
-        await db.commit()
+            if execution_aborted:
+                base_dir = ApiAutomationService._get_api_result_dir(result_id)
+                all_log = base_dir / f"{result_id}.txt"
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ApiAutomationService._append_log_file(all_log, f"{now} 用户已请求停止，执行中断 ")
 
-       
-        notice_data = {
-            "task_name": data.get("name"),
-            "result_id": result_id,
-            "total": total,
-            "passed": all_pass,
-            "fail": all_fail,
-            "un_run": total - all_pass - all_fail,
-            "percent": percent,
-        }
-        await ApiAutomationService._send_notice(db, 33, "api_report", notice_data, user_id=user_id)
+            percent = round(all_pass / total * 100, 2) if total else 0
+            summary.script = data.get("run_list") or []
+            summary.result = {
+                "total": total,
+                "pass": all_pass,
+                "fail": all_fail,
+                "percent": percent,
+                "stopped": execution_aborted,
+            }
+            summary.end_time = datetime.now()
+            await db.flush()
+
+            # 结束标记
+            end_row = ApiScriptResultModel(
+                name="执行结束",
+                uuid="",
+                menu_id="",
+                result_id=int(result_id),
+                status=1,
+                req={},
+                res={},
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            db.add(end_row)
+            await db.commit()
+
+            notice_data = {
+                "task_name": data.get("name"),
+                "result_id": result_id,
+                "total": total,
+                "passed": all_pass,
+                "fail": all_fail,
+                "un_run": total - all_pass - all_fail,
+                "percent": percent,
+            }
+            await ApiAutomationService._send_notice(db, 33, "api_report", notice_data, user_id=user_id)
+        finally:
+            ApiAutomationService._clear_api_script_cancel(result_id)
 
     @staticmethod
     async def _execute_script_step(
@@ -3026,6 +3097,17 @@ class ApiAutomationService:
     # 结果查询 & 日志
     @staticmethod
     async def get_script_result(db: AsyncSession, result_id: int, user_id: int) -> List[Dict[str, Any]]:
+        own = (
+            await db.execute(
+                select(ApiScriptResultListModel.id).where(
+                    ApiScriptResultListModel.enabled_flag == 1,
+                    ApiScriptResultListModel.result_id == result_id,
+                    ApiScriptResultListModel.created_by == user_id,
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if own is None:
+            return []
         stmt = (
             select(ApiScriptResultModel)
             .where(
@@ -3043,23 +3125,88 @@ class ApiAutomationService:
         return data
 
     @staticmethod
-    async def get_script_result_list(db: AsyncSession, user_id: int, page: int, page_size: int) -> Dict[str, Any]:
-        stmt = (
-            select(ApiScriptResultListModel)
-            .where(ApiScriptResultListModel.enabled_flag == 1)
-            .order_by(ApiScriptResultListModel.id.desc())
+    async def get_script_result_list(
+        db: AsyncSession,
+        user_id: int,
+        page: int,
+        page_size: int,
+        search_name: str = "",
+    ) -> Dict[str, Any]:
+        stmt = select(ApiScriptResultListModel).where(
+            ApiScriptResultListModel.enabled_flag == 1,
+            ApiScriptResultListModel.created_by == user_id,
         )
+        name_kw = (search_name or "").strip()
+        if name_kw:
+            stmt = stmt.where(ApiScriptResultListModel.name.contains(name_kw))
+        stmt = stmt.order_by(ApiScriptResultListModel.id.desc())
         rows = (await db.execute(stmt)).scalars().all()
         total = len(rows)
         start = (page - 1) * page_size
         end = start + page_size
         page_rows = rows[start:end]
+        user_ids = [int(r.created_by) for r in page_rows if getattr(r, "created_by", None)]
+        username_map = await _get_username_map(db, user_ids)
         content: List[Dict[str, Any]] = []
         for r in page_rows:
             d = r.__dict__.copy()
             d.pop("_sa_instance_state", None)
+            stopped = bool((r.result or {}).get("stopped"))
+            d["status"] = 2 if stopped else (0 if r.end_time is None else 1)
+            uid = getattr(r, "created_by", None)
+            d["username"] = username_map.get(int(uid), "") if uid else ""
             content.append(d)
         return {"content": content, "total": total, "page": page, "pageSize": page_size}
+
+    @staticmethod
+    async def stop_api_script_result(db: AsyncSession, result_id: int, user_id: int) -> Dict[str, Any]:
+        row = (
+            await db.execute(
+                select(ApiScriptResultListModel).where(
+                    ApiScriptResultListModel.enabled_flag == 1,
+                    ApiScriptResultListModel.result_id == result_id,
+                    ApiScriptResultListModel.created_by == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not row:
+            return {"stopped": False, "message": "未找到执行记录"}
+        if row.end_time is not None:
+            return {"stopped": False, "message": "任务已结束"}
+        ApiAutomationService._request_cancel_api_script_result(str(result_id))
+        row.result = {**(row.result or {}), "stopped": True}
+        await db.flush()
+        await db.commit()
+        return {"stopped": True, "message": "已请求停止"}
+
+    @staticmethod
+    async def delete_api_script_result(db: AsyncSession, result_id: int, user_id: int) -> Dict[str, Any]:
+        row = (
+            await db.execute(
+                select(ApiScriptResultListModel).where(
+                    ApiScriptResultListModel.enabled_flag == 1,
+                    ApiScriptResultListModel.result_id == result_id,
+                    ApiScriptResultListModel.created_by == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not row:
+            return {"deleted": False, "message": "未找到执行记录"}
+        if row.end_time is None:
+            ApiAutomationService._request_cancel_api_script_result(str(result_id))
+        await db.execute(
+            delete(ApiScriptResultModel).where(ApiScriptResultModel.result_id == result_id)
+        )
+        await db.execute(
+            delete(ApiScriptResultListModel).where(
+                ApiScriptResultListModel.result_id == result_id,
+                ApiScriptResultListModel.created_by == user_id,
+            )
+        )
+        await db.commit()
+        ApiAutomationService._remove_api_result_files(str(result_id))
+        ApiAutomationService._clear_api_script_cancel(str(result_id))
+        return {"deleted": True, "message": "已删除"}
 
     @staticmethod
     async def get_script_result_detail(db: AsyncSession, result_id: int) -> Optional[Dict[str, Any]]:

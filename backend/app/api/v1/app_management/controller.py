@@ -591,6 +591,26 @@ async def stop_app_process(
         return error_response(str(e))
 
 
+@router.post("/del_app_result")
+async def del_app_result(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """删除 APP 执行记录（执行中会先停止进程）"""
+    try:
+        body = await body_to_json(request)
+        result_id = str(body.get("result_id") or "")
+        if not result_id:
+            return error_response("缺少 result_id")
+        data = await AppManagementService.delete_app_result(db, result_id, current_user_id)
+        if not data.get("deleted"):
+            return error_response(data.get("message") or "删除失败")
+        return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
 @router.post("/pid_status")
 async def get_process_status(
     request: Request,

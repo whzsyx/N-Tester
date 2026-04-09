@@ -147,7 +147,8 @@
                   <el-table-column label="目标值" min-width="120" show-overflow-tooltip>
                     <template #default="{ row }">{{ row.element.value }}</template>
                   </el-table-column>
-                  <el-table-column prop="username" label="更新人" width="80" align="center" />
+                  <el-table-column prop="username" label="更新人" width="100" align="center" />
+                  <el-table-column prop="update_time" label="更新时间" width="170" align="center" />
                   <el-table-column label="操作" width="170" align="center" fixed="right">
                     <template #default="{ row }">
                       <span style="white-space: nowrap">

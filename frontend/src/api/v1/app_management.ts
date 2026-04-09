@@ -34,6 +34,8 @@ export function useAppManagementApi() {
     app_correction: (data: any) => postAppManagement('/v1/app_management/app_correction', data),
     app_menu_select: (data: any) => postAppManagement('/v1/app_management/app_menu_select', data),
     send_app_warn: (data: any) => postAppManagement('/v1/app_management/send_app_warn', data),
+    del_app_result: (data: { result_id: string }) =>
+      postAppManagement('/v1/app_management/del_app_result', data),
   };
 }
 
@@ -63,5 +65,6 @@ export const {
   app_correction,
   app_menu_select,
   send_app_warn,
+  del_app_result,
 } = appManagementApi;
 
