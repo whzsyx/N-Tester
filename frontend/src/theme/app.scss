@@ -133,7 +133,8 @@ pre {
     }
 
     &-view {
-      background: var(--el-color-white);
+      /* 用页面级背景语义色，避免深色下仍依赖「white」命名 token */
+      background-color: var(--el-bg-color);
       width: 100%;
       height: 100%;
       border-radius: 4px;

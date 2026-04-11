@@ -26,6 +26,33 @@ export function useProjectPlatformApi() {
           data,
         }),
     },
+    skills: {
+      list: (projectId: number, params?: Record<string, any>) =>
+        request({ url: `/v1/projects/${projectId}/skills`, method: 'get', params }),
+      create: (projectId: number, data: any) =>
+        request({ url: `/v1/projects/${projectId}/skills`, method: 'post', data }),
+      update: (projectId: number, id: number, data: any) =>
+        request({ url: `/v1/projects/${projectId}/skills/${id}`, method: 'put', data }),
+      remove: (projectId: number, id: number) =>
+        request({ url: `/v1/projects/${projectId}/skills/${id}`, method: 'delete' }),
+      content: (projectId: number, id: number) =>
+        request({ url: `/v1/projects/${projectId}/skills/${id}/content`, method: 'get' }),
+      execute: (projectId: number, id: number, data?: { arguments?: Record<string, any>; session_id?: string }) =>
+        request({ url: `/v1/projects/${projectId}/skills/${id}/execute`, method: 'post', data: data || {} }),
+      importGit: (projectId: number, data: any) =>
+        request({ url: `/v1/projects/${projectId}/skills/import/git`, method: 'post', data }),
+      importUpload: (projectId: number, file: File, params?: { scenario_category?: string; entry_command?: string }) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        return request({
+          url: `/v1/projects/${projectId}/skills/import/upload`,
+          method: 'post',
+          params,
+          data: fd,
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      },
+    },
     apiKeys: {
       list: (projectId: number, params?: Record<string, any>) =>
         request({ url: `/v1/projects/${projectId}/api-keys`, method: 'get', params }),

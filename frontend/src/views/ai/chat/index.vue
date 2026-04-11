@@ -104,6 +104,36 @@
             >
               <el-option v-for="m in mcpConfigs" :key="m.id" :label="m.name" :value="m.id" />
             </el-select>
+            <el-switch v-model="useSkill" size="small" />
+            <el-select
+              v-model="selectedSkillId"
+              placeholder="Skill配置"
+              size="small"
+              style="width: 160px"
+              :disabled="!useSkill"
+            >
+              <el-option v-for="s in skillConfigs" :key="s.id" :label="s.name" :value="s.id" />
+            </el-select>
+            <el-select
+              v-if="toolMode === 'direct' && useSkill"
+              v-model="directSkillAction"
+              placeholder="Skill动作"
+              size="small"
+              style="width: 170px"
+            >
+              <el-option v-for="a in directSkillActions" :key="a.value" :label="a.label" :value="a.value" />
+            </el-select>
+            <el-input
+              v-if="toolMode === 'direct' && useSkill"
+              v-model="directSkillArgsText"
+              placeholder='动作参数JSON，如 {"url":"https://example.com"}'
+              size="small"
+              style="width: 260px"
+            />
+            <el-select v-model="toolMode" placeholder="调用模式" size="small" style="width: 110px">
+              <el-option label="智能" value="smart" />
+              <el-option label="直连" value="direct" />
+            </el-select>
           </div>
           <div class="connection-status">
             <el-icon :class="['status-icon', isWsConnected ? 'connected' : 'disconnected']">
@@ -235,6 +265,33 @@
                   :class="['message-text', { collapsed: msg.collapsed }]"
                   v-html="renderMarkdown(msg.content)"
                 ></div>
+
+                <div
+                  v-if="msg.role === 'assistant' && extractEvidenceLinks(msg.content).length > 0"
+                  class="evidence-links"
+                >
+                  <div class="evidence-title">执行证据</div>
+                  <div class="evidence-list">
+                    <div
+                      v-for="(ev, i) in extractEvidenceLinks(msg.content)"
+                      :key="`${msg.id}-${i}-${ev.url}`"
+                      class="evidence-item"
+                    >
+                      <template v-if="ev.isImage">
+                        <img class="evidence-thumb" :src="toAbsUrl(ev.url)" :alt="ev.name" @click="openEvidence(ev.url)" />
+                        <div class="evidence-meta">
+                          <span class="evidence-name">{{ ev.name }}</span>
+                          <el-button text size="small" @click="openEvidence(ev.url)">查看原图</el-button>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <el-icon><Document /></el-icon>
+                        <span class="evidence-name">{{ ev.name }}</span>
+                        <el-button text size="small" @click="openEvidence(ev.url)">下载</el-button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
                 
                 <!-- 只有内容为空且loading时才显示打字指示器 -->
                 <div
@@ -446,6 +503,9 @@ import type { ConversationData, MessageData } from '/@/api/v1/ai/conversation'
 import { useFileApi } from '/@/api/v1/common/file'
 import { useProjectApi } from '/@/api/v1/projects/project'
 import { projectPlatformApi } from '/@/api/v1/projects/platform'
+import { skillsApi } from '/@/api/v1/skills'
+import { Session } from '/@/utils/storage'
+import { getApiBaseUrl } from '/@/utils/config'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
@@ -491,6 +551,65 @@ const attachments = ref<Attachment[]>([])
 const fileInputRef = ref<HTMLInputElement>()
 const imageInputRef = ref<HTMLInputElement>()
 
+const apiBaseUrl = getApiBaseUrl()
+
+const fetchSse = async (
+  url: string,
+  onEvent: (evt: { event: string; data: any }) => void,
+  signal?: AbortSignal,
+  timeoutMs = 15000
+) => {
+  const token = Session.get('token')
+  const ctl = new AbortController()
+  const timer = window.setTimeout(() => ctl.abort('timeout'), timeoutMs)
+  const mergedSignal = signal || ctl.signal
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}`, token: `${token}` } : {}),
+      Accept: 'text/event-stream',
+    },
+    signal: mergedSignal,
+  })
+  if (!resp.ok || !resp.body) {
+    clearTimeout(timer)
+    throw new Error(`SSE连接失败: ${resp.status}`)
+  }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buf = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      clearTimeout(timer)
+      window.setTimeout(() => ctl.abort('timeout'), timeoutMs)
+      buf += decoder.decode(value, { stream: true })
+      // Split by blank line (SSE frame)
+      const parts = buf.split('\n\n')
+      buf = parts.pop() || ''
+      for (const part of parts) {
+        const lines = part.split('\n').filter(Boolean)
+        let event = 'message'
+        let dataStr = ''
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim()
+          if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+        }
+        let data: any = dataStr
+        try {
+          data = dataStr ? JSON.parse(dataStr) : {}
+        } catch {
+          // keep raw
+        }
+        onEvent({ event, data })
+      }
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // 状态
 const conversations = ref<ConversationData[]>([])
 const messages = ref<MessageData[]>([])
@@ -514,6 +633,12 @@ const knowledgeBases = ref<any[]>([])
 const useMcp = ref(false)
 const selectedMcpConfigId = ref<number | null>(null)
 const mcpConfigs = ref<any[]>([])
+const useSkill = ref(false)
+const selectedSkillId = ref<number | null>(null)
+const skillConfigs = ref<any[]>([])
+const directSkillAction = ref<string>('agent_browser_open_snapshot')
+const directSkillArgsText = ref<string>('{}')
+const toolMode = ref<'smart' | 'direct'>('smart')
 const mcpRecordDialogVisible = ref(false)
 const mcpRecordLoading = ref(false)
 const mcpRecords = ref<any[]>([])
@@ -555,6 +680,26 @@ const filteredConversations = computed(() => {
   return conversations.value.filter(conv => {
     return conv.title?.toLowerCase().includes(keyword)
   })
+})
+
+const selectedSkill = computed(() => skillConfigs.value.find((s: any) => s.id === selectedSkillId.value))
+const isAgentBrowserSkill = computed(() => String(selectedSkill.value?.name || '').toLowerCase().includes('agent-browser'))
+const isPlaywrightSkill = computed(() => String(selectedSkill.value?.name || '').toLowerCase().includes('playwright'))
+
+const directSkillActions = computed(() => {
+  const base = [{ label: '自定义命令', value: 'custom' }]
+  if (isAgentBrowserSkill.value) {
+    return [
+      { label: '打开并快照', value: 'agent_browser_open_snapshot' },
+      { label: '打开并截图', value: 'agent_browser_open_screenshot' },
+      { label: '仅执行帮助', value: 'agent_browser_help' },
+      ...base,
+    ]
+  }
+  if (isPlaywrightSkill.value) {
+    return [{ label: '示例截图', value: 'playwright_example' }, ...base]
+  }
+  return base
 })
 
 /**
@@ -605,9 +750,10 @@ const handleProjectChange = async () => {
   if (!selectedProjectId.value) return
   localStorage.setItem('defaultProjectId', String(selectedProjectId.value))
   try {
-    const [kbRes, mcpRes]: any = await Promise.all([
+    const [kbRes, mcpRes, skillRes]: any = await Promise.all([
       projectPlatformApi.knowledge.bases.list(selectedProjectId.value, { page: 1, page_size: 200 }),
-      projectPlatformApi.mcp.list(selectedProjectId.value, { page: 1, page_size: 200, is_enabled: true })
+      projectPlatformApi.mcp.list(selectedProjectId.value, { page: 1, page_size: 200, is_enabled: true }),
+      skillsApi.list(selectedProjectId.value, { page: 1, page_size: 200, is_active: true })
     ])
     knowledgeBases.value = kbRes?.data?.items || []
     if (!knowledgeBases.value.some((kb: any) => Number(kb.id) === selectedKnowledgeBaseId.value)) {
@@ -617,9 +763,28 @@ const handleProjectChange = async () => {
     if (!mcpConfigs.value.some((m: any) => m.id === selectedMcpConfigId.value)) {
       selectedMcpConfigId.value = mcpConfigs.value.length ? mcpConfigs.value[0].id : null
     }
+    skillConfigs.value = skillRes?.data?.items || []
+    if (!skillConfigs.value.some((s: any) => s.id === selectedSkillId.value)) {
+      selectedSkillId.value = skillConfigs.value.length ? skillConfigs.value[0].id : null
+    }
+    if (toolMode.value === 'direct' && useSkill.value) {
+      directSkillAction.value = 'agent_browser_open_snapshot'
+      directSkillArgsText.value = '{}'
+    }
   } catch (e: any) {
-    ElMessage.error(e?.message || '加载知识库/MCP配置失败')
+    ElMessage.error(e?.message || '加载知识库/MCP/Skill配置失败')
   }
+}
+
+const buildDirectSkillCommand = (action: string, args: Record<string, any>, content: string) => {
+  const url = String(args.url || 'https://example.com')
+  if (action === 'agent_browser_help') return 'npx agent-browser --help'
+  if (action === 'agent_browser_open_snapshot') return `npx agent-browser open ${url} && npx agent-browser snapshot -i`
+  if (action === 'agent_browser_open_screenshot') return `npx agent-browser open ${url} && npx agent-browser screenshot --full`
+  if (action === 'playwright_example') {
+    return 'node run.js "const dir = process.env.SCREENSHOT_DIR || \\"./media/screenshots\\"; const { chromium } = require(\\"playwright\\"); const browser = await chromium.launch({ headless: true }); const page = await browser.newPage(); await page.goto(\\"https://example.com\\"); await page.screenshot({ path: dir + \\"/example.png\\", fullPage: true }); console.log(\\"saved\\", dir + \\"/example.png\\"); await browser.close();"'
+  }
+  return content
 }
 
 /**
@@ -934,6 +1099,36 @@ const handleSendMessage = async () => {
     ElMessage.warning('正在连接中，请稍候...')
     return
   }
+
+  if (toolMode.value === 'direct') {
+    const directProvider = useSkill.value ? 'skill' : (useMcp.value ? 'mcp' : '')
+    if (!directProvider) {
+      ElMessage.warning('直连模式请先开启 MCP 或 Skill')
+      return
+    }
+    if (directProvider === 'skill' && !selectedSkillId.value) {
+      ElMessage.warning('直连模式请选择 Skill')
+      return
+    }
+    if (directProvider === 'mcp' && !selectedMcpConfigId.value) {
+      ElMessage.warning('直连模式请选择 MCP 配置')
+      return
+    }
+    if (directProvider === 'skill') {
+      if (directSkillAction.value === 'custom') {
+        const text = (content || '').trim()
+        const looksLikeCommand =
+          text.startsWith('npx ') ||
+          text.startsWith('agent-browser ') ||
+          text.startsWith('node ') ||
+          text.startsWith('{')
+        if (!looksLikeCommand) {
+          ElMessage.warning('直连 Skill 自定义模式请输入可执行命令（如 npx agent-browser ...）')
+          return
+        }
+      }
+    }
+  }
   
   // 检查是否有正在上传的附件
   const uploadingAttachments = attachments.value.filter(a => a.uploading)
@@ -1001,8 +1196,89 @@ const handleSendMessage = async () => {
     // 滚动到底部
     await nextTick()
     scrollToBottom()
+
+    // 直连 Skill：绕过对话 WebSocket，直接走 skills job + SSE
+    if (toolMode.value === 'direct' && useSkill.value && selectedProjectId.value && selectedSkillId.value) {
+      let actionArgs: Record<string, any> = {}
+      try {
+        actionArgs = (directSkillArgsText.value || '').trim() ? JSON.parse(directSkillArgsText.value) : {}
+      } catch {
+        ElMessage.warning('动作参数 JSON 格式错误')
+        throw new Error('动作参数 JSON 格式错误')
+      }
+      const command = buildDirectSkillCommand(directSkillAction.value, actionArgs, content)
+      const res: any = await skillsApi.executeActionAsync(selectedProjectId.value, selectedSkillId.value, {
+        action_name: directSkillAction.value,
+        arguments: { ...actionArgs, command },
+        // runner_type: 'docker', // 可在生产默认配置
+      })
+      const jobId = Number(res?.data?.job_id)
+      if (!jobId) throw new Error('未返回 job_id')
+      const abort = new AbortController()
+      // 把 jobId 写进 meta 方便追溯
+      streamingMessage.value!.meta_data = { job_id: jobId }
+      streamingMessage.value!.content += `已入队执行: job #${jobId}\n`
+      const streamUrl = `${apiBaseUrl}${skillsApi.jobStreamUrl(selectedProjectId.value, jobId)}`
+      void fetchSse(
+        streamUrl,
+        (evt) => {
+          if (!streamingMessage.value) return
+          if (evt.event === 'log') {
+            const line = evt.data?.message ?? ''
+            if (line) streamingMessage.value.content += `${line}\n`
+          } else if (evt.event === 'done') {
+            streamingMessage.value.content += `\n[done] status=${evt.data?.status} rc=${evt.data?.return_code}\n`
+          }
+          nextTick(() => scrollToBottom())
+        },
+        abort.signal
+      ).catch(() => {
+        if (streamingMessage.value) {
+          streamingMessage.value.content += '\n[SSE超时] 任务已在后台继续执行，正在轮询状态...\n'
+        }
+      })
+
+      const pollDone = async () => {
+        for (let i = 0; i < 120; i += 1) {
+          try {
+            const jr: any = await skillsApi.job(selectedProjectId.value!, jobId)
+            const d = jr?.data || {}
+            if (streamingMessage.value && d.stdout) {
+              streamingMessage.value.content = d.stdout + (d.stderr ? `\n${d.stderr}` : '')
+            }
+            if (['succeeded', 'failed', 'cancelled'].includes(String(d.status || ''))) {
+              try {
+                const arts: any = await skillsApi.jobArtifacts(selectedProjectId.value!, jobId)
+                const items = arts?.data?.items || []
+                if (streamingMessage.value && items.length) {
+                  streamingMessage.value.content += `\n产物(${items.length}):\n`
+                  for (const it of items) {
+                    const url = `${apiBaseUrl}${skillsApi.artifactDownloadUrl(selectedProjectId.value!, it.id)}`
+                    streamingMessage.value.content += `- [${it.kind}] ${it.name} (${it.size || 0}): ${url}\n`
+                  }
+                }
+              } catch {
+                // ignore
+              }
+              break
+            }
+          } catch {
+            // ignore
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        }
+        if (streamingMessage.value) streamingMessage.value.loading = false
+        streamingMessage.value = null
+      }
+      void pollDone()
+      sending.value = false
+      return
+    }
     
     // 通过 WebSocket 发送消息，同时携带知识库/MCP选项
+    const directProvider = toolMode.value === 'direct'
+      ? (useSkill.value ? 'skill' : (useMcp.value ? 'mcp' : undefined))
+      : undefined
     wsConnection.value.send({
       content: content || '[发送了附件]',
       attachments: attachmentData,
@@ -1010,7 +1286,24 @@ const handleSendMessage = async () => {
       use_knowledge_base: useKnowledgeBase.value && !!selectedKnowledgeBaseId.value,
       knowledge_base_id: selectedKnowledgeBaseId.value || undefined,
       use_mcp: useMcp.value && !!selectedMcpConfigId.value,
-      mcp_config_id: selectedMcpConfigId.value || undefined
+      mcp_config_id: selectedMcpConfigId.value || undefined,
+      use_skill: useSkill.value && !!selectedSkillId.value,
+      skill_id: selectedSkillId.value || undefined,
+      tool_mode: toolMode.value,
+      tool_provider: directProvider,
+      tool_name:
+        toolMode.value === 'direct'
+          ? (directProvider === 'skill'
+              ? String(selectedSkillId.value || '')
+              : (content || '').trim())
+          : undefined,
+      tool_arguments:
+        toolMode.value === 'direct'
+          ? {
+              query: content || '[发送了附件]',
+              attachments: attachmentData,
+            }
+          : undefined,
     })
   } catch (error: any) {
     ElMessage.error(error.message || '发送消息失败')
@@ -1173,6 +1466,31 @@ const renderMarkdown = (content: string) => {
   if (!content) return ''
   const html = marked(content)
   return DOMPurify.sanitize(html)
+}
+
+const toAbsUrl = (url: string) => {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  return `${apiBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
+const openEvidence = (url: string) => {
+  const abs = toAbsUrl(url)
+  if (abs) window.open(abs, '_blank')
+}
+
+const extractEvidenceLinks = (content: string): Array<{ name: string; url: string; isImage: boolean }> => {
+  if (!content) return []
+  const out: Array<{ name: string; url: string; isImage: boolean }> = []
+  const mdRe = /\[([^\]]+)\]\((\/uploads\/[^)\s]+)\)/g
+  let m: RegExpExecArray | null = null
+  while ((m = mdRe.exec(content)) !== null) {
+    const name = m[1] || 'artifact'
+    const url = m[2] || ''
+    const isImage = /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
+    out.push({ name, url, isImage })
+  }
+  return out
 }
 
 /**
@@ -1753,6 +2071,53 @@ onUnmounted(() => {
                   color: var(--el-text-color-secondary);
                   font-size: 12px;
                 }
+              }
+            }
+
+            .evidence-links {
+              margin-top: 10px;
+              padding: 10px;
+              border: 1px solid var(--el-border-color-light);
+              border-radius: 8px;
+              background: var(--el-fill-color-lighter);
+
+              .evidence-title {
+                font-size: 12px;
+                color: var(--el-text-color-secondary);
+                margin-bottom: 8px;
+              }
+
+              .evidence-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+              }
+
+              .evidence-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              }
+
+              .evidence-thumb {
+                width: 120px;
+                height: 80px;
+                object-fit: cover;
+                border-radius: 6px;
+                border: 1px solid var(--el-border-color);
+                cursor: pointer;
+              }
+
+              .evidence-meta {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+              }
+
+              .evidence-name {
+                font-size: 12px;
+                color: var(--el-text-color-primary);
+                word-break: break-all;
               }
             }
 

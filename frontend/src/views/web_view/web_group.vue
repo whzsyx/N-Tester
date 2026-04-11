@@ -293,100 +293,153 @@
       </KoiDialog>
 
 
-      <KoiDialog
-        ref="res_koiDialogRef"
+      <el-drawer
+        v-model="runMonitorDrawerVisible"
         :title="title"
-        :height="680"
-        :width="1600"
-        :footer-hidden="true"
+        direction="rtl"
+        size="min(92vw, 1680px)"
+        append-to-body
+        class="wa-run-monitor-drawer wa-run-monitor-theme"
+        :show-close="true"
+        :close-on-click-modal="false"
+        @closed="onRunMonitorDrawerClosed"
       >
-        <template #content>
-          <div style="width: 100%">
+        <template #header>
+          <div class="wa-run-monitor-drawer-header">
+            <div class="wa-run-monitor-drawer-titleline">
+              <span class="wa-run-monitor-drawer-title">{{ title }}</span>
+              <el-tag type="info" effect="plain" size="small" class="wa-run-monitor-drawer-badge">执行监控</el-tag>
+            </div>
+            <p class="wa-run-monitor-drawer-sub">场景步骤与日志，执行结束后可继续查看或关闭抽屉</p>
+          </div>
+        </template>
+        <div class="wa-run-monitor-shell">
+          <div class="wa-run-monitor-body">
             <el-tabs
               tab-position="left"
               v-model="run_browser_active"
-              class="demo-tabs"
+              class="wa-run-monitor-tabs"
               @tab-click="change_browser"
             >
               <el-tab-pane v-for="(item, index) in run_browsers" :key="index" :name="item.value">
                 <template #label>
-                  <span>{{ item.name }}</span>
+                  <span class="wa-run-monitor-tab-label">{{ item.name }}</span>
                 </template>
-                <div style="width: 100%">
-                  <div style="width: 100%; padding-block-end: 10px">
-                    <KoiCard style="height: 80px">
-                      <div>
-                        <el-descriptions :column="5">
-                          <el-descriptions-item label="执行状态：">
-                            <el-tag type="success" v-if="run_type === '正在执行'">{{ run_type }}</el-tag>
-                            <el-tag type="danger" v-else-if="run_type === '执行结束'">{{ run_type }}</el-tag>
-                          </el-descriptions-item>
-                          <el-descriptions-item label="浏览器：">{{ item.name }}</el-descriptions-item>
-                          <el-descriptions-item label="执行人：">{{ user?.username }}</el-descriptions-item>
-                          <el-descriptions-item label="开始时间：">{{ fmtDateTime(start_time) }}</el-descriptions-item>
-                          <el-descriptions-item label="结束时间：">{{ fmtDateTime(end_time) }}</el-descriptions-item>
-                          <el-descriptions-item label="已执行：">{{ run_count }}</el-descriptions-item>
-                          <el-descriptions-item label="通过：">{{ run_count - run_fail }}</el-descriptions-item>
-                          <el-descriptions-item label="失败：">{{ run_fail }}</el-descriptions-item>
-                        </el-descriptions>
-                      </div>
-                    </KoiCard>
+                <div class="wa-run-monitor-pane">
+                  <div class="wa-run-monitor-desc">
+                    <el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-summary">
+                      <el-descriptions :column="3" class="wa-run-monitor-desc-table" size="small">
+                        <el-descriptions-item label="执行状态">
+                          <span v-if="run_type === '正在执行'" class="wa-run-monitor-pill wa-run-monitor-pill--run">{{
+                            run_type
+                          }}</span>
+                          <span
+                            v-else-if="run_type === '执行结束'"
+                            class="wa-run-monitor-pill wa-run-monitor-pill--done"
+                          >{{ run_type }}</span>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="浏览器">{{ item.name }}</el-descriptions-item>
+                        <el-descriptions-item label="执行人">{{ user?.username || '—' }}</el-descriptions-item>
+                        <el-descriptions-item label="开始时间">{{
+                          start_time ? fmtDateTime(start_time) : '—'
+                        }}</el-descriptions-item>
+                        <el-descriptions-item label="结束时间">{{
+                          end_time ? fmtDateTime(end_time) : '—'
+                        }}</el-descriptions-item>
+                        <el-descriptions-item label="已执行">{{ run_count }}</el-descriptions-item>
+                        <el-descriptions-item label="通过">{{ run_count - run_fail }}</el-descriptions-item>
+                        <el-descriptions-item label="失败">{{ run_fail }}</el-descriptions-item>
+                      </el-descriptions>
+                    </el-card>
                   </div>
-                  <div style="width: 100%">
-                    <KoiCard style="width: 30%; float: left; height: 560px; overflow-y: auto">
-                      <div>
-                        <el-timeline style="width: 80%">
-                          <el-timeline-item
-                            v-for="(res, index) in web_result"
-                            :key="index"
-                            center
-                            :icon="getIcon(res.status)"
-                            type="primary"
-                            :color="colors(res.status)"
-                            size="large"
-                            :timestamp="'执行时间：' + fmtDateTime(res.create_time)"
-                            placement="top"
-                          >
-                            <KoiCard :style="get_colors(res.status)">
-                              <span>{{ res.name }}</span>
-                              <span>{{ '结果：' + res.log }}</span>
-                            </KoiCard>
-                          </el-timeline-item>
-                        </el-timeline>
-                      </div>
-                    </KoiCard>
-                    <KoiCard style="width: 66%; float: right; height: 560px; overflow-y: auto">
-                      <div>
-                        <li
-                          v-if="run_type !== '执行结束'"
-                          style="margin-bottom: 7px; color: #0bbd87"
+                  <div class="wa-run-monitor-split">
+                    <el-card
+                      shadow="never"
+                      class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--timeline"
+                    >
+                      <template #header>
+                        <span class="wa-run-monitor-card-title">执行步骤</span>
+                      </template>
+                      <el-timeline class="wa-run-monitor-timeline">
+                        <el-timeline-item
+                          v-for="(res, index) in web_result"
+                          :key="index"
+                          center
+                          :icon="getIcon(res.status)"
+                          type="primary"
+                          :color="colors(res.status)"
+                          size="large"
+                          :timestamp="'执行时间：' + fmtDateTime(res.create_time)"
+                          placement="top"
                         >
-                          执行日志获取中...
+                          <el-card
+                            shadow="never"
+                            class="wa-run-monitor-timeline-node"
+                            :class="
+                              res.status === 1
+                                ? 'wa-run-monitor-timeline-node--ok'
+                                : 'wa-run-monitor-timeline-node--fail'
+                            "
+                            :body-style="{ padding: '8px 12px' }"
+                          >
+                            <span>{{ res.name }}</span>
+                            <span>{{ '结果：' + res.log }}</span>
+                          </el-card>
+                        </el-timeline-item>
+                      </el-timeline>
+                    </el-card>
+                    <el-card
+                      shadow="never"
+                      class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--log"
+                    >
+                      <template #header>
+                        <div class="wa-run-monitor-log-toolbar">
+                          <span class="wa-run-monitor-log-toolbar-title">
+                            <el-icon class="wa-run-monitor-log-toolbar-icon"><Monitor /></el-icon>
+                            场景执行日志
+                          </span>
+                          <el-button size="small" class="wa-run-monitor-btn-ghost" @click="copyWebResultLog">
+                            <el-icon class="el-icon--left"><DocumentCopy /></el-icon>
+                            复制
+                          </el-button>
+                        </div>
+                      </template>
+                      <ul class="wa-run-monitor-log-list">
+                        <li v-if="run_type !== '执行结束'" class="wa-run-monitor-log-pending">
+                          <span class="wa-run-monitor-log-dot" aria-hidden="true" />
+                          执行日志获取中…
                         </li>
                         <li
                           v-for="(log, index) in web_result_log"
                           :key="index"
-                          :style="get_log_style(log)"
+                          class="wa-run-monitor-log-line"
+                          :class="logLineClass(log)"
                         >
-                          {{ log }}
+                          <template v-for="(seg, si) in parseLogLineForDisplay(log)" :key="`${index}-${si}`">
+                            <span :class="seg.cls">{{ seg.text }}</span>
+                          </template>
                         </li>
-                      </div>
-                    </KoiCard>
+                      </ul>
+                    </el-card>
                   </div>
                 </div>
               </el-tab-pane>
             </el-tabs>
           </div>
-        </template>
-      </KoiDialog>
+          <div class="wa-run-monitor-footer">
+            <el-button class="wa-run-monitor-btn-ghost" @click="runMonitorDrawerVisible = false">关闭</el-button>
+          </div>
+        </div>
+      </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import KoiCard from '/@/components/koi/KoiCard.vue'
+import { DocumentCopy, Monitor } from '@element-plus/icons-vue'
 import KoiDialog from '/@/components/koi/KoiDialog.vue'
+import { logLineClass, parseLogLineForDisplay } from './webRunMonitorLog'
 import { useWebManagementApi } from '/@/api/v1/web_management'
 import commonFunction from '/@/utils/commonFunction'
 import { formatDateTime } from '/@/utils/formatTime'
@@ -461,7 +514,6 @@ const del_web = (data: any) => {
 
 const add_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
 const edit_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const res_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
 
 const add_form = ref<any>({
   name: '',
@@ -550,7 +602,12 @@ const browser_list = ref([
 
 const run_browsers = ref<any[]>([])
 const run_browser_active = ref<any>('')
+const runMonitorDrawerVisible = ref(false)
 const result_id = ref<string>('')
+
+const onRunMonitorDrawerClosed = () => {
+  stopPolling()
+}
 
 const user = ref<any>(null)
 const web_result = ref<any[]>([])
@@ -598,7 +655,8 @@ const run_script_confirm = async () => {
 
   run_browser_active.value = run_script_form.value.browser[0]
   title.value = `正在执行：${run_script_form.value.task_name}`
-  res_koiDialogRef.value?.koiOpen()
+  run_koiDialogRef.value?.koiQuickClose('')
+  runMonitorDrawerVisible.value = true
 
   await startPolling()
   await run_web_script(run_script_form.value)
@@ -667,8 +725,21 @@ const change_browser = async () => {
 
 const getIcon = (status: any) => (status === 1 ? 'Check' : 'Close')
 const colors = (status: any) => (status === 1 ? '#0bbd87' : '#d70e0e')
-const get_colors = (status: any) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e')
-const get_log_style = (data: string) => (data.includes('失败') ? 'color: #d70e0e' : '')
+
+const copyWebResultLog = async () => {
+  const lines = web_result_log.value
+  const text = Array.isArray(lines) ? lines.join('\n') : ''
+  if (!text.trim()) {
+    ElMessage.info('暂无日志可复制')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.warning('复制失败，请手动选择日志文本')
+  }
+}
 
 onMounted(() => {
   group_list()
@@ -733,5 +804,7 @@ onMounted(() => {
   margin-bottom: 5px;
   height: 28px;
 }
+
+@import './web-run-monitor.scss';
 </style>
 

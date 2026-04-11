@@ -49,6 +49,8 @@
 	--el-border-color-extra-light: var(--el-color-primary-light-8) !important;
 	--el-text-color-regular: var(--next-text-color-regular) !important;
 	--el-bg-color: var(--next-color-disabled) !important;
+	/* EP 默认 --el-bg-color-page 为 #f2f3f5，深色未覆盖时主内容区会发灰发白 */
+	--el-bg-color-page: var(--next-bg-main) !important;
 	--el-color-primary-light-9: var(--next-color-hover) !important;
 	--el-text-color-disabled: var(--next-text-color-placeholder) !important;
 	--el-text-color-disabled-base: var(--el-color-primary) !important;

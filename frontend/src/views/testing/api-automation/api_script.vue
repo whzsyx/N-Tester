@@ -162,61 +162,113 @@
 		</el-dialog>
 
 
-		<el-dialog v-model="resultDialogRef" :title="run_form.name + ' - ' + run_type" width="81%" destroy-on-close @close="stopPolling">
-			<el-card shadow="never" style="margin-bottom: 10px;">
-				<el-descriptions :column="4" border>
-					<el-descriptions-item label="任务名称">{{ run_form.name }}</el-descriptions-item>
-					<el-descriptions-item label="执行人">{{ run_form.username || '-' }}</el-descriptions-item>
-					<el-descriptions-item label="开始时间">{{ start_time ? String(start_time).replace('T', ' ') : '-' }}</el-descriptions-item>
-					<el-descriptions-item label="结束时间">{{ end_time ? String(end_time).replace('T', ' ') : '-' }}</el-descriptions-item>
-					<el-descriptions-item label="执行环境">{{ run_env || '-' }}</el-descriptions-item>
-					<el-descriptions-item label="执行总数">{{ run_count }}</el-descriptions-item>
-					<el-descriptions-item label="通过数">{{ Math.max(0, run_count - run_fail) }}</el-descriptions-item>
-					<el-descriptions-item label="失败数">{{ run_fail }}</el-descriptions-item>
-				</el-descriptions>
-			</el-card>
-			<el-card shadow="never" style="height: 560px;">
-				<el-row :gutter="10" style="height: 100%;">
-					<el-col :span="8" style="height: 100%;">
-						<el-card shadow="never" style="height: 100%; overflow: auto;">
-							<el-timeline>
-								<el-timeline-item
-									v-for="(res, index) in run_result_list"
-									:key="index"
-									:timestamp="res.create_time ? '执行时间：' + String(res.create_time).replace('T', ' ') : ''"
-									:type="res.status === 1 ? 'success' : 'danger'"
-								>
-									<div style="display:flex; justify-content: space-between; gap: 10px;">
-										<div>
-											<div style="font-weight: 600;">
-												<span v-if="res.name !== '执行结束'">接口：{{ res.name }}</span>
-												<span v-else>{{ res.name }}</span>
+		<!-- 执行监控：右侧抽屉-->
+		<el-drawer
+			v-model="resultDialogRef"
+			direction="rtl"
+			size="min(92vw, 1680px)"
+			append-to-body
+			destroy-on-close
+			class="wa-run-monitor-drawer wa-run-monitor-theme"
+			:show-close="true"
+			:close-on-click-modal="false"
+			@closed="stopPolling"
+		>
+			<template #header>
+				<div class="wa-run-monitor-drawer-header">
+					<div class="wa-run-monitor-drawer-titleline">
+						<span class="wa-run-monitor-drawer-title">{{ run_form.name }} - {{ run_type }}</span>
+						<el-tag type="info" effect="plain" size="small" class="wa-run-monitor-drawer-badge">执行监控</el-tag>
+					</div>
+					<p class="wa-run-monitor-drawer-sub">接口场景步骤与日志，执行结束后可继续查看或关闭抽屉</p>
+				</div>
+			</template>
+			<div class="wa-run-monitor-shell">
+				<div class="wa-run-monitor-body api-run-monitor-body--solo">
+					<div class="wa-run-monitor-pane api-run-monitor-pane--solo">
+						<div class="wa-run-monitor-desc">
+							<el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-summary">
+								<el-descriptions :column="4" class="wa-run-monitor-desc-table" size="small">
+									<el-descriptions-item label="任务名称">{{ run_form.name }}</el-descriptions-item>
+									<el-descriptions-item label="执行人">{{ run_form.username || '—' }}</el-descriptions-item>
+									<el-descriptions-item label="开始时间">{{ start_time ? String(start_time).replace('T', ' ') : '—' }}</el-descriptions-item>
+									<el-descriptions-item label="结束时间">{{ end_time ? String(end_time).replace('T', ' ') : '—' }}</el-descriptions-item>
+									<el-descriptions-item label="执行环境">{{ run_env || '—' }}</el-descriptions-item>
+									<el-descriptions-item label="执行总数">{{ run_count }}</el-descriptions-item>
+									<el-descriptions-item label="通过数">{{ Math.max(0, run_count - run_fail) }}</el-descriptions-item>
+									<el-descriptions-item label="失败数">{{ run_fail }}</el-descriptions-item>
+								</el-descriptions>
+							</el-card>
+						</div>
+						<div class="wa-run-monitor-split">
+							<el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--timeline">
+								<template #header>
+									<span class="wa-run-monitor-card-title">执行步骤</span>
+								</template>
+								<el-timeline class="wa-run-monitor-timeline">
+									<el-timeline-item
+										v-for="(res, index) in run_result_list"
+										:key="index"
+										:timestamp="res.create_time ? '执行时间：' + String(res.create_time).replace('T', ' ') : ''"
+										:type="res.status === 1 ? 'success' : 'danger'"
+									>
+										<div class="api-run-monitor-step">
+											<div>
+												<div class="api-run-monitor-step-title">
+													<span v-if="res.name !== '执行结束'">接口：{{ res.name }}</span>
+													<span v-else>{{ res.name }}</span>
+												</div>
+												<div v-if="res.name !== '执行结束'" class="api-run-monitor-step-meta">
+													<span>code：{{ res?.res?.code ?? '-' }}</span>
+													<span>size：{{ res?.res?.size ?? 0 }}B</span>
+													<span>time：{{ res?.res?.res_time ?? 0 }}ms</span>
+												</div>
 											</div>
-											<div v-if="res.name !== '执行结束'" style="margin-top: 6px; color: #606266;">
-												<span style="margin-right: 10px;">code：{{ res?.res?.code ?? '-' }}</span>
-												<span style="margin-right: 10px;">size：{{ res?.res?.size ?? 0 }}B</span>
-												<span>time：{{ res?.res?.res_time ?? 0 }}ms</span>
+											<div v-if="res.name !== '执行结束'">
+												<el-button type="primary" link @click="view_result(res)">查看详情</el-button>
 											</div>
 										</div>
-										<div v-if="res.name !== '执行结束'">
-											<el-button type="primary" link @click="view_result(res)">查看详情</el-button>
-										</div>
+									</el-timeline-item>
+								</el-timeline>
+							</el-card>
+							<el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--log">
+								<template #header>
+									<div class="wa-run-monitor-log-toolbar">
+										<span class="wa-run-monitor-log-toolbar-title">
+											<el-icon class="wa-run-monitor-log-toolbar-icon"><Monitor /></el-icon>
+											场景执行日志
+										</span>
+										<el-button size="small" class="wa-run-monitor-btn-ghost" @click="copyApiRunLog">
+											<el-icon class="el-icon--left"><DocumentCopy /></el-icon>
+											复制
+										</el-button>
 									</div>
-								</el-timeline-item>
-							</el-timeline>
-						</el-card>
-					</el-col>
-					<el-col :span="16" style="height: 100%;">
-						<el-card shadow="never" style="height: 100%; overflow: auto;">
-							<div v-if="run_type !== '执行结束'" style="margin-bottom: 8px; color: #0bbd87;">执行日志获取中...</div>
-							<div v-for="(log, idx) in run_result_log" :key="idx" :style="String(log).includes('失败') ? 'color:#d70e0e;' : ''">
-								{{ log }}
-							</div>
-						</el-card>
-					</el-col>
-				</el-row>
-			</el-card>
-		</el-dialog>
+								</template>
+								<ul class="wa-run-monitor-log-list">
+									<li v-if="run_type !== '执行结束'" class="wa-run-monitor-log-pending">
+										<span class="wa-run-monitor-log-dot" aria-hidden="true" />
+										执行日志获取中…
+									</li>
+									<li
+										v-for="(log, idx) in run_result_log"
+										:key="idx"
+										class="wa-run-monitor-log-line"
+										:class="logLineClass(log)"
+									>
+										<template v-for="(seg, si) in parseLogLineForDisplay(log)" :key="`${idx}-${si}`">
+											<span :class="seg.cls">{{ seg.text }}</span>
+										</template>
+									</li>
+								</ul>
+							</el-card>
+						</div>
+					</div>
+				</div>
+				<div class="wa-run-monitor-footer">
+					<el-button class="wa-run-monitor-btn-ghost" @click="resultDialogRef = false">关闭</el-button>
+				</div>
+			</div>
+		</el-drawer>
 
 		<!-- 结果详情抽屉 -->
 		<el-drawer v-model="detail_drawer" title="请求详情" size="1100px" destroy-on-close>
@@ -235,7 +287,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus';
+import { DocumentCopy, Monitor } from '@element-plus/icons-vue';
 import { Session } from '/@/utils/storage';
+import { logLineClass, parseLogLineForDisplay } from '../../web_view/webRunMonitorLog';
 import ApiDetail from './api_detail.vue';
 import {
 	api_tree_list,
@@ -466,6 +520,21 @@ const stopPolling = () => {
 	interval.value = null;
 };
 
+const copyApiRunLog = async () => {
+	const lines = run_result_log.value;
+	const text = Array.isArray(lines) ? lines.join('\n') : '';
+	if (!text.trim()) {
+		ElMessage.info('暂无日志可复制');
+		return;
+	}
+	try {
+		await navigator.clipboard.writeText(text);
+		ElMessage.success('已复制到剪贴板');
+	} catch {
+		ElMessage.warning('复制失败，请手动选择日志文本');
+	}
+};
+
 const get_result = async () => {
 	await Promise.all([get_script_log(), get_script_result()]);
 };
@@ -524,6 +593,7 @@ const run_confirm = async () => {
 		if (userInfo?.username) run_form.value.username = userInfo.username;
 	} catch (_) {}
 
+	runDialogRef.value = false;
 	resultDialogRef.value = true;
 	await startPolling();
 	const res: any = await run_api_script(run_form.value);
@@ -598,4 +668,42 @@ onMounted(async () => {
 .font-bold {
 	font-weight: bold;
 }
+
+/* 无浏览器 Tab 时，单列铺满抽屉主区域 */
+.api-run-monitor-body--solo {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.api-run-monitor-pane--solo {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.api-run-monitor-step {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	align-items: flex-start;
+}
+
+.api-run-monitor-step-title {
+	font-weight: 600;
+	color: var(--wa-tm-text);
+}
+
+.api-run-monitor-step-meta {
+	margin-top: 6px;
+	color: var(--wa-tm-muted);
+	font-size: 12px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 10px;
+}
+</style>
+
+<style lang="scss">
+@import '../../web_view/web-run-monitor.scss';
 </style>

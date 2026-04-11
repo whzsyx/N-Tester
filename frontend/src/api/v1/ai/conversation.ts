@@ -69,6 +69,11 @@ export interface SendMessageRequest {
     type: string
     url: string
   }>
+  tool_mode?: 'smart' | 'direct'
+  tool_provider?: 'mcp' | 'skill'
+  tool_name?: string
+  tool_arguments?: Record<string, any>
+  tool_session_id?: string
 }
 
 /**
@@ -123,6 +128,11 @@ export interface WSMessageRequest {
   knowledge_base_id?: number
   use_mcp?: boolean
   mcp_config_id?: number
+  tool_mode?: 'smart' | 'direct'
+  tool_provider?: 'mcp' | 'skill'
+  tool_name?: string
+  tool_arguments?: Record<string, any>
+  tool_session_id?: string
 }
 
 // ==================== API 函数 ====================

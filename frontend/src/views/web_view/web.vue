@@ -1,104 +1,102 @@
 <template>
-  <div>
-    <div style="width: 100%; display: flex; gap: 8px; align-items: flex-start">
-      <el-card shadow="hover" style="width: 220px; flex-shrink: 0; height: 800px; overflow-y: auto">
-        <div style="width: 100%">
-          <div>
-            <el-input
-              v-model="filterText"
-              style="margin-bottom: 5px; width: 90%; padding-right: 10px"
-              placeholder="请输入节点名称"
-            />
-            <el-button type="text" style="padding-left: 5px" icon="Refresh" @click="get_web_menu" />
-          </div>
-          <el-tree
-            ref="treeRef"
-            class="filter-tree"
-            :data="tree_data"
-            :props="defaultProps"
-            default-expand-all
-            :filter-node-method="filterNode"
-            @node-click="web_menu_click"
-            :allow-drop="on_menu_allowDrop"
-            draggable
-          >
-            <template #default="{ node, data }">
-              <span class="custom-tree-node">
-                <span v-if="data.type === 0">
-                  <el-icon style="padding-right: 3px">
-                    <HomeFilled />
-                  </el-icon>
-                  {{ node.label }}
-                </span>
-                <span v-else-if="data.type === 1">
-                  <el-icon style="padding-right: 3px">
-                    <Folder />
-                  </el-icon>
-                  {{ node.label }}
-                </span>
-                <span v-else-if="data.type === 2">
-                  <el-icon style="padding-right: 3px">
-                    <ChromeFilled />
-                  </el-icon>
-                  {{ node.label }}
-                </span>
-                <span v-if="data.type === 0" class="right" style="padding-right: 10px">
-                  <el-dropdown placement="bottom">
-                    <el-icon>
-                      <MoreFilled />
-                    </el-icon>
-                    <span class="el-dropdown-link" style="font-size: 20px" />
-                    <template #dropdown>
-                      <el-dropdown-menu class="header-new-drop">
-                        <el-dropdown-item :icon="CirclePlus" @click="add_menu(data)">
-                          新建子菜单
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </span>
-                <span v-else-if="data.type === 1" class="right" style="padding-right: 10px">
-                  <el-dropdown placement="bottom">
-                    <el-icon>
-                      <MoreFilled />
-                    </el-icon>
-                    <span class="el-dropdown-link" style="font-size: 20px" />
-                    <template #dropdown>
-                      <el-dropdown-menu class="header-new-drop">
-                        <el-dropdown-item :icon="CirclePlus" @click="add_menu(data)">
-                          新建子菜单
-                        </el-dropdown-item>
-                        <el-dropdown-item :icon="Upload" @click="upload_file(data)">上传</el-dropdown-item>
-                        <el-dropdown-item :icon="Edit" @click="rename_menu(data)">重命名</el-dropdown-item>
-                        <el-dropdown-item :icon="Delete" @click="del_menu(data)">删除</el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </span>
-                <span v-else-if="data.type === 2" class="right" style="padding-right: 10px">
-                  <el-dropdown placement="bottom">
-                    <el-icon>
-                      <MoreFilled />
-                    </el-icon>
-                    <span class="el-dropdown-link" style="font-size: 20px" />
-                    <template #dropdown>
-                      <el-dropdown-menu class="header-new-drop">
-                        <el-dropdown-item :icon="Edit" @click="rename_menu(data)">重命名</el-dropdown-item>
-                        <el-dropdown-item :icon="Delete" @click="del_menu(data)">删除</el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </span>
-              </span>
-            </template>
-          </el-tree>
+  <div class="web-automation-page">
+    <el-container class="wa-container" direction="vertical">
+      <el-header class="wa-page-header">
+        <div v-if="pageMode === 'list'" class="wa-header-row">
+          <el-space wrap :size="12">
+            <el-text tag="b" size="large">{{ listPageTitle }}</el-text>
+            <el-text size="small" type="info">点击表格行：脚本进入编辑，文件夹进入分组管理</el-text>
+          </el-space>
+          <el-space wrap :size="8">
+            <el-button type="primary" :plain="false" @click="openCreateResourceDialog('script')">
+              <el-icon class="el-icon--left"><CirclePlus /></el-icon>
+              新建脚本
+            </el-button>
+            <el-button type="success" :plain="false" @click="openCreateResourceDialog('folder')">
+              <el-icon class="el-icon--left"><Folder /></el-icon>
+              新建文件夹
+            </el-button>
+            <el-button type="info" :plain="false" @click="get_web_menu">
+              <el-icon class="el-icon--left"><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </el-space>
         </div>
-      </el-card>
+        <div v-else class="wa-header-row">
+          <el-space wrap :size="8">
+            <el-button @click="goBackToList">
+              <el-icon class="el-icon--left"><ArrowLeft /></el-icon>
+              返回列表
+            </el-button>
+            <el-button type="primary" @click="resourceDrawerVisible = true">
+              <el-icon class="el-icon--left"><Folder /></el-icon>
+              切换脚本
+            </el-button>
+          </el-space>
+          <el-button text type="primary" @click="get_web_menu">
+            <el-icon class="el-icon--left"><Refresh /></el-icon>
+            刷新目录
+          </el-button>
+        </div>
+      </el-header>
+      <el-main class="wa-main">
+      <!-- 首页：脚本列表 -->
+      <div v-if="pageMode === 'list'" class="wa-home-list">
+        <el-card shadow="never" class="wa-list-card">
+          <el-table
+            class="wa-script-table"
+            v-loading="loading"
+            :data="homeResourceRows"
+            stripe
+            border
+            style="width: 100%"
+            empty-text="暂无目录与脚本，请先新建或刷新"
+            @row-click="onHomeResourceRowClick"
+          >
+            <el-table-column label="类型" width="108" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.menuType === 2 ? 'primary' : 'warning'" effect="dark" size="small">
+                  {{ row.menuType === 2 ? '脚本' : '文件夹' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-space :size="8" alignment="center">
+                  <el-icon class="wa-res-icon" :class="row.menuType === 2 ? 'wa-res-icon--script' : 'wa-res-icon--folder'">
+                    <ChromeFilled v-if="row.menuType === 2" />
+                    <Folder v-else />
+                  </el-icon>
+                  <span>{{ row.name }}</span>
+                </el-space>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="112" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.statusTagType" size="small">{{ row.statusLabel }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="groupPath" label="所属分组" min-width="200" show-overflow-tooltip />
+            <el-table-column label="操作" width="268" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-space :size="8" wrap alignment="center" class="wa-table-actions">
+                  <el-button type="primary" size="small" :plain="false" @click.stop="openResourceFromList(row)">
+                    {{ row.menuType === 2 ? '进入编辑' : '进入管理' }}
+                  </el-button>
+                  <el-button type="danger" size="small" :plain="false" @click.stop="deleteResourceFromList(row)">
+                    删除
+                  </el-button>
+                </el-space>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
 
-      <!-- 右侧脚本编辑区域 -->
-      <el-card shadow="hover" style="flex: 1; min-width: 0; height: 800px; overflow: hidden">
-        <div>
-          <el-tabs v-model="tab_active" type="card" closable class="demo-tabs" @tab-remove="removeTab">
+      <section v-else class="web-automation-workspace">
+        <div class="workspace-shell">
+        <div class="workspace-inner">
+          <el-tabs v-model="tab_active" closable class="demo-tabs web-script-tabs web-script-tabs--underline" @tab-remove="removeTab">
             <el-tab-pane
               v-for="(item, index) in tab_list"
               :key="index"
@@ -122,8 +120,8 @@
               </template>
 
               <!-- 脚本集 tab -->
-              <div v-if="item.type === 1">
-                <el-card shadow="never" style="height: 700px">
+              <div v-if="item.type === 1" class="folder-tab-panel">
+                <el-card shadow="never" class="folder-batch-card">
                   <div>
                     <div
                       style="float: right; padding-left: 10px; padding-right: 10px; padding-block-end: 10px"
@@ -134,7 +132,7 @@
                       v-loading="loading"
                       border
                       :data="table_list"
-                      empty-text="暂时没有数据哟🌻"
+                      empty-text="暂时没有数据"
                       @selection-change="handleSelectionChange"
                     >
                       <el-table-column type="selection" align="center" />
@@ -161,29 +159,43 @@
                 </el-card>
               </div>
 
-              <!-- 单脚本 tab -->
-              <div v-else-if="item.type === 2" style="padding: 5px; height: 100%; display: flex; flex-direction: column; min-height: 0">
-                <div style="flex-shrink: 0; padding-block-end: 5px">
-                  <el-card shadow="never" class="script-info-card">
-                    <el-descriptions title="脚本信息" :column="4" size="small" border>
-                      <el-descriptions-item label="类型">Web自动化</el-descriptions-item>
-                      <el-descriptions-item label="脚本名称">{{ item.name }}</el-descriptions-item>
-                      <el-descriptions-item label="最后更新人">
-                        {{ item.content?.username ?? '-' }}
-                      </el-descriptions-item>
-                      <el-descriptions-item label="最后更新时间">
-                        {{ item.content?.update_time ?? '-' }}
-                      </el-descriptions-item>
-                    </el-descriptions>
-                  </el-card>
-                </div>
+              <!-- 单脚本：顶区卡片 + 步骤工具卡片 + 上下分栏（步骤上 / 属性下） -->
+              <div v-else-if="item.type === 2" class="script-tab-root">
+                <el-card class="wa-hero-card" shadow="never">
+                  <div class="workspace-hero">
+                    <div class="hero-left">
+                      <div class="hero-icon-wrap" aria-hidden="true">
+                        <el-icon><ChromeFilled /></el-icon>
+                      </div>
+                      <div class="hero-text">
+                        <el-text tag="h2" class="hero-title" truncated>{{ item.name }}</el-text>
+                        <p class="hero-meta-line">
+                          <el-tag size="small" type="info" effect="plain">Web 自动化</el-tag>
+                          <el-text size="small" type="info" class="hero-meta-sep">·</el-text>
+                          <el-text size="small" type="info">{{ item.content?.username ?? '-' }}</el-text>
+                          <el-text size="small" type="info" class="hero-meta-sep">·</el-text>
+                          <el-text size="small" type="info">{{ item.content?.update_time ?? '-' }}</el-text>
+                        </p>
+                      </div>
+                    </div>
+                    <div class="hero-actions">
+                      <!-- 暂不启用 AI 脚本录入，仅保留自定义步骤入口
+                      <el-button type="primary" plain @click="ai_script_input()">AI 脚本录入</el-button>
+                      -->
+                      <el-button type="primary" @click="run_script(item)">立即调试</el-button>
+                      <el-button type="success" @click="save_web_script_handler(item.id)">保存</el-button>
+                    </div>
+                  </div>
+                </el-card>
 
-                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
-                  <el-card shadow="never" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden">
-                    <!-- 顶部工具栏 -->
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 8px; flex-shrink: 0">
-                      <el-dropdown @command="add_script">
-                        <el-button type="info">浏览器操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                <el-card class="wa-ribbon-card" shadow="never" aria-label="添加步骤">
+                  <div class="step-ribbon">
+                  <el-text size="small" type="info" class="ribbon-label">添加步骤</el-text>
+                  <div class="ribbon-scroll">
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button type="primary" :plain="false" class="toolbar-dd-btn">
+                          浏览器操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item divided :command="{ type: 0, name: '首次打开网页' }">首次打开网页</el-dropdown-item>
@@ -195,8 +207,18 @@
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="primary">AI + 自定义<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <el-button
+                        :plain="false"
+                        class="toolbar-dd-btn wa-step-dd--custom"
+                        @click="add_script({ type: 17, name: '自定义步骤' })"
+                      >
+                        自定义步骤
+                      </el-button>
+                      <!-- AI 步骤（type:19）暂下线，恢复时还原下拉并取消下行注释
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button :plain="false" class="toolbar-dd-btn wa-step-dd--ai">
+                          AI + 自定义<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 19, name: 'AI 步骤' }">AI 步骤</el-dropdown-item>
@@ -204,8 +226,11 @@
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="primary">鼠标操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      -->
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button type="success" :plain="false" class="toolbar-dd-btn">
+                          鼠标操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 1, name: '左键点击' }">左键点击</el-dropdown-item>
@@ -216,8 +241,10 @@
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="success">输入操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button type="info" :plain="false" class="toolbar-dd-btn">
+                          输入操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 5, name: '直接输入' }">直接输入</el-dropdown-item>
@@ -226,24 +253,30 @@
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="warning">滑动操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button type="warning" :plain="false" class="toolbar-dd-btn">
+                          滑动操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 8, name: '上下滑动' }">上下滑动</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="info">文件操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button type="danger" :plain="false" class="toolbar-dd-btn">
+                          文件操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 18, name: '上传文件' }">上传文件</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <el-dropdown @command="add_script">
-                        <el-button type="danger">逻辑事件<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <el-dropdown @command="add_script" trigger="click">
+                        <el-button :plain="false" class="toolbar-dd-btn wa-step-dd--logic">
+                          逻辑事件<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item :command="{ type: 10, name: 'if 事件' }">if 事件</el-dropdown-item>
@@ -252,17 +285,16 @@
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
-                      <div style="margin-left: auto; display: flex; gap: 8px">
-                        <el-button type="primary" plain @click="ai_script_input()">AI脚本录入</el-button>
-                        <el-button type="primary" @click="run_script(item)">立即调试</el-button>
-                        <el-button type="success" @click="save_web_script_handler(item.id)">保存</el-button>
-                      </div>
-                    </div>
+                  </div>
+                </div>
+                </el-card>
 
-                    <!-- 脚本树 + 配置表单 -->
-                    <div style="flex: 1; min-height: 0; display: flex; width: 100%">
-                      <div class="step-tree-wrap">
-                        <div class="step-tree-inner">
+                <div class="workspace-canvas workspace-canvas--stacked">
+                  <el-card class="step-rail-card" shadow="never">
+                    <template #header>
+                      <span>步骤</span>
+                    </template>
+                    <div class="step-tree-inner">
                           <el-tree
                             ref="step_treeRef"
                             :data="item.content.script"
@@ -277,7 +309,7 @@
                               <el-card class="step-card" shadow="never" :body-style="{ padding: '4px 8px' }">
                                 <div class="card-header">
                                   <span class="card-left">
-                                    <span class="step-icon" :style="{ color: 'rgb(97, 100, 159)' }">1</span>
+                                    <span class="step-icon">1</span>
                                     <span class="method-tag">{{ data.name }}</span>
                                   </span>
                                   <div class="card-actions">
@@ -285,7 +317,7 @@
                                       v-model="data.status"
                                       inline-prompt
                                       size="small"
-                                      style="--el-switch-on-color: #53a8ff; --el-switch-off-color: #f56c6c"
+                                      style="--el-switch-on-color: var(--el-color-primary); --el-switch-off-color: var(--el-color-danger)"
                                     />
                                     <el-button
                                       :icon="DocumentCopy"
@@ -312,11 +344,14 @@
                               </el-card>
                             </template>
                           </el-tree>
-                        </div>
-                      </div>
+                    </div>
+                  </el-card>
 
-                      <!-- 右侧配置表单 -->
-                      <div class="step-config-wrap">
+                  <el-card class="step-inspector-card" shadow="never">
+                    <template #header>
+                      <span>步骤属性</span>
+                    </template>
+                    <div class="step-config-body">
                           <el-form>
                             <el-form-item v-if="script_info.type !== 19" label="名称：">
                               <el-input v-model="script_info.name" />
@@ -850,7 +885,7 @@
                             </el-form-item>
                             <div style="margin-top: 4px">
                               <div style="width: 100%">
-                                <el-tabs v-model="config_active" class="demo-tabs">
+                                <el-tabs v-model="config_active" class="demo-tabs web-config-tabs">
                                   <el-tab-pane label="配置项" name="first">
                                     <el-form label-width="120px" label-position="right" style="margin-top: 8px">
                                       <el-form-item label="执行前等待(秒)">
@@ -989,8 +1024,7 @@
                               </div>
                             </div>
                           </el-form>
-                        </div>
-                      </div>
+                    </div>
                   </el-card>
                 </div>
               </div>
@@ -1106,47 +1140,61 @@
           </template>
         </KoiDialog>
 
-        <KoiDialog
-          ref="res_koiDialogRef"
+        <el-drawer
+          v-model="runMonitorDrawerVisible"
           :title="title"
-          :height="680"
-          :width="1600"
-          :footer-hidden="true"
+          direction="rtl"
+          size="min(92vw, 1680px)"
+          append-to-body
+          class="wa-run-monitor-drawer wa-run-monitor-theme"
+          :show-close="true"
+          :close-on-click-modal="false"
+          @closed="onRunMonitorDrawerClosed"
         >
-          <template #content>
-            <div v-loading="loading" style="width: 100%">
+          <template #header>
+            <div class="wa-run-monitor-drawer-header">
+              <div class="wa-run-monitor-drawer-titleline">
+                <span class="wa-run-monitor-drawer-title">{{ title }}</span>
+                <el-tag type="info" effect="plain" size="small" class="wa-run-monitor-drawer-badge">执行监控</el-tag>
+              </div>
+              <p class="wa-run-monitor-drawer-sub">实时步骤与日志，执行结束后可继续查看或关闭抽屉</p>
+            </div>
+          </template>
+          <div class="wa-run-monitor-shell">
+            <div v-loading="loading" class="wa-run-monitor-body">
               <el-tabs
                 tab-position="left"
                 v-model="run_browser_active"
-                class="demo-tabs"
+                class="wa-run-monitor-tabs"
                 @tab-click="change_browser"
               >
                 <el-tab-pane v-for="(item, index) in run_browsers" :key="index" :name="item.value">
                   <template #label>
-                    <span>{{ item.name }}</span>
+                    <span class="wa-run-monitor-tab-label">{{ item.name }}</span>
                   </template>
-                  <div style="width: 100%">
-                    <div style="width: 100%; padding-block-end: 10px">
-                      <el-card shadow="never" :body-style="{ padding: '8px 12px' }">
-                        <el-descriptions :column="5">
-                          <el-descriptions-item label="执行状态：">
-                            <el-tag type="success" v-if="run_type === '正在执行'">{{ run_type }}</el-tag>
-                            <el-tag type="danger" v-else-if="run_type === '执行结束'">{{ run_type }}</el-tag>
+                  <div class="wa-run-monitor-pane">
+                    <div class="wa-run-monitor-desc">
+                      <el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-summary">
+                        <el-descriptions :column="3" class="wa-run-monitor-desc-table" size="small">
+                          <el-descriptions-item label="执行状态">
+                            <span v-if="run_type === '正在执行'" class="wa-run-monitor-pill wa-run-monitor-pill--run">{{ run_type }}</span>
+                            <span v-else-if="run_type === '执行结束'" class="wa-run-monitor-pill wa-run-monitor-pill--done">{{ run_type }}</span>
                           </el-descriptions-item>
-                          <el-descriptions-item label="浏览器：">{{ item.name }}</el-descriptions-item>
-                          <el-descriptions-item label="开始时间：">{{ start_time }}</el-descriptions-item>
-                          <el-descriptions-item label="结束时间：">{{ end_time }}</el-descriptions-item>
-                          <el-descriptions-item label="已执行：">{{ run_count }}</el-descriptions-item>
-                          <el-descriptions-item label="通过：">
-                            {{ run_count - run_fail }}
-                          </el-descriptions-item>
-                          <el-descriptions-item label="失败：">{{ run_fail }}</el-descriptions-item>
+                          <el-descriptions-item label="浏览器">{{ item.name }}</el-descriptions-item>
+                          <el-descriptions-item label="开始时间">{{ start_time || '—' }}</el-descriptions-item>
+                          <el-descriptions-item label="结束时间">{{ end_time || '—' }}</el-descriptions-item>
+                          <el-descriptions-item label="已执行">{{ run_count }}</el-descriptions-item>
+                          <el-descriptions-item label="通过">{{ run_count - run_fail }}</el-descriptions-item>
+                          <el-descriptions-item label="失败">{{ run_fail }}</el-descriptions-item>
                         </el-descriptions>
                       </el-card>
                     </div>
-                    <div style="width: 100%; display: flex; gap: 8px">
-                      <el-card shadow="never" style="width: 30%; height: 560px; overflow-y: auto">
-                        <el-timeline style="width: 80%">
+                    <div class="wa-run-monitor-split">
+                      <el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--timeline">
+                        <template #header>
+                          <span class="wa-run-monitor-card-title">执行步骤</span>
+                        </template>
+                        <el-timeline class="wa-run-monitor-timeline">
                           <el-timeline-item
                             v-for="(res, index) in web_result"
                             :key="index"
@@ -1158,27 +1206,45 @@
                             :timestamp="'执行时间：' + formatTime(res.create_time)"
                             placement="top"
                           >
-                            <el-card shadow="never" :body-style="{ padding: '6px 10px' }" :style="get_colors(res.status)">
+                            <el-card
+                              shadow="never"
+                              class="wa-run-monitor-timeline-node"
+                              :class="res.status === 1 ? 'wa-run-monitor-timeline-node--ok' : 'wa-run-monitor-timeline-node--fail'"
+                              :body-style="{ padding: '8px 12px' }"
+                            >
                               <span>{{ res.name }}</span>
                               <span>{{ '结果：' + res.log }}</span>
                             </el-card>
                           </el-timeline-item>
                         </el-timeline>
                       </el-card>
-                      <el-card shadow="never" style="flex: 1; height: 560px; overflow-y: auto">
-                        <ul>
-                          <li
-                            v-if="run_type !== '执行结束'"
-                            style="margin-bottom: 7px; color: #0bbd87"
-                          >
-                            执行日志获取中...
+                      <el-card shadow="never" class="wa-run-monitor-surface wa-run-monitor-card wa-run-monitor-card--log">
+                        <template #header>
+                          <div class="wa-run-monitor-log-toolbar">
+                            <span class="wa-run-monitor-log-toolbar-title">
+                              <el-icon class="wa-run-monitor-log-toolbar-icon"><Monitor /></el-icon>
+                              调试执行日志
+                            </span>
+                            <el-button size="small" class="wa-run-monitor-btn-ghost" @click="copyWebResultLog">
+                              <el-icon class="el-icon--left"><DocumentCopy /></el-icon>
+                              复制
+                            </el-button>
+                          </div>
+                        </template>
+                        <ul class="wa-run-monitor-log-list">
+                          <li v-if="run_type !== '执行结束'" class="wa-run-monitor-log-pending">
+                            <span class="wa-run-monitor-log-dot" aria-hidden="true" />
+                            执行日志获取中…
                           </li>
                           <li
                             v-for="(log, index) in web_result_log"
                             :key="index"
-                            :style="get_log_style(log)"
+                            class="wa-run-monitor-log-line"
+                            :class="logLineClass(log)"
                           >
-                            {{ log }}
+                            <template v-for="(seg, si) in parseLogLineForDisplay(log)" :key="`${index}-${si}`">
+                              <span :class="seg.cls">{{ seg.text }}</span>
+                            </template>
                           </li>
                         </ul>
                       </el-card>
@@ -1187,14 +1253,157 @@
                 </el-tab-pane>
               </el-tabs>
             </div>
-          </template>
-        </KoiDialog>
-      </el-card>
-    </div>
+            <div class="wa-run-monitor-footer">
+              <el-button class="wa-run-monitor-btn-ghost" @click="runMonitorDrawerVisible = false">关闭</el-button>
+            </div>
+          </div>
+        </el-drawer>
+      </div>
+      </section>
+      </el-main>
+    </el-container>
+
+    <el-drawer
+      v-model="resourceDrawerVisible"
+      title="脚本资源"
+      direction="ltr"
+      size="320px"
+      append-to-body
+    >
+      <el-input
+        v-model="filterText"
+        clearable
+        placeholder="搜索节点名称"
+        class="wa-drawer-search"
+      />
+      <el-tree
+        ref="treeRef"
+        class="filter-tree"
+        :data="tree_data"
+        :props="defaultProps"
+        default-expand-all
+        :filter-node-method="filterNode"
+        @node-click="web_menu_click"
+        :allow-drop="on_menu_allowDrop"
+        draggable
+      >
+        <template #default="{ node, data }">
+          <span class="custom-tree-node">
+            <span v-if="data.type === 0">
+              <el-icon class="wa-tree-icon">
+                <HomeFilled />
+              </el-icon>
+              {{ node.label }}
+            </span>
+            <span v-else-if="data.type === 1">
+              <el-icon class="wa-tree-icon">
+                <Folder />
+              </el-icon>
+              {{ node.label }}
+            </span>
+            <span v-else-if="data.type === 2">
+              <el-icon class="wa-tree-icon">
+                <ChromeFilled />
+              </el-icon>
+              {{ node.label }}
+            </span>
+            <span v-if="data.type === 0" class="right tree-node-actions">
+              <el-dropdown placement="bottom" trigger="click">
+                <el-icon class="tree-more-trigger">
+                  <MoreFilled />
+                </el-icon>
+                <span class="el-dropdown-link" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item :icon="CirclePlus" @click="add_menu(data)">
+                      新建子菜单
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </span>
+            <span v-else-if="data.type === 1" class="right tree-node-actions">
+              <el-dropdown placement="bottom" trigger="click">
+                <el-icon class="tree-more-trigger">
+                  <MoreFilled />
+                </el-icon>
+                <span class="el-dropdown-link" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item :icon="CirclePlus" @click="add_menu(data)">
+                      新建子菜单
+                    </el-dropdown-item>
+                    <el-dropdown-item :icon="Upload" @click="upload_file(data)">上传</el-dropdown-item>
+                    <el-dropdown-item :icon="Edit" @click="rename_menu(data)">重命名</el-dropdown-item>
+                    <el-dropdown-item :icon="Delete" @click="del_menu(data)">删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </span>
+            <span v-else-if="data.type === 2" class="right tree-node-actions">
+              <el-dropdown placement="bottom" trigger="click">
+                <el-icon class="tree-more-trigger">
+                  <MoreFilled />
+                </el-icon>
+                <span class="el-dropdown-link" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item :icon="Edit" @click="rename_menu(data)">重命名</el-dropdown-item>
+                    <el-dropdown-item :icon="Delete" @click="del_menu(data)">删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </span>
+          </span>
+        </template>
+      </el-tree>
+    </el-drawer>
+
+    <el-dialog
+      v-model="createResourceVisible"
+      :title="createResourceForm.resourceType === 2 ? '新建脚本' : '新建文件夹'"
+      width="460px"
+      destroy-on-close
+      append-to-body
+      @closed="resetCreateResourceForm"
+    >
+      <el-form :model="createResourceForm" label-width="96px">
+        <el-form-item label="类型">
+          <el-radio-group v-model="createResourceForm.resourceType" @change="onCreateResourceTypeChange">
+            <el-radio :value="2">脚本</el-radio>
+            <el-radio :value="1">文件夹</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item :label="createResourceForm.resourceType === 2 ? '脚本名称' : '文件夹名称'" required>
+          <el-input
+            v-model="createResourceForm.name"
+            :placeholder="createResourceForm.resourceType === 2 ? '请输入脚本名称' : '请输入文件夹名称'"
+            clearable
+            maxlength="64"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="父级位置" required>
+          <el-select v-model="createResourceForm.pid" placeholder="选择父级目录" filterable style="width: 100%">
+            <el-option
+              v-for="opt in folderParentOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createResourceVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createResourceSubmitting" @click="submitCreateResource">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
 import { onMounted, ref, watch, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElTree, ElMessage, ElMessageBox } from 'element-plus'
 import {
   DocumentCopy,
@@ -1208,10 +1417,14 @@ import {
   Edit,
   Upload,
   Remove,
+  Refresh,
+  ArrowLeft,
+  Monitor,
 } from '@element-plus/icons-vue'
 import KoiDialog from '/@/components/koi/KoiDialog.vue'
 import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue'
 import { useWebManagementApi } from '/@/api/v1/web_management'
+import { logLineClass, parseLogLineForDisplay } from './webRunMonitorLog'
 
 const {
   web_menu,
@@ -1229,7 +1442,16 @@ const {
 } = useWebManagementApi()
 
 // 数据表格加载页面动画
+const route = useRoute()
+const router = useRouter()
+
+/** list：首页脚本表；script：单脚本编辑 */
+const pageMode = ref<'list' | 'script'>('list')
+const listPageTitle = 'Web 自动化脚本'
+
 const loading = ref(false)
+/** 仅在脚本编辑页左上角打开，用于切换脚本 */
+const resourceDrawerVisible = ref(false)
 const filterText = ref<any>('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
 const tree_data = ref<any>()
@@ -1237,6 +1459,261 @@ const defaultProps = {
   children: 'children',
   label: 'name',
 }
+
+/** 接口可能返回单根对象或根数组，统一成数组再遍历 */
+function normalizeMenuRoots(data: any): any[] {
+  if (data == null) return []
+  return Array.isArray(data) ? data : [data]
+}
+
+/** 拍平菜单树（节点上保留后端返回的 pid） */
+function flattenWebMenuTree(nodes: any[] | any | undefined, out: any[] = []): any[] {
+  const list = normalizeMenuRoots(nodes)
+  for (const n of list) {
+    if (!n) continue
+    out.push(n)
+    if (n.children?.length) flattenWebMenuTree(n.children, out)
+  }
+  return out
+}
+
+function isRootPid(pid: any): boolean {
+  return pid === undefined || pid === null || pid === 0 || pid === '0'
+}
+
+function nodeByIdMap(flat: any[]): Map<any, any> {
+  const m = new Map<any, any>()
+  for (const n of flat) {
+    if (n && n.id != null) {
+      m.set(n.id, n)
+      const num = Number(n.id)
+      if (!Number.isNaN(num)) m.set(num, n)
+    }
+  }
+  return m
+}
+
+function getMenuNode(m: Map<any, any>, pid: any): any {
+  if (pid === undefined || pid === null) return undefined
+  return m.get(pid) ?? m.get(Number(pid)) ?? m.get(String(pid))
+}
+
+/**
+ * 用 pid 向上解析「所属分组」（不依赖子节点是否挂在 children 下，避免树结构异常时路径丢失）
+ */
+function groupPathForScript(script: any, m: Map<any, any>): string {
+  const names: string[] = []
+  let pid = script.pid
+  let guard = 0
+  while (!isRootPid(pid) && guard++ < 64) {
+    const p = getMenuNode(m, pid)
+    if (!p) break
+    if (p.type === 0 || p.type === 1) {
+      names.unshift(p.name)
+    }
+    pid = p.pid
+  }
+  if (names.length) return names.join(' / ')
+  const direct = getMenuNode(m, script.pid)
+  if (direct?.name && direct.type !== 2) return String(direct.name)
+  return '—'
+}
+
+/** 文件夹节点完整路径（用于新建脚本选父级） */
+function fullPathForFolderNode(node: any, m: Map<any, any>): string {
+  const chain: string[] = []
+  let cur: any = node
+  let guard = 0
+  while (cur && guard++ < 64) {
+    chain.unshift(cur.name)
+    if (isRootPid(cur.pid)) break
+    cur = getMenuNode(m, cur.pid)
+  }
+  return chain.filter(Boolean).join(' / ')
+}
+
+/** 首页列表：文件夹 + 脚本，含类型与状态展示 */
+const homeResourceRows = computed(() => {
+  const flat = flattenWebMenuTree(tree_data.value)
+  const m = nodeByIdMap(flat)
+  const rows: Array<{
+    id: number
+    name: string
+    groupPath: string
+    menuType: 1 | 2
+    statusLabel: string
+    statusTagType: 'success' | 'info' | 'warning' | 'danger'
+    raw: any
+  }> = []
+  for (const n of flat) {
+    if (n.type !== 1 && n.type !== 2) continue
+    const groupPath = groupPathForScript({ pid: n.pid, id: n.id }, m)
+    let statusLabel = '正常'
+    let statusTagType: 'success' | 'info' | 'warning' | 'danger' = 'success'
+    if (n.status === false || n.enabled === false || n.disabled === true) {
+      statusLabel = '停用'
+      statusTagType = 'danger'
+    } else if (n.type === 1) {
+      statusLabel = '目录'
+      statusTagType = 'info'
+    } else {
+      statusLabel = '就绪'
+      statusTagType = 'success'
+    }
+    rows.push({
+      id: n.id,
+      name: n.name,
+      groupPath,
+      menuType: n.type,
+      statusLabel,
+      statusTagType,
+      raw: n,
+    })
+  }
+  return rows
+})
+
+/** 新建脚本：所有可作为父级的文件夹/脚本组 */
+const folderParentOptions = computed(() => {
+  const flat = flattenWebMenuTree(tree_data.value)
+  const m = nodeByIdMap(flat)
+  const opts: { label: string; value: number }[] = []
+  for (const n of flat) {
+    if (n.type !== 0 && n.type !== 1) continue
+    opts.push({ label: fullPathForFolderNode(n, m), value: n.id })
+  }
+  return opts
+})
+
+const createResourceVisible = ref(false)
+const createResourceSubmitting = ref(false)
+/** resourceType：与树侧「新建子菜单」一致，1=文件夹，2=脚本 */
+const createResourceForm = ref<{
+  resourceType: 1 | 2
+  name: string
+  pid: number | undefined
+}>({ resourceType: 2, name: '', pid: undefined })
+
+const resetCreateResourceForm = () => {
+  createResourceForm.value = { resourceType: 2, name: '', pid: undefined }
+}
+
+const openCreateResourceDialog = (kind: 'script' | 'folder') => {
+  resetCreateResourceForm()
+  createResourceForm.value.resourceType = kind === 'folder' ? 1 : 2
+  const opts = folderParentOptions.value
+  if (!opts.length) {
+    ElMessage.warning('目录数据未就绪或无可用父级，请先刷新页面')
+    return
+  }
+  createResourceForm.value.pid = opts[0].value
+  createResourceVisible.value = true
+}
+
+const onCreateResourceTypeChange = () => {
+  /* 切换类型时保留已选父级（仍在 options 内） */
+}
+
+function findNodeInTree(nodes: any[], id: number): any | null {
+  for (const n of nodes || []) {
+    if (n.id === id) return n
+    if (n.children?.length) {
+      const f = findNodeInTree(n.children, id)
+      if (f) return f
+    }
+  }
+  return null
+}
+
+/** 按 id 打开脚本编辑（列表 / 路由 / 新建后） */
+const openScriptByIdFromApi = async (id: number) => {
+  const node = findNodeInTree(tree_data.value, id)
+  if (!node || node.type !== 2) {
+    ElMessage.warning('未找到该脚本')
+    return
+  }
+  loading.value = true
+  try {
+    const res: any = await get_web_script({ id })
+    script_info.value = res.data.script[0]
+    tab_list.value = []
+    tab_active.value = ''
+    await addTab(node, res.data)
+    pageMode.value = 'script'
+    await router.replace({ query: { ...route.query, scriptId: String(id) } })
+  } catch {
+    ElMessage.error('加载脚本失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const goBackToList = () => {
+  tab_list.value = []
+  tab_active.value = ''
+  pageMode.value = 'list'
+  resourceDrawerVisible.value = false
+  router.replace({ query: {} })
+}
+
+const openScriptFromList = async (row: { id: number }) => {
+  await openScriptByIdFromApi(row.id)
+}
+
+const openResourceFromList = async (row: { menuType: 1 | 2; id: number; raw: any }) => {
+  if (row.menuType === 2) await openScriptFromList(row)
+  else await web_menu_click(row.raw)
+}
+
+const onHomeResourceRowClick = (row: { menuType: 1 | 2; id: number; raw: any }) => {
+  openResourceFromList(row)
+}
+
+const deleteResourceFromList = (row: { id: number; name: string; menuType: 1 | 2 }) => {
+  const kind = row.menuType === 2 ? '脚本' : '文件夹'
+  ElMessageBox.confirm(`确定删除${kind}「${row.name}」吗？`, '提示', { type: 'warning' })
+    .then(async () => {
+      const res: any = await del_web_menu({ id: row.id, type: row.menuType })
+      ElMessage.success(res.message || '已删除')
+      if (pageMode.value === 'script' && tab_list.value[0]?.id === row.id) {
+        goBackToList()
+      }
+      await get_web_menu()
+    })
+    .catch(() => {})
+}
+
+const submitCreateResource = async () => {
+  const name = createResourceForm.value.name?.trim()
+  if (!name) {
+    ElMessage.warning(createResourceForm.value.resourceType === 2 ? '请输入脚本名称' : '请输入文件夹名称')
+    return
+  }
+  if (createResourceForm.value.pid == null) {
+    ElMessage.warning('请选择父级位置')
+    return
+  }
+  try {
+    createResourceSubmitting.value = true
+    const res: any = await add_web_menu({
+      name,
+      type: createResourceForm.value.resourceType,
+      pid: createResourceForm.value.pid,
+    })
+    ElMessage.success(res.message || '创建成功')
+    createResourceVisible.value = false
+    await get_web_menu()
+    if (createResourceForm.value.resourceType === 2) {
+      const newId = res.data?.id
+      if (newId) await openScriptByIdFromApi(Number(newId))
+    }
+  } catch {
+    ElMessage.error('创建失败')
+  } finally {
+    createResourceSubmitting.value = false
+  }
+}
+
 // 当前页面的脚本数据 — 始终指向当前激活 tab 的 script 数组
 const script_list = computed<any[]>(() => {
   const active = tab_list.value.find((t: any) => t.name === tab_active.value)
@@ -1346,11 +1823,27 @@ const web_menu_click = async (node: any) => {
     if (node.type === 1) {
       const res: any = await menu_script_list({ id: node.id })
       table_list.value = res.data
+      if (pageMode.value === 'script') {
+        tab_list.value = []
+        tab_active.value = ''
+      }
       await addTab(node, res.data)
+      pageMode.value = 'script'
+      const q = { ...route.query } as Record<string, any>
+      delete q.scriptId
+      await router.replace({ query: q })
+      resourceDrawerVisible.value = false
     } else if (node.type === 2) {
+      if (pageMode.value === 'script') {
+        tab_list.value = []
+        tab_active.value = ''
+      }
       const res: any = await get_web_script({ id: node.id })
       script_info.value = res.data.script[0]
       await addTab(node, res.data)
+      pageMode.value = 'script'
+      await router.replace({ query: { ...route.query, scriptId: String(node.id) } })
+      resourceDrawerVisible.value = false
     }
   } catch {
     ElMessage.error('数据查询失败，请刷新重试')
@@ -1618,14 +2111,13 @@ const web_script_click = (node: any) => {
   script_info.value = node
 }
 
-// 顶部“AI脚本录入”按钮：（后续可接真正的AI生成/录入流程）
-const ai_script_input = () => {
-  // 默认新增一个 AI 步骤并选中它
-  add_script({ type: 19, name: 'AI 步骤' })
-  const last = script_list.value?.[script_list.value.length - 1]
-  if (last) web_script_click(last)
-  ElMessage.success('已添加 AI 步骤，请在右侧填写脚本内容')
-}
+// 顶部「AI 脚本录入」：与下拉「AI 步骤」一并暂注释，仅保留自定义步骤
+// const ai_script_input = () => {
+//   add_script({ type: 19, name: 'AI 步骤' })
+//   const last = script_list.value?.[script_list.value.length - 1]
+//   if (last) web_script_click(last)
+//   ElMessage.success('已添加 AI 步骤，请在右侧填写脚本内容')
+// }
 
 const save_web_script_handler = async (id: any) => {
   const res: any = await save_web_script({
@@ -1737,7 +2229,11 @@ const run_script = (item: any) => {
 
 const run_browsers = ref<any>([])
 const run_browser_active = ref<any>('')
-const res_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const runMonitorDrawerVisible = ref(false)
+
+const onRunMonitorDrawerClosed = () => {
+  stopPolling()
+}
 
 const run_script_confirm = async () => {
   if (run_script_form.value.script.length === 0) {
@@ -1763,12 +2259,12 @@ const run_script_confirm = async () => {
   await run_browser_show()
   run_browser_active.value = run_script_form.value.browser[0]
   title.value = `正在执行：${run_script_form.value.task_name}`
-  res_koiDialogRef.value?.koiOpen()
+  runMonitorDrawerVisible.value = true
   await startPolling()
   const res: any = await run_web_script(run_script_form.value)
   if (res.code === 10001) {
     ElMessage.error(res.message || '执行失败')
-    res_koiDialogRef.value?.koiQuickClose(res.message)
+    runMonitorDrawerVisible.value = false
     stopPolling()
   }
 }
@@ -1864,15 +2360,20 @@ const get_result_log = async () => {
 
 const getIcon = (status: any) => (status === 1 ? 'Check' : 'Close')
 const colors = (status: any) => (status === 1 ? '#0bbd87' : '#d70e0e')
-const get_colors = (status: any) => (status === 1 ? 'color: #0bbd87' : 'color: #d70e0e')
-const get_log_style = (data: any) => {
-  if (data.includes('失败')) {
-    return 'color: #d70e0e'
+
+const copyWebResultLog = async () => {
+  const lines = web_result_log.value
+  const text = Array.isArray(lines) ? lines.join('\n') : ''
+  if (!text.trim()) {
+    ElMessage.info('暂无日志可复制')
+    return
   }
-  if (data.includes('补救')) {
-    return 'color: #1605ef'
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.warning('复制失败，请手动选择日志文本')
   }
-  return ''
 }
 
 const pre_view = (img: any) => {
@@ -1908,83 +2409,500 @@ const view_trace = () => {
   window.open('https://trace.playwright.dev/')
 }
 
-onMounted(() => {
-  get_web_menu()
-  element_select()
+watch(
+  () => route.query.scriptId,
+  (sid) => {
+    const empty = sid === undefined || sid === null || sid === ''
+    if (empty && pageMode.value === 'script') {
+      tab_list.value = []
+      tab_active.value = ''
+      pageMode.value = 'list'
+      resourceDrawerVisible.value = false
+    }
+  }
+)
+
+onMounted(async () => {
+  await get_web_menu()
+  await element_select()
+  const raw = route.query.scriptId
+  const sid = Array.isArray(raw) ? raw[0] : raw
+  if (sid) {
+    await openScriptByIdFromApi(Number(sid))
+  }
 })
 </script>
 
 
 
 <style lang="scss" scoped>
-/* 脚本信息区域 */
-.script-info-card {
-  min-height: 72px;
+/* 遵循 Element Plus 语义色（--el-*），适配亮色 / 深色模式 */
+.web-automation-page {
+  --wa-gap: 12px;
+  box-sizing: border-box;
+  min-height: calc(100vh - 88px);
+  background-color: var(--el-bg-color-page);
 }
 
-/* 步骤树 + 右侧配置：左右分栏，可滚动不重叠 */
-.step-tree-wrap {
-  width: 50%;
+.wa-container {
+  min-height: calc(100vh - 88px);
+  background-color: var(--el-bg-color-page);
+}
+
+/* 避免嵌套的 el-main 使用默认浅色底，与布局深色区脱节 */
+.web-automation-page :deep(.el-main.wa-main) {
+  background-color: var(--el-bg-color-page) !important;
+}
+
+.wa-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin: 0;
+  height: auto !important;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-bg-color);
+  box-sizing: border-box;
+}
+
+.wa-header-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wa-main {
+  padding: 12px 16px 20px;
+  box-sizing: border-box;
+  overflow: auto;
+  background-color: var(--el-bg-color-page);
+}
+
+.wa-home-list {
+  width: 100%;
+  min-height: 320px;
+  background-color: var(--el-bg-color-page);
+}
+
+.wa-list-card {
+  --el-card-bg-color: var(--el-bg-color);
+  border-color: var(--el-border-color-lighter);
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+
+.wa-list-card :deep(.el-card__body) {
+  padding: 16px;
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+
+.wa-home-list :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+/* 首页表格：背景、表头、斑马行均走 Element Plus 变量，深色模式一致 */
+.wa-script-table {
+  --el-table-bg-color: var(--el-bg-color);
+  --el-table-tr-bg-color: var(--el-bg-color);
+  --el-table-header-bg-color: var(--el-fill-color-light);
+  --el-table-header-text-color: var(--el-text-color-regular);
+  --el-table-text-color: var(--el-text-color-primary);
+  --el-table-border-color: var(--el-border-color-lighter);
+  --el-table-row-hover-bg-color: var(--el-fill-color-light);
+}
+.wa-script-table :deep(.el-table__inner-wrapper::before) {
+  background-color: var(--el-border-color-lighter);
+}
+.wa-script-table :deep(.el-table__body tr.el-table__row--striped > td.el-table__cell) {
+  background-color: var(--el-fill-color-lighter);
+}
+
+/*
+ * EP 表格 fixed 列在表体底部会插入 .el-table__fixed-right-patch，theme-chalk 里写死 background:#fff，
+ * 深色模式下会出现表格下方一条浅色带，改为跟随页面/表格背景。
+ */
+.wa-script-table :deep(.el-table__fixed-right-patch) {
+  background-color: var(--el-table-bg-color, var(--el-bg-color)) !important;
+}
+
+.wa-table-actions {
+  justify-content: center;
+}
+
+.wa-res-icon {
+  font-size: 18px;
   flex-shrink: 0;
-  border: 1px solid var(--el-border-color);
-  border-radius: 5px;
-  margin-right: 8px;
+}
+.wa-res-icon--folder {
+  color: var(--el-color-warning);
+}
+.wa-res-icon--script {
+  color: var(--el-color-primary);
+}
+
+.wa-drawer-search {
+  margin-bottom: 12px;
+}
+
+@import './web-run-monitor.scss';
+
+.wa-tree-icon {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.tree-more-trigger {
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+}
+
+.tree-more-trigger:hover {
+  color: var(--el-color-primary);
+}
+
+.tree-node-actions {
+  padding-right: 2px;
+  opacity: 0.85;
+}
+
+/* —— 主工作区 —— */
+.web-automation-workspace {
+  flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--el-border-radius-base);
+  background-color: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.workspace-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 4px 8px;
+}
+
+.web-script-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 4px;
+}
+
+.web-script-tabs--underline :deep(.el-tabs__header) {
+  margin: 0;
+  border-bottom: none;
+  background: transparent;
+}
+
+.web-script-tabs--underline :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.web-script-tabs--underline :deep(.el-tabs__item) {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 18px;
+  height: 44px;
+  line-height: 44px;
+  color: var(--el-text-color-secondary);
+  border: none;
+  transition: color 0.2s;
+}
+
+.web-script-tabs--underline :deep(.el-tabs__item.is-active) {
+  color: var(--el-color-primary);
+}
+
+.web-script-tabs--underline :deep(.el-tabs__active-bar) {
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+}
+
+.web-script-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 8px;
+}
+
+.web-script-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+/* 单脚本：卡片 + 上下分栏 */
+.script-tab-root {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-gap);
+  box-sizing: border-box;
+}
+
+.wa-hero-card,
+.wa-ribbon-card {
+  flex-shrink: 0;
+}
+
+.wa-hero-card :deep(.el-card__body) {
+  padding: 16px 18px;
+}
+
+.wa-ribbon-card :deep(.el-card__body) {
+  padding: 12px 14px;
+}
+
+.workspace-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-left {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1;
+}
+
+.hero-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--el-border-radius-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--el-color-white);
+  background-color: var(--el-color-primary);
+  font-size: 22px;
+}
+
+.hero-text {
+  min-width: 0;
+}
+
+.hero-title {
+  margin: 0 0 8px;
+  font-size: var(--el-font-size-large);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  line-height: 1.35;
+}
+
+.hero-meta-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-meta-sep {
+  opacity: 0.65;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.step-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ribbon-label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.ribbon-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar-dd-btn {
+  font-weight: 500;
+}
+
+/* 添加步骤下拉触发：分类高级色（实心），与 EP 主题变量协同 */
+.wa-step-dd--custom.el-button {
+  --el-button-text-color: var(--el-color-white);
+  --el-button-bg-color: #7c3aed;
+  --el-button-border-color: #6d28d9;
+  --el-button-hover-text-color: var(--el-color-white);
+  --el-button-hover-bg-color: #6d28d9;
+  --el-button-hover-border-color: #5b21b6;
+  --el-button-active-text-color: var(--el-color-white);
+  --el-button-active-bg-color: #5b21b6;
+  --el-button-active-border-color: #4c1d95;
+}
+
+.wa-step-dd--logic.el-button {
+  --el-button-text-color: var(--el-color-white);
+  --el-button-bg-color: #0d9488;
+  --el-button-border-color: #0f766e;
+  --el-button-hover-text-color: var(--el-color-white);
+  --el-button-hover-bg-color: #0f766e;
+  --el-button-hover-border-color: #115e59;
+  --el-button-active-text-color: var(--el-color-white);
+  --el-button-active-bg-color: #115e59;
+  --el-button-active-border-color: #134e4a;
+}
+
+[data-theme='dark'] .wa-step-dd--custom.el-button {
+  --el-button-bg-color: #8b5cf6;
+  --el-button-border-color: #7c3aed;
+  --el-button-hover-bg-color: #7c3aed;
+  --el-button-hover-border-color: #6d28d9;
+  --el-button-active-bg-color: #6d28d9;
+  --el-button-active-border-color: #5b21b6;
+}
+
+[data-theme='dark'] .wa-step-dd--logic.el-button {
+  --el-button-bg-color: #14b8a6;
+  --el-button-border-color: #0d9488;
+  --el-button-hover-bg-color: #0d9488;
+  --el-button-hover-border-color: #0f766e;
+  --el-button-active-bg-color: #0f766e;
+  --el-button-active-border-color: #115e59;
+}
+
+.workspace-canvas--stacked {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wa-gap);
+}
+
+.step-rail-card {
+  flex: 0 1 auto;
+  max-height: min(42vh, 420px);
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
+.step-rail-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.step-inspector-card {
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.step-inspector-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
 .step-tree-inner {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: auto;
-  padding: 8px;
-}
-.step-config-wrap {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--el-border-color);
-  border-radius: 5px;
-  padding: 10px;
-  overflow-y: auto;
-  overflow-x: auto;
+  overflow: auto;
+  padding: 12px;
 }
 
-/* 步骤树：每行高度紧凑 */
+.step-config-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 16px 16px;
+}
+
+.web-config-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+.web-config-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background-color: var(--el-border-color-lighter);
+}
+
 .step-tree :deep(.el-tree-node__content) {
   height: auto;
   margin-bottom: 4px;
   padding: 0;
   min-height: 0;
 }
+
 .step-tree :deep(.el-tree-node) {
   margin-bottom: 2px;
 }
 
-/* 步骤小卡片：单行紧凑，不叠加重叠 */
 .step-card {
-  border-radius: 6px;
-  margin-bottom: 4px;
-  transition: all 0.2s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: var(--el-border-radius-base);
+  margin-bottom: 6px;
   width: 100%;
-  position: relative;
-  overflow: visible;
-  border: 1px solid var(--el-border-color-lighter);
+  border-color: var(--el-border-color);
+  background-color: var(--el-fill-color-blank);
 }
+
+.step-card:hover {
+  border-color: var(--el-color-primary-light-5);
+}
+
 .step-card :deep(.el-card__body) {
-  padding: 4px 8px;
-  line-height: 1.4;
+  padding: 6px 10px;
+  line-height: 1.45;
 }
+
 .card-header {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 28px;
+  min-height: 30px;
 }
+
 .card-left {
   display: flex;
   align-items: center;
@@ -1993,39 +2911,40 @@ onMounted(() => {
   flex: 1;
   overflow: hidden;
 }
+
 .method-tag {
   font-size: 13px;
-  color: #49cc90;
+  color: var(--el-color-primary);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .step-icon {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   font-size: 11px;
-  font-weight: bold;
-  border-radius: 50%;
-  background: #f0f2f5;
-  border: 1px solid #dcdfe6;
+  font-weight: 700;
+  border-radius: var(--el-border-radius-small);
+  background-color: var(--el-color-primary-light-9);
+  border: 1px solid var(--el-color-primary-light-5);
+  color: var(--el-color-primary);
   flex-shrink: 0;
 }
+
 .card-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex-shrink: 0;
 }
+
 .action-button {
   padding: 4px;
-  transition: all 0.2s;
-}
-.action-button:hover {
-  transform: scale(1.1);
 }
 
 .custom-tree-node {
@@ -2033,13 +2952,32 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 13px;
   padding-right: 2px;
+  color: var(--el-text-color-primary);
 }
 
-.el-tree-node__content {
-  margin-bottom: 5px;
-  height: 28px;
+.folder-tab-panel {
+  padding: 4px 0 0;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.folder-batch-card {
+  min-height: min(680px, calc(100vh - 200px));
+  border-color: var(--el-border-color-lighter);
+  background-color: var(--el-bg-color);
+}
+
+.folder-batch-card :deep(.el-card__body) {
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .workspace-hero {
+    flex-direction: column;
+  }
 }
 </style>
 
