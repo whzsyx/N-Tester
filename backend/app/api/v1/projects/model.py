@@ -156,3 +156,4 @@ class KnowledgeGlobalConfigModel(Base):
     model_name = Column(String(200), default="text-embedding-3-small", comment="嵌入模型名")
     chunk_size = Column(Integer, default=1000, comment="默认分块大小")
     chunk_overlap = Column(Integer, default=200, comment="默认分块重叠")
+

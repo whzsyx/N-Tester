@@ -79,7 +79,7 @@ const get_app_menu = async () => {
     const res: any = await app_menu({});
     tree_data.value = res.data;
   } catch {
-    NoticeError("数据查询失败，请刷新重试🌻");
+    NoticeError("数据查询失败，请刷新重试");
   } finally {
     loading.value = false;
   }
@@ -105,7 +105,7 @@ const app_menu_click = async (node: any) => {
       }
     }
   } catch {
-    NoticeError("数据查询失败，请刷新重试🌻");
+    NoticeError("数据查询失败，请刷新重试");
   } finally {
     loading.value = false;
   }

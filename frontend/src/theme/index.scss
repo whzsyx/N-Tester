@@ -1,3 +1,4 @@
+@import './common/surface-tokens.scss';
 @import './app.scss';
 @import 'common/transition.scss';
 @import 'common/default.scss';
@@ -10,3 +11,4 @@
 @import "./splitpanes.scss";
 @import "./iconfont/iconfont.css";
 @import "./N-Tester/case.scss";
+/* 按需引入的共享模块见 theme/modules/，例如：@import '@/theme/modules/web-run-monitor.scss'; */

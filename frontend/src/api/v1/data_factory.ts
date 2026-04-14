@@ -3,7 +3,7 @@
  */
 import request from '/@/utils/request';
 
-// ========== 数据工厂工具相关接口 ==========
+
 
 /**
  * 获取工具分类和工具列表
@@ -52,7 +52,6 @@ export function batchGenerate(data: {
 	});
 }
 
-// ========== 工具使用记录相关接口 ==========
 
 /**
  * 获取工具使用记录列表
@@ -101,7 +100,7 @@ export function batchDeleteRecords(ids: number[]) {
 	});
 }
 
-// ========== 统计相关接口 ==========
+
 
 /**
  * 获取使用统计
@@ -123,7 +122,7 @@ export function getTagList() {
 	});
 }
 
-// ========== 工具相关类型定义 ==========
+
 
 /**
  * 工具分类

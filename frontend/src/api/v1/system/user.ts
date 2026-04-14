@@ -15,7 +15,7 @@ export function useUserApi() {
       status?: number;
       dept_id?: number;
     }) => {
-      // 转换参数：pageSize -> page_size
+      // 转换参数
       const transformedParams = {
         ...params,
         page_size: params?.page_size || params?.pageSize || 10,
@@ -68,7 +68,7 @@ export function useUserApi() {
     
     // 批量删除用户
     batchDelete: (ids: number[]) => {
-      // 将数组转为多个ids参数：ids=1&ids=2&ids=3
+      // 将数组转为多个ids参数
       const idsParam = ids.map(id => `ids=${id}`).join('&');
       return request({
         url: `/v1/system/user?${idsParam}`,
@@ -80,7 +80,7 @@ export function useUserApi() {
     resetPassword: (id: number, data: { new_password: string }) => {
       return request({
         url: `/v1/system/user/${id}/reset-password`,
-        method: 'PUT',  // 改为PUT方法
+        method: 'PUT',  
         data,
       });
     },
@@ -92,7 +92,7 @@ export function useUserApi() {
       confirm_password: string;
     }) => {
       return request({
-        url: '/v1/system/user/password',  // 使用新的路由，不需要user_id
+        url: '/v1/system/user/password',  
         method: 'PUT',
         data,
       });
@@ -160,7 +160,7 @@ export function useUserApi() {
     // API：删除
     deleted: (data?: any) => {
       if (data?.id) {
-        // 使用多个ids参数的方式，FastAPI可以正确解析
+        // 使用多个ids参数的方式
         return request({
           url: `/v1/system/user?ids=${data.id}`,
           method: 'DELETE',
@@ -183,8 +183,7 @@ export function useUserApi() {
       throw new Error('缺少用户ID');
     },
     
-    // API：用户修改密码（使用changePassword代替）
-    // resetPassword 已被标准方法占用，应使用 changePassword
+    
     
     // API：更新头像
     updateUserAvatar: (data?: any) => {
@@ -222,7 +221,7 @@ export function useUserApi() {
       });
     },
     
-    // API：登录（映射到auth API）
+    // API：登录
     signIn: (data: { username: string; password: string; captcha?: string }) => {
       return request({
         url: '/v1/system/auth/login',
@@ -231,7 +230,7 @@ export function useUserApi() {
       });
     },
     
-    // API：登出（映射到auth API）
+    // API：登出
     signOut: () => {
       return request({
         url: '/v1/system/auth/logout',
@@ -239,7 +238,7 @@ export function useUserApi() {
       });
     },
     
-    // API：登录（另一个名称）
+    // API：登录
     login: (data: { username: string; password: string; captcha?: string }) => {
       return request({
         url: '/v1/system/auth/login',
@@ -248,7 +247,7 @@ export function useUserApi() {
       });
     },
     
-    // API：登出（另一个名称）
+    // API：登出
     logout: () => {
       return request({
         url: '/v1/system/auth/logout',

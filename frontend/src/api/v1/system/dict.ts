@@ -4,7 +4,7 @@ import request from '/@/utils/request';
  * 字典管理API
  */
 
-// ==================== 字典类型 ====================
+
 
 export function useDictTypeApi() {
   return {
@@ -88,7 +88,7 @@ export function useDictTypeApi() {
   };
 }
 
-// ==================== 字典数据 ====================
+
 
 export function useDictDataApi() {
   return {

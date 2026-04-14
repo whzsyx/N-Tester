@@ -289,7 +289,7 @@ import { onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus';
 import { DocumentCopy, Monitor } from '@element-plus/icons-vue';
 import { Session } from '/@/utils/storage';
-import { logLineClass, parseLogLineForDisplay } from '../../web_view/webRunMonitorLog';
+import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog';
 import ApiDetail from './api_detail.vue';
 import {
 	api_tree_list,
@@ -705,5 +705,5 @@ onMounted(async () => {
 </style>
 
 <style lang="scss">
-@import '../../web_view/web-run-monitor.scss';
+@import '@/theme/modules/web-run-monitor.scss';
 </style>

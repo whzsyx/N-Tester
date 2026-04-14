@@ -1424,7 +1424,7 @@ import {
 import KoiDialog from '/@/components/koi/KoiDialog.vue'
 import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue'
 import { useWebManagementApi } from '/@/api/v1/web_management'
-import { logLineClass, parseLogLineForDisplay } from './webRunMonitorLog'
+import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
 
 const {
   web_menu,
@@ -2549,8 +2549,6 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-@import './web-run-monitor.scss';
-
 .wa-tree-icon {
   margin-right: 6px;
   vertical-align: middle;
@@ -2979,5 +2977,9 @@ onMounted(async () => {
     flex-direction: column;
   }
 }
+</style>
+
+<style lang="scss">
+@import '@/theme/modules/web-run-monitor.scss';
 </style>
 

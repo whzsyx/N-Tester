@@ -16,6 +16,33 @@ from app.corelibs.logger import logger
 
 from .service import AppManagementService
 from .model import AppResultModel
+from .device_service import AppDeviceCenterService
+from .device_schema import (
+    PhoneAddBody,
+    PhoneIdBody,
+    PhoneListBody,
+    PhoneSortBody,
+    PhoneUpdateBody,
+    ServerAddBody,
+    ServerIdBody,
+    ServerListBody,
+    ServerSortBody,
+    ServerUpdateBody,
+)
+from .page_schema import (
+    ElementAddBody,
+    ElementIdBody,
+    ElementImportBody,
+    ElementListBody,
+    ElementSortBody,
+    ElementUpdateBody,
+    PageAddBody,
+    PageIdBody,
+    PageListBody,
+    PageSortBody,
+    PageUpdateBody,
+)
+from .page_service import AppPageService
 
 router = APIRouter()
 
@@ -646,5 +673,480 @@ async def get_process_status(
 
         data = await AppManagementService.get_process_status(db, str(body.get("result_id") or ""), current_user_id)
         return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+# ----- APP 设备中心（Appium 服务器 / 运行终端，对齐 ntest 设备模块） -----
+
+
+@router.post("/device/server/list")
+async def device_server_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ServerListBody.model_validate(body or {})
+        srv_os = form.os or form.server_os
+        total, rows = await AppDeviceCenterService.server_list(
+            db,
+            current_user_id,
+            form.currentPage,
+            form.pageSize,
+            form.name,
+            srv_os,
+            form.ip,
+            form.port,
+        )
+        return success_response({"total": total, "data": rows}, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/detail")
+async def device_server_detail(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        sid = ServerIdBody.model_validate(body or {}).id
+        row = await AppDeviceCenterService.server_get(db, current_user_id, sid)
+        return success_response(
+            {
+                "id": row.id,
+                "name": row.name,
+                "num": row.num,
+                "os": row.server_os,
+                "server_os": row.server_os,
+                "ip": row.ip,
+                "port": row.port,
+                "appium_version": row.appium_version,
+                "status": row.status,
+            },
+            message="请求成功",
+        )
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/add")
+async def device_server_add(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ServerAddBody.model_validate(body or {})
+        await AppDeviceCenterService.server_add(
+            db, current_user_id, [x.model_dump() for x in form.data_list]
+        )
+        return success_response({}, message="新增成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/update")
+async def device_server_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ServerUpdateBody.model_validate(body or {})
+        await AppDeviceCenterService.server_update(
+            db, current_user_id, form.id, form.model_dump(exclude={"id"})
+        )
+        return success_response({}, message="更新成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/delete")
+async def device_server_delete(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        sid = ServerIdBody.model_validate(body or {}).id
+        await AppDeviceCenterService.server_delete(db, current_user_id, sid)
+        return success_response({}, message="删除成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/copy")
+async def device_server_copy(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        sid = ServerIdBody.model_validate(body or {}).id
+        data = await AppDeviceCenterService.server_copy(db, current_user_id, sid)
+        return success_response(data, message="复制成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/sort")
+async def device_server_sort(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ServerSortBody.model_validate(body or {})
+        await AppDeviceCenterService.server_sort(db, current_user_id, form.id_list)
+        return success_response({}, message="排序已保存")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/server/run")
+async def device_server_run(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        sid = ServerIdBody.model_validate(body or {}).id
+        msg = await AppDeviceCenterService.server_run_check(db, current_user_id, sid)
+        return success_response({}, message=msg)
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/list")
+async def device_phone_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PhoneListBody.model_validate(body or {})
+        ph_os = form.os or form.phone_os
+        total, rows = await AppDeviceCenterService.phone_list(
+            db,
+            current_user_id,
+            form.currentPage,
+            form.pageSize,
+            form.name,
+            ph_os,
+            form.os_version,
+        )
+        return success_response({"total": total, "data": rows}, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/detail")
+async def device_phone_detail(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        pid = PhoneIdBody.model_validate(body or {}).id
+        row = await AppDeviceCenterService.phone_get(db, current_user_id, pid)
+        return success_response(
+            {
+                "id": row.id,
+                "name": row.name,
+                "num": row.num,
+                "os": row.phone_os,
+                "phone_os": row.phone_os,
+                "os_version": row.os_version,
+                "device_id": row.device_id,
+                "extends": row.extends or {},
+                "screen": row.screen,
+            },
+            message="请求成功",
+        )
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/add")
+async def device_phone_add(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PhoneAddBody.model_validate(body or {})
+        await AppDeviceCenterService.phone_add(
+            db, current_user_id, [x.model_dump() for x in form.data_list]
+        )
+        return success_response({}, message="新增成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/update")
+async def device_phone_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PhoneUpdateBody.model_validate(body or {})
+        await AppDeviceCenterService.phone_update(
+            db, current_user_id, form.id, form.model_dump(exclude={"id"})
+        )
+        return success_response({}, message="更新成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/delete")
+async def device_phone_delete(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        pid = PhoneIdBody.model_validate(body or {}).id
+        await AppDeviceCenterService.phone_delete(db, current_user_id, pid)
+        return success_response({}, message="删除成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/copy")
+async def device_phone_copy(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        pid = PhoneIdBody.model_validate(body or {}).id
+        data = await AppDeviceCenterService.phone_copy(db, current_user_id, pid)
+        return success_response(data, message="复制成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/device/phone/sort")
+async def device_phone_sort(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PhoneSortBody.model_validate(body or {})
+        await AppDeviceCenterService.phone_sort(db, current_user_id, form.id_list)
+        return success_response({}, message="排序已保存")
+    except Exception as e:
+        return error_response(str(e))
+
+
+# ----- APP 页面 / 元素（对齐 ntest 页面管理） -----
+
+
+@router.post("/page/list")
+async def app_page_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PageListBody.model_validate(body or {})
+        total, rows = await AppPageService.page_list(
+            db,
+            current_user_id,
+            form.module_menu_id,
+            form.currentPage,
+            form.pageSize,
+        )
+        return success_response({"total": total, "data": rows}, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/add")
+async def app_page_add(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PageAddBody.model_validate(body or {})
+        data = await AppPageService.page_add(db, current_user_id, form.model_dump())
+        return success_response(data, message="新增成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/update")
+async def app_page_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PageUpdateBody.model_validate(body or {})
+        data = await AppPageService.page_update(db, current_user_id, form.model_dump())
+        return success_response(data, message="保存成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/delete")
+async def app_page_delete(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        pid = PageIdBody.model_validate(body or {}).id
+        await AppPageService.page_delete(db, current_user_id, pid)
+        return success_response({}, message="删除成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/sort")
+async def app_page_sort(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = PageSortBody.model_validate(body or {})
+        await AppPageService.page_sort(db, current_user_id, form.id_list)
+        return success_response({}, message="排序已保存")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/copy")
+async def app_page_copy(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        pid = PageIdBody.model_validate(body or {}).id
+        data = await AppPageService.page_copy(db, current_user_id, pid)
+        return success_response(data, message="复制成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/list")
+async def app_page_element_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        page_id = ElementListBody.model_validate(body or {}).page_id
+        rows = await AppPageService.element_list(db, current_user_id, page_id)
+        return success_response(rows, message="请求成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/add")
+async def app_page_element_add(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ElementAddBody.model_validate(body or {})
+        data = await AppPageService.element_add(db, current_user_id, form.model_dump())
+        return success_response(data, message="新增成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/update")
+async def app_page_element_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ElementUpdateBody.model_validate(body or {})
+        data = await AppPageService.element_update(db, current_user_id, form.model_dump())
+        return success_response(data, message="保存成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/delete")
+async def app_page_element_delete(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        eid = ElementIdBody.model_validate(body or {}).id
+        await AppPageService.element_delete(db, current_user_id, eid)
+        return success_response({}, message="删除成功")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/sort")
+async def app_page_element_sort(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ElementSortBody.model_validate(body or {})
+        await AppPageService.element_sort(db, current_user_id, form.id_list)
+        return success_response({}, message="排序已保存")
+    except Exception as e:
+        return error_response(str(e))
+
+
+@router.post("/page/element/import")
+async def app_page_element_import(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        body = await body_to_json(request)
+        form = ElementImportBody.model_validate(body or {})
+        n = await AppPageService.element_import_bulk(
+            db,
+            current_user_id,
+            form.page_id,
+            [e.model_dump() for e in form.elements],
+        )
+        return success_response({"imported": n}, message=f"已导入 {n} 条元素")
     except Exception as e:
         return error_response(str(e))

@@ -78,3 +78,36 @@ export const generateColorByContent = (str: string) => {
 	const h = rng.genrand_int32() % 360
 	return 'hsla(' + h + ', 50%, 50%, 1)'
 }
+
+/** 从 axios 成功回调结果中解析分页列表（兼容 data / items / rows / content 及一层嵌套） */
+function pickPageRows(obj: any, depth = 0): any[] {
+	if (!obj || typeof obj !== 'object' || depth > 2) return [];
+	if (Array.isArray(obj)) return obj;
+	for (const key of ['data', 'items', 'rows', 'content'] as const) {
+		const v = obj[key];
+		if (Array.isArray(v)) return v;
+	}
+	if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+		return pickPageRows(obj.data, depth + 1);
+	}
+	return [];
+}
+
+function pickPageTotal(obj: any, listLen: number, depth = 0): number {
+	if (!obj || typeof obj !== 'object' || depth > 2) return listLen;
+	const t = obj.total ?? obj.rowTotal ?? (obj as any).row_total;
+	if (t !== undefined && t !== null && String(t) !== '' && Number.isFinite(Number(t))) {
+		return Number(t);
+	}
+	if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+		return pickPageTotal(obj.data, listLen, depth + 1);
+	}
+	return listLen;
+}
+
+export function parseListPagePayload(res: any): { list: any[]; total: number } {
+	const payload = res?.data ?? res;
+	const list = pickPageRows(payload);
+	const total = pickPageTotal(payload, list.length);
+	return { list, total };
+}

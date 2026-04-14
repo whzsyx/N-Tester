@@ -439,7 +439,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentCopy, Monitor } from '@element-plus/icons-vue'
 import KoiDialog from '/@/components/koi/KoiDialog.vue'
-import { logLineClass, parseLogLineForDisplay } from './webRunMonitorLog'
+import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
 import { useWebManagementApi } from '/@/api/v1/web_management'
 import commonFunction from '/@/utils/commonFunction'
 import { formatDateTime } from '/@/utils/formatTime'
@@ -805,6 +805,9 @@ onMounted(() => {
   height: 28px;
 }
 
-@import './web-run-monitor.scss';
+</style>
+
+<style lang="scss">
+@import '@/theme/modules/web-run-monitor.scss';
 </style>
 

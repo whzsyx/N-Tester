@@ -144,6 +144,13 @@ async def websocket_chat(
                                 knowledge_base_id=data.get("knowledge_base_id"),
                                 use_mcp=bool(data.get("use_mcp", False)),
                                 mcp_config_id=data.get("mcp_config_id"),
+                                use_skill=bool(data.get("use_skill", False)),
+                                skill_id=data.get("skill_id"),
+                                tool_mode=data.get("tool_mode", "smart"),
+                                tool_provider=data.get("tool_provider"),
+                                tool_name=data.get("tool_name"),
+                                tool_arguments=data.get("tool_arguments"),
+                                tool_session_id=data.get("tool_session_id"),
                             )
                             
                             # 调用流式消息服务

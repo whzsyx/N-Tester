@@ -3,7 +3,7 @@
  */
 import request from '/@/utils/request';
 
-// ========== AI助手配置相关接口 ==========
+
 
 /**
  * 获取助手配置列表
@@ -72,7 +72,7 @@ export function deleteConfig(id: number) {
 	});
 }
 
-// ========== 对话相关接口 ==========
+
 
 /**
  * 获取对话列表
@@ -136,7 +136,7 @@ export function deleteConversation(id: number) {
 	});
 }
 
-// ========== 消息相关接口 ==========
+
 
 /**
  * 获取对话消息列表
@@ -153,7 +153,7 @@ export function getMessageList(conversationId: number, params?: {
 }
 
 /**
- * 获取对话消息列表 (别名函数，保持兼容性)
+ * 获取对话消息列表
  */
 export function getConversationMessages(conversationId: number, params?: {
 	page?: number;
@@ -191,7 +191,7 @@ export function chatWithDify(data: {
 	});
 }
 
-// ========== 统计相关接口 ==========
+
 
 /**
  * 获取助手统计信息
@@ -203,7 +203,7 @@ export function getStatistics() {
 	});
 }
 
-// ========== 类型定义 ==========
+
 
 /**
  * 助手类型

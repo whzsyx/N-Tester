@@ -308,8 +308,91 @@ async def mcp_call_tool(project_id: int, user_id: int, config_id: int, db: Async
         return success_response(data={"result": result}, message="调用成功")
     except Exception as e:
         return error_response(message=f"调用失败: {e}")
-    except Exception as e:
-        return success_response(data={"ok": False, "reachable": False, "error": str(e)}, message="连接失败")
+
+
+# ---------- Skill 管理（兼容转发到独立模块） ----------
+
+
+async def list_skills(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    search: str = "",
+    scenario_category: str = "",
+    is_active: Optional[bool] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.list_skills(project_id, user_id, db, search, scenario_category, is_active, page, page_size)
+
+
+async def create_skill(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.create_skill(project_id, user_id, db, data)
+
+
+async def update_skill(project_id: int, user_id: int, skill_id: int, db: AsyncSession, data: dict) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.update_skill(project_id, user_id, skill_id, db, data)
+
+
+async def delete_skill(project_id: int, user_id: int, skill_id: int, db: AsyncSession) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.delete_skill(project_id, user_id, skill_id, db)
+
+
+async def import_skill_from_git(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.import_skill_from_git(project_id, user_id, db, data)
+
+
+async def import_skill_from_upload(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    file: UploadFile,
+    scenario_category: Optional[str] = None,
+    entry_command: Optional[str] = None,
+) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.import_skill_from_upload(project_id, user_id, db, file, scenario_category, entry_command)
+
+
+async def get_skill_content(project_id: int, user_id: int, skill_id: int, db: AsyncSession) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.get_skill_content(project_id, user_id, skill_id, db)
+
+
+async def run_skill_tool(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    *,
+    skill_ref: str,
+    arguments: Optional[dict] = None,
+    session_id: Optional[str] = None,
+) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.run_skill_tool(
+        project_id=project_id,
+        user_id=user_id,
+        db=db,
+        skill_ref=skill_ref,
+        arguments=arguments,
+        session_id=session_id,
+    )
+
+
+async def execute_skill(
+    project_id: int,
+    user_id: int,
+    skill_id: int,
+    db: AsyncSession,
+    data: dict,
+) -> dict:
+    from app.api.v1.skills import service as skill_service
+    return await skill_service.execute_skill(project_id, user_id, skill_id, db, data)
 
 
 # ---------- API 密钥 ----------

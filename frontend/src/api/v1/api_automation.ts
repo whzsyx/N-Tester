@@ -134,8 +134,6 @@ export function useApiAutomationApi() {
     gitlab_ci_notice: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/gitlab_ci_notice', data),
   };
 }
-
-// 兼容旧用法：逐步迁移页面 import 后可移除
 export const apiAutomationApi = useApiAutomationApi();
 export const {
   api_project,

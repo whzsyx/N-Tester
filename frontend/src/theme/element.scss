@@ -73,7 +73,8 @@
 .el-message {
   min-width: unset !important;
   padding: 15px !important;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.02);
+  border-radius: var(--app-radius-sm);
+  box-shadow: var(--app-shadow-elevated);
 }
 
 /* NavMenu 导航菜单

@@ -14,7 +14,7 @@ export function useRoleApi() {
       role_code?: string;
       status?: number;
     }) => {
-      // 转换参数：pageSize -> page_size
+      // 转换参数
       const transformedParams = {
         ...params,
         page_size: params?.page_size || params?.pageSize || 10,

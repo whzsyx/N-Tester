@@ -5,9 +5,9 @@ import request from '/@/utils/request';
  */
 export function useWebManagementApi() {
   return {
-    // -------------------- 元素菜单 & 元素管理 --------------------
+    
 
-    // 获取元素菜单树（only_menu=true：目录树；false：包含叶子元素）
+    // 获取元素菜单树
     element_tree: (data: any) => {
       return request({
         url: '/v1/web_management/web_element/element_tree',
@@ -79,7 +79,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 获取元素选择树（脚本编辑时选择元素）
+    // 获取元素选择树
     get_element_select: (data: any) => {
       return request({
         url: '/v1/web_management/web_element/get_element_select',
@@ -88,7 +88,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // -------------------- Web 脚本 & 菜单 --------------------
+  
 
     // 获取 Web 脚本菜单树
     web_menu: (data: any) => {
@@ -153,7 +153,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 导入元素脚本（从文件生成脚本）
+    // 导入元素脚本
     input_element: (data: any) => {
       return request({
         url: '/v1/web_management/web/input_element',
@@ -207,7 +207,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 获取全部 Web 脚本集（选择器）
+    // 获取全部 Web 脚本集
     web_group_select: (data: any) => {
       return request({
         url: '/v1/web_management/web/web_group_select',
@@ -225,7 +225,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // -------------------- Web 执行 & 结果 --------------------
+    
 
     // 执行 Web 脚本
     run_web_script: (data: any) => {
@@ -245,7 +245,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 停止一次 Web 执行（按 result_id 停止并更新状态）
+    // 停止一次 Web 执行
     stop_web_result: (data: any) => {
       return request({
         url: '/v1/web_management/web/stop_web_result',
@@ -254,7 +254,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 删除一次 Web 执行记录（按 result_id，必要时先停止进程）
+    // 删除一次 Web 执行记录
     del_web_result: (data: any) => {
       return request({
         url: '/v1/web_management/web/del_web_result',
@@ -272,7 +272,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 获取执行日志（按浏览器）
+    // 获取执行日志
     get_web_result_log: (data: any) => {
       return request({
         url: '/v1/web_management/web/get_web_result_log',
@@ -281,7 +281,7 @@ export function useWebManagementApi() {
       });
     },
 
-    // 获取 Web 结果列表（任务历史）
+    // 获取 Web 结果列表
     get_web_result_list: (data: any) => {
       return request({
         url: '/v1/web_management/web/get_web_result_list',

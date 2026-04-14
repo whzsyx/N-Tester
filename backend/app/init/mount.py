@@ -22,3 +22,8 @@ def init_mount(app: FastAPI):
     media_abs = os.path.join(static_abs, "media")
     os.makedirs(media_abs, exist_ok=True)
     app.mount("/media", StaticFiles(directory=media_abs), name="media")
+
+    # 挂载 uploads（用于 Skill runtime 截图/产物直链访问）
+    uploads_abs = os.path.join(backend_root, "uploads")
+    os.makedirs(uploads_abs, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_abs), name="uploads")

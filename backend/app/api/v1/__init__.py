@@ -10,6 +10,7 @@ from app.api.v1.oauth.controller import router as oauth_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.ai_intelligence.controller import router as ai_intelligence_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.skills import router as skills_router
 from app.api.v1.testcases.controller import router as testcases_router
 from app.api.v1.api_testing.controller import router as api_testing_router
 from app.api.v1.ui_automation.controller import router as ui_automation_router
@@ -36,6 +37,7 @@ router.include_router(oauth_router)
 router.include_router(ai_router, prefix="/ai", tags=["AI管理"])
 router.include_router(ai_intelligence_router, prefix="/ai_intelligence", tags=["AI智能化"])
 router.include_router(projects_router, prefix="/projects", tags=["项目管理"])
+router.include_router(skills_router, tags=["Skill管理"])
 router.include_router(testcases_router, tags=["测试用例管理"])
 router.include_router(api_testing_router, tags=["API测试"])
 router.include_router(ui_automation_router, prefix="/ui_automation", tags=["UI自动化"])
@@ -49,6 +51,6 @@ router.include_router(api_automation_router, prefix="/api_automation", tags=["�
 router.include_router(web_management_router, prefix="/web_management", tags=["Web管理模块"])
 router.include_router(app_management_router, prefix="/app_management", tags=["APP管理"])
 router.include_router(task_scheduler_router, prefix="/task_scheduler", tags=["定时任务调度"])
-router.include_router(app_mitmproxy_router, prefix="/mitmproxy", tags=["APP抓包( mitmproxy )"])
+router.include_router(app_mitmproxy_router, prefix="/mitmproxy", tags=["APP抓包"])
 
 __all__ = ["router"]

@@ -5,7 +5,7 @@ import request from '/@/utils/request';
  */
 export function useProjectApi() {
   return {
-    // ========== 项目管理 ==========
+   
     
     // 获取项目列表
     getList: (params?: {
@@ -63,7 +63,7 @@ export function useProjectApi() {
       });
     },
     
-    // ========== 项目成员管理 ==========
+
     
     // 获取项目成员列表
     getMemberList: (projectId: number) => {
@@ -104,7 +104,7 @@ export function useProjectApi() {
       });
     },
     
-    // ========== 项目环境管理 ==========
+ 
     
     // 获取项目环境列表
     getEnvironmentList: (projectId: number) => {

@@ -1,6 +1,6 @@
 import request from '/@/utils/request';
 
-/** 与旧版 cloud_device 接口路径一致，供兼容引用 */
+/** 云设备 */
 export function useCloudDeviceCompatApi() {
   return {
     get_device_list: (data: any) =>

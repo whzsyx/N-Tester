@@ -279,7 +279,7 @@ export function useNotificationSendApi() {
   }
 }
 
-// 兼容旧用法：逐步迁移页面 import 后可移除
+// import 后可移除
 export const notificationConfigApi = useNotificationConfigApi()
 export const notificationHistoryApi = useNotificationHistoryApi()
 export const taskNotificationApi = useTaskNotificationApi()

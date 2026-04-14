@@ -36,6 +36,24 @@ export function useAppManagementApi() {
     send_app_warn: (data: any) => postAppManagement('/v1/app_management/send_app_warn', data),
     del_app_result: (data: { result_id: string }) =>
       postAppManagement('/v1/app_management/del_app_result', data),
+
+    /** APP 页面管理 */
+    pageList: (data: object) => postAppManagement('/v1/app_management/page/list', data),
+    pageAdd: (data: object) => postAppManagement('/v1/app_management/page/add', data),
+    pageUpdate: (data: object) => postAppManagement('/v1/app_management/page/update', data),
+    pageDelete: (data: { id: number }) => postAppManagement('/v1/app_management/page/delete', data),
+    pageSort: (data: { id_list: number[] }) => postAppManagement('/v1/app_management/page/sort', data),
+    pageCopy: (data: { id: number }) => postAppManagement('/v1/app_management/page/copy', data),
+    pageElementList: (data: { page_id: number }) =>
+      postAppManagement('/v1/app_management/page/element/list', data),
+    pageElementAdd: (data: object) => postAppManagement('/v1/app_management/page/element/add', data),
+    pageElementUpdate: (data: object) => postAppManagement('/v1/app_management/page/element/update', data),
+    pageElementDelete: (data: { id: number }) =>
+      postAppManagement('/v1/app_management/page/element/delete', data),
+    pageElementSort: (data: { id_list: number[] }) =>
+      postAppManagement('/v1/app_management/page/element/sort', data),
+    pageElementImport: (data: { page_id: number; elements: object[] }) =>
+      postAppManagement('/v1/app_management/page/element/import', data),
   };
 }
 

@@ -22,6 +22,7 @@ from .model import (
     AppResultListModel,
     AppResultModel,
     AppAirtestImageModel,
+    AppUiElementModel,
 )
 from .airtest_runner import run_airtest_script_process
 from .executor import run_appium_process
@@ -30,7 +31,7 @@ from .executor import run_appium_process
 class AppManagementService:
     """APP管理服务"""
 
-    # 用于 pid_status 快速定位（单进程内有效；最终应替换为可持久化/可分布式的执行器）
+    
     _pid_index: Dict[int, Dict[str, str]] = {}
     _proc_index: Dict[int, multiprocessing.Process] = {}
 
@@ -70,11 +71,54 @@ class AppManagementService:
         except Exception:
             pass
         return str(os.getenv("APP_TEMPLATE_ROOT") or "backend")
+
+    @staticmethod
+    async def _resolve_ntest_appium_session(
+        db: AsyncSession,
+        user_id: int,
+        server_id: Any,
+        phone_id: Any,
+        package: str,
+        app_activity: str,
+    ) -> Optional[Dict[str, Any]]:
+       
+        if server_id is None or phone_id is None:
+            return None
+        try:
+            sid = int(server_id)
+            pid = int(phone_id)
+        except (TypeError, ValueError):
+            return None
+        from .device_service import AppDeviceCenterService
+
+        try:
+            srv = await AppDeviceCenterService.server_get(db, user_id, sid)
+            phone = await AppDeviceCenterService.phone_get(db, user_id, pid)
+        except ValueError:
+            return None
+        act = (app_activity or "").strip() or ".MainActivity"
+        full = AppDeviceCenterService.build_appium_capabilities(
+            server_ip=srv.ip,
+            server_port=str(srv.port),
+            appium_version=srv.appium_version or "2.x",
+            phone_os=phone.phone_os or "Android",
+            os_version=phone.os_version or "",
+            device_id=phone.device_id,
+            app_package=package or "",
+            app_activity=act,
+            no_reset=True,
+            command_timeout=3600,
+        )
+        remote = AppDeviceCenterService.ntest_remote_url(
+            full["host"], str(full["port"]), full.get("remote_path")
+        )
+        caps = AppDeviceCenterService.session_capabilities_only(full)
+        return {"remote_url": remote, "capabilities": caps, "udid": phone.device_id}
     
     @staticmethod
     async def get_app_menu(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
         """获取APP脚本菜单树"""
-        # 若该用户尚未创建根目录，则自动补一条 type=0 的根节点记录。
+ 
         root_row = (
             await db.execute(
                 select(AppMenuModel).where(
@@ -119,7 +163,7 @@ class AppManagementService:
     @staticmethod
     async def recover_root_menu(db: AsyncSession, user_id: int) -> Dict[str, Any]:
         """恢复被软删除的根目录"""
-        # 查找被软删除的根目录
+     
         soft_deleted_root = (
             await db.execute(
                 select(AppMenuModel).where(
@@ -285,6 +329,25 @@ class AppManagementService:
         for raw in steps or []:
             item = dict(raw)
             try:
+                eid = item.get("element_id")
+                if eid is not None and str(eid).strip() != "":
+                    er = (
+                        await db.execute(
+                            select(AppUiElementModel).where(
+                                AppUiElementModel.id == int(eid),
+                                AppUiElementModel.user_id == user_id,
+                                AppUiElementModel.enabled_flag == 1,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if er:
+                        android = dict(item.get("android") or {})
+                        android["locate_type"] = er.locate_type
+                        android["locate_value"] = er.locate_value
+                        item["android"] = android
+            except (TypeError, ValueError):
+                pass
+            try:
                 t = int(item.get("type") if item.get("type") is not None else -999)
             except (TypeError, ValueError):
                 t = -999
@@ -311,14 +374,6 @@ class AppManagementService:
         version = str(script_config.get("version") or "")
         channel_id = str(script_config.get("channel_id") or "")
 
-        # 标记设备使用中
-        for d in device_list:
-            deviceid = d.get("deviceid")
-            if deviceid:
-                await db.execute(
-                    update(AppDevice).where(AppDevice.device_id == deviceid, AppDevice.user_id == user_id).values(device_status=2)
-                )
-
         # 读取脚本步骤（数据库存储）
         script_row = (
             await db.execute(
@@ -338,33 +393,57 @@ class AppManagementService:
         device_store: List[Dict[str, Any]] = []
         for d in device_list:
             deviceid = str(d.get("deviceid") or "")
-            if not deviceid:
+            ntest_ctx = None
+            if AppManagementService._use_appium_executor():
+                ntest_ctx = await AppManagementService._resolve_ntest_appium_session(
+                    db,
+                    user_id,
+                    d.get("server_id") or script_config.get("server_id"),
+                    d.get("phone_id") or script_config.get("phone_id"),
+                    str(d.get("package") or script_config.get("package") or ""),
+                    str(d.get("app_activity") or script_config.get("app_activity") or ""),
+                )
+            exec_id = (ntest_ctx or {}).get("udid") or deviceid
+            if not exec_id:
                 continue
+            await db.execute(
+                update(AppDevice)
+                .where(AppDevice.device_id == exec_id, AppDevice.user_id == user_id)
+                .values(device_status=2)
+            )
             device_name = str(d.get("name") or d.get("device_name") or "")
             pkg = str(d.get("package") or script_config.get("package") or "")
             os_type = str(d.get("os_type") or "android")
             install_path = str(d.get("path") or script_config.get("path") or "")
             appium_url = AppManagementService._appium_server_url()
             if AppManagementService._use_appium_executor():
+                appium_kw: Dict[str, Any] = {
+                    "deviceid": exec_id,
+                    "scripts": steps,
+                    "result_id": result_id,
+                    "menu_id": menu_id,
+                    "package": pkg,
+                    "user_id": int(user_id),
+                    "template_root": AppManagementService._app_template_root(),
+                    "appium_server_url": "",
+                    "ntest_remote_url": "",
+                    "ntest_capabilities": None,
+                }
+                if ntest_ctx:
+                    appium_kw["ntest_remote_url"] = ntest_ctx["remote_url"]
+                    appium_kw["ntest_capabilities"] = ntest_ctx["capabilities"]
+                else:
+                    appium_kw["appium_server_url"] = appium_url
                 p = multiprocessing.Process(
                     target=run_appium_process,
-                    kwargs={
-                        "deviceid": deviceid,
-                        "scripts": steps,
-                        "result_id": result_id,
-                        "menu_id": menu_id,
-                        "appium_server_url": appium_url,
-                        "package": pkg,
-                        "user_id": int(user_id),
-                        "template_root": AppManagementService._app_template_root(),
-                    },
+                    kwargs=appium_kw,
                     daemon=True,
                 )
             else:
                 p = multiprocessing.Process(
                     target=run_airtest_script_process,
                     kwargs={
-                        "deviceid": deviceid,
+                        "deviceid": exec_id,
                         "script_blocks": script_blocks,
                         "result_id": result_id,
                         "user_id": int(user_id),
@@ -378,10 +457,10 @@ class AppManagementService:
                     daemon=True,
                 )
             p.start()
-            pid_list.append({"deviceid": deviceid, "pid": int(p.pid), "name": device_name})
+            pid_list.append({"deviceid": exec_id, "pid": int(p.pid), "name": device_name})
             script_status.append(
                 {
-                    "device": deviceid,
+                    "device": exec_id,
                     "pid": int(p.pid),
                     "percent": 0,
                     "passed": 0,
@@ -393,14 +472,14 @@ class AppManagementService:
             )
             device_store.append(
                 {
-                    "deviceid": deviceid,
+                    "deviceid": exec_id,
                     "pid": int(p.pid),
                     "name": device_name,
                     "notify": 0,
                     "notice_time": 0,
                 }
             )
-            AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": deviceid}
+            AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": exec_id}
             AppManagementService._proc_index[int(p.pid)] = p
 
         # 写入汇总记录
@@ -460,14 +539,25 @@ class AppManagementService:
 
         for d in (device_list or []):
             deviceid = str(d.get("deviceid") or "")
-            if not deviceid:
+            ntest_ctx = None
+            if AppManagementService._use_appium_executor():
+                ntest_ctx = await AppManagementService._resolve_ntest_appium_session(
+                    db,
+                    user_id,
+                    d.get("server_id") or ro.get("server_id"),
+                    d.get("phone_id") or ro.get("phone_id"),
+                    str(d.get("package") or ro.get("package") or ""),
+                    str(d.get("app_activity") or ro.get("app_activity") or ""),
+                )
+            exec_id = (ntest_ctx or {}).get("udid") or deviceid
+            if not exec_id:
                 continue
             device_name = str(d.get("name") or d.get("device_name") or "")
             device_package = str(d.get("package") or "")
             os_type = str(d.get("os_type") or "android")
             install_path = str(d.get("path") or "")
             await db.execute(
-                update(AppDevice).where(AppDevice.device_id == deviceid, AppDevice.user_id == user_id).values(device_status=2)
+                update(AppDevice).where(AppDevice.device_id == exec_id, AppDevice.user_id == user_id).values(device_status=2)
             )
 
             appium_url = AppManagementService._appium_server_url()
@@ -476,25 +566,33 @@ class AppManagementService:
                 merged_steps.extend(blk.get("script") or [])
             first_menu = int(script_blocks[0].get("id") or 0) if script_blocks else 0
             if AppManagementService._use_appium_executor():
+                appium_kw2: Dict[str, Any] = {
+                    "deviceid": exec_id,
+                    "scripts": merged_steps,
+                    "result_id": result_id,
+                    "menu_id": first_menu,
+                    "package": device_package,
+                    "user_id": int(user_id),
+                    "template_root": AppManagementService._app_template_root(),
+                    "appium_server_url": "",
+                    "ntest_remote_url": "",
+                    "ntest_capabilities": None,
+                }
+                if ntest_ctx:
+                    appium_kw2["ntest_remote_url"] = ntest_ctx["remote_url"]
+                    appium_kw2["ntest_capabilities"] = ntest_ctx["capabilities"]
+                else:
+                    appium_kw2["appium_server_url"] = appium_url
                 p = multiprocessing.Process(
                     target=run_appium_process,
-                    kwargs={
-                        "deviceid": deviceid,
-                        "scripts": merged_steps,
-                        "result_id": result_id,
-                        "menu_id": first_menu,
-                        "appium_server_url": appium_url,
-                        "package": device_package,
-                        "user_id": int(user_id),
-                        "template_root": AppManagementService._app_template_root(),
-                    },
+                    kwargs=appium_kw2,
                     daemon=True,
                 )
             else:
                 p = multiprocessing.Process(
                     target=run_airtest_script_process,
                     kwargs={
-                        "deviceid": deviceid,
+                        "deviceid": exec_id,
                         "script_blocks": script_blocks,
                         "result_id": result_id,
                         "user_id": int(user_id),
@@ -508,10 +606,10 @@ class AppManagementService:
                     daemon=True,
                 )
             p.start()
-            pid_list.append({"deviceid": deviceid, "pid": int(p.pid), "name": device_name})
+            pid_list.append({"deviceid": exec_id, "pid": int(p.pid), "name": device_name})
             script_status.append(
                 {
-                    "device": deviceid,
+                    "device": exec_id,
                     "name": device_name,
                     "pid": int(p.pid),
                     "percent": 0,
@@ -524,14 +622,14 @@ class AppManagementService:
             )
             device_store.append(
                 {
-                    "deviceid": deviceid,
+                    "deviceid": exec_id,
                     "pid": int(p.pid),
                     "name": device_name,
                     "notify": 0,
                     "notice_time": 0,
                 }
             )
-            AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": deviceid}
+            AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": exec_id}
             AppManagementService._proc_index[int(p.pid)] = p
 
         script_list_payload: List[Dict[str, Any]] = []
@@ -578,7 +676,7 @@ class AppManagementService:
     
     @staticmethod
     async def delete_app_menu(db: AsyncSession, menu_id: int, user_id: int) -> bool:
-        """删除APP菜单 - 硬删除（递归删除子节点）"""
+        """删除APP菜单"""
         try:
             # 检查是否为根目录
             menu_row = (

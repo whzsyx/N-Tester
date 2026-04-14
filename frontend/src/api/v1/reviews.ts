@@ -3,7 +3,7 @@
  */
 import request from '/@/utils/request';
 
-// ========== 评审相关接口 ==========
+
 
 /**
  * 获取评审列表
@@ -203,7 +203,7 @@ export function getReviewComments(reviewId: number, params?: {
 	});
 }
 
-// ========== AI评审相关接口 ==========
+
 
 /**
  * 检查AI评审功能可用性
@@ -257,7 +257,7 @@ export function getAIPreReviewSummary(reviewId: number) {
 	});
 }
 
-// ========== 评审分配相关接口 ==========
+
 
 /**
  * 分配评审人
@@ -287,7 +287,7 @@ export function submitReview(reviewId: number, data: {
 	});
 }
 
-// ========== 评审意见相关接口 ==========
+
 
 /**
  * 添加评审意见
@@ -315,7 +315,7 @@ export function resolveComment(commentId: number) {
 	});
 }
 
-// ========== 评审模板相关接口 ==========
+
 
 /**
  * 获取评审模板列表
@@ -384,7 +384,7 @@ export function deleteTemplate(id: number) {
 	});
 }
 
-// ========== 类型定义 ==========
+
 
 /**
  * 评审状态

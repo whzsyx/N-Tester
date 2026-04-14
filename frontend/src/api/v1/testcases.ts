@@ -3,7 +3,7 @@
  */
 import request from '/@/utils/request';
 
-// ========== 测试用例相关接口 ==========
+
 
 /**
  * 创建测试用例
@@ -58,7 +58,7 @@ export function deleteTestCase(id: number) {
 	});
 }
 
-// ========== 版本管理相关接口 ==========
+
 
 /**
  * 创建版本
@@ -124,7 +124,7 @@ export function associateTestCases(data: any) {
 	});
 }
 
-// ========== Excel导入导出相关接口 ==========
+
 
 /**
  * 从Excel导入测试用例

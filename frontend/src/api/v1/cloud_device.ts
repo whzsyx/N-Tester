@@ -1,5 +1,5 @@
 /**
- * 云真机模块接口
+ * 云真机模块
  */
 import request from '/@/utils/request';
 

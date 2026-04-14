@@ -251,6 +251,6 @@ export function useTaskSchedulerApi() {
   };
 }
 
-// 兼容旧用法：逐步迁移页面 import 后可移除
+//import 后可移除
 export const taskSchedulerApi = useTaskSchedulerApi();
 

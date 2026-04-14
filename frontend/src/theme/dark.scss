@@ -1,6 +1,15 @@
 /* 深色模式样式
 ------------------------------- */
 [data-theme='dark'] {
+	/* 与 surface-tokens 配套：深色下阴影偏「内收」，避免发灰发脏 */
+	--app-shadow-content:
+		0 1px 0 rgba(255, 255, 255, 0.04),
+		0 8px 28px rgba(0, 0, 0, 0.42);
+	--app-shadow-elevated:
+		0 2px 0 rgba(255, 255, 255, 0.05),
+		0 16px 40px rgba(0, 0, 0, 0.55);
+	--app-shadow-aside: 2px 0 20px rgba(0, 0, 0, 0.35);
+
 	// 变量(自定义时，只需修改这里的值)
 	--next-bg-main: #1f1f1f;
 	--next-color-white: #ffffff;

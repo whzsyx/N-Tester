@@ -141,6 +141,15 @@ service.interceptors.response.use(
 				else if (Array.isArray(res.data)) {
 					res.data = res.data.map(mapFields);
 				}
+				// APP 设备中心等：{ total, data: [] }，只对行映射，避免整包走 mapFields 引发异常
+				else if (
+					typeof res.data === 'object' &&
+					res.data !== null &&
+					typeof (res.data as any).total === 'number' &&
+					Array.isArray((res.data as any).data)
+				) {
+					(res.data as any).data = (res.data as any).data.map(mapFields);
+				}
 				// 如果是单个对象（避免对 { content, total } 整对象 mapFields 导致 content 被误改）
 				else if (typeof res.data === 'object') {
 					res.data = mapFields(res.data);

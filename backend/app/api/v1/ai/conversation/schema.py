@@ -69,6 +69,13 @@ class SendMessageRequest(BaseModel):
     knowledge_base_id: Optional[int] = Field(None, description="知识库ID")
     use_mcp: bool = Field(False, description="是否启用MCP工具")
     mcp_config_id: Optional[int] = Field(None, description="MCP配置ID")
+    use_skill: bool = Field(False, description="是否启用Skill工具")
+    skill_id: Optional[int] = Field(None, description="Skill ID（智能模式默认工具）")
+    tool_mode: str = Field("smart", description="工具模式：smart(智能) / direct(直连)")
+    tool_provider: Optional[str] = Field(None, description="直连模式工具提供方：mcp/skill")
+    tool_name: Optional[str] = Field(None, description="直连模式工具名称")
+    tool_arguments: Optional[Dict[str, Any]] = Field(None, description="直连模式工具参数")
+    tool_session_id: Optional[str] = Field(None, description="直连模式会话ID（预留给Skill会话化执行）")
 
     @field_validator("use_knowledge_base", "use_mcp", mode="before")
     @classmethod
@@ -82,6 +89,20 @@ class SendMessageRequest(BaseModel):
         if isinstance(v, str):
             return v.strip().lower() in ("1", "true", "yes", "on")
         return bool(v)
+
+    @field_validator("tool_mode", mode="before")
+    @classmethod
+    def normalize_tool_mode(cls, v):
+        val = str(v or "smart").strip().lower()
+        return val if val in ("smart", "direct") else "smart"
+
+    @field_validator("tool_provider", mode="before")
+    @classmethod
+    def normalize_tool_provider(cls, v):
+        if v is None:
+            return None
+        val = str(v).strip().lower()
+        return val if val in ("mcp", "skill") else None
 
 
 class SendMessageResponse(BaseModel):

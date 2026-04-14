@@ -69,6 +69,104 @@ async def test_mcp(
     return await S.test_mcp_config(project_id, current_user_id, config_id, db)
 
 
+# ---------- Skill ----------
+
+
+@router.get("/{project_id}/skills", summary="Skill 列表")
+async def list_skills(
+    project_id: int,
+    search: str = Query("", description="名称搜索"),
+    scenario_category: str = Query("", description="场景分类"),
+    is_active: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.list_skills(project_id, current_user_id, db, search, scenario_category, is_active, page, page_size)
+
+
+@router.post("/{project_id}/skills", summary="创建 Skill")
+async def create_skill(
+    project_id: int,
+    data: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.create_skill(project_id, current_user_id, db, data)
+
+
+@router.put("/{project_id}/skills/{skill_id}", summary="更新 Skill")
+async def update_skill(
+    project_id: int,
+    skill_id: int,
+    data: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.update_skill(project_id, current_user_id, skill_id, db, data)
+
+
+@router.delete("/{project_id}/skills/{skill_id}", summary="删除 Skill")
+async def delete_skill(
+    project_id: int,
+    skill_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.delete_skill(project_id, current_user_id, skill_id, db)
+
+
+@router.post("/{project_id}/skills/import/git", summary="从Git仓库导入 Skill")
+async def import_skill_git(
+    project_id: int,
+    data: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.import_skill_from_git(project_id, current_user_id, db, data)
+
+
+@router.post("/{project_id}/skills/import/upload", summary="上传zip导入 Skill")
+async def import_skill_upload(
+    project_id: int,
+    file: UploadFile = File(...),
+    scenario_category: Optional[str] = Query(None, description="场景分类"),
+    entry_command: Optional[str] = Query(None, description="执行命令"),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.import_skill_from_upload(
+        project_id=project_id,
+        user_id=current_user_id,
+        db=db,
+        file=file,
+        scenario_category=scenario_category,
+        entry_command=entry_command,
+    )
+
+
+@router.get("/{project_id}/skills/{skill_id}/content", summary="读取 Skill 内容")
+async def get_skill_content(
+    project_id: int,
+    skill_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.get_skill_content(project_id, current_user_id, skill_id, db)
+
+
+@router.post("/{project_id}/skills/{skill_id}/execute", summary="执行 Skill")
+async def execute_skill(
+    project_id: int,
+    skill_id: int,
+    data: Dict[str, Any] = Body({}),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.execute_skill(project_id, current_user_id, skill_id, db, data)
+
+
 # ---------- API 密钥 ----------
 
 

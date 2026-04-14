@@ -4,8 +4,6 @@
 import request from '/@/utils/request'
 import { Session } from '/@/utils/storage'
 
-// ==================== 类型定义 ====================
-
 /**
  * 对话数据
  */
@@ -19,7 +17,7 @@ export interface ConversationData {
   creation_date: string
   updation_date: string
   message_count?: number
-  total_tokens?: number  // 总 token 数
+  total_tokens?: number  
 }
 
 /**
@@ -32,12 +30,12 @@ export interface MessageData {
   content: string
   message_type: string
   metadata?: Record<string, any>
-  meta_data?: Record<string, any>  // 兼容后端字段名
+  meta_data?: Record<string, any>  
   tokens_used?: number
   creation_date: string
-  loading?: boolean  // 是否正在加载（流式响应中）
-  collapsed?: boolean  // 是否折叠显示
-  total_tokens?: number  // 总 token 数
+  loading?: boolean  
+  collapsed?: boolean  
+  total_tokens?: number  
 }
 
 /**
@@ -135,7 +133,7 @@ export interface WSMessageRequest {
   tool_session_id?: string
 }
 
-// ==================== API 函数 ====================
+
 
 /**
  * 对话管理 API
@@ -328,7 +326,7 @@ export const useConversationApi = () => {
   }
 
   /**
-   * 发送消息（WebSocket 流式响应）- 简化版本
+   * 发送消息（WebSocket 流式响应）- 简化
    * @param conversationId 对话 ID
    * @param onMessage 消息回调
    * @param onError 错误回调
