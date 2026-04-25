@@ -4,17 +4,13 @@
       <div class="logo-section">
         <img src="/@/assets/logo.png" alt="Logo" class="logo" />
       </div>
-
-
       <div v-if="!state.error" class="callback-success">
         <div class="icon-wrapper">
           <el-icon class="loading-icon" :size="56">
             <Loading />
           </el-icon>
         </div>
-        
         <h2 class="callback-title">{{ state.message }}</h2>
-        
         <div class="progress-wrapper">
           <el-progress 
             :percentage="state.progress" 
@@ -23,23 +19,18 @@
             color="#409EFF"
           />
         </div>
-        
         <p class="callback-tips">
           <el-icon class="tips-icon"><Clock /></el-icon>
           <span>{{ state.tips }}</span>
         </p>
       </div>
-
-
       <div v-else class="callback-error">
         <div class="icon-wrapper error">
           <el-icon class="error-icon" :size="56">
             <CircleClose />
           </el-icon>
         </div>
-        
         <h2 class="callback-title error">{{ state.message }}</h2>
-        
         <div class="error-content">
           <el-alert
             :title="state.errorDetail"
@@ -48,7 +39,6 @@
             show-icon
           />
         </div>
-        
         <el-button 
           type="primary" 
           size="large"
@@ -59,8 +49,6 @@
         </el-button>
       </div>
     </div>
-
-
     <div class="footer-info">
       <p>© 2026 FastAPI N-Tester. All rights reserved.</p>
     </div>

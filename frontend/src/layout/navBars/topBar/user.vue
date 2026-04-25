@@ -20,6 +20,21 @@
       </el-button>
     </div>
 
+    <div>
+      <el-button
+          :title="themeConfig.isIsDark ? '切换浅色' : '切换深色'"
+          size="default"
+          class="layout-navbars-breadcrumb-user-icon rounded-full"
+          @click="onToggleDark($event)"
+          text
+      >
+        <el-icon class="icon-size">
+          <ele-Sunny v-if="themeConfig.isIsDark" />
+          <ele-Moon v-else />
+        </el-icon>
+      </el-button>
+    </div>
+
 
     <!--    <div class="layout-navbars-breadcrumb-user-icon rounded-full" @click="onLayoutSettingClick">-->
     <!--      <i class="iconfont icon-zhuti" title="布局配置"></i>-->
@@ -100,7 +115,12 @@
 
           <div class="avatar-box-menu-itme" @click="onMenuClick('doc')">
             <BookOpenText class="icon-size mr5"></BookOpenText>
-            文档
+            官方文档
+          </div>
+
+          <div class="avatar-box-menu-itme" @click="onMenuClick('doc-c')">
+            <BookOpenText class="icon-size mr5"></BookOpenText>
+            用户文档手册
           </div>
 
           <div class="avatar-box-menu-itme" @click="onMenuClick('GitHub')">
@@ -143,6 +163,7 @@ import mittBus from '/@/utils/mitt';
 import { Local } from '/@/utils/storage';
 import { Bell, BookOpenText, Github, LockKeyhole, LogOut, Maximize, Minimize, Settings, UserRoundPen } from "/@/icons"
 import { useMenuInfo } from "/@/stores/menu";
+import { onAddDarkChange } from '/@/layout/navBars/topBar/settings/index';
 
 defineOptions({ name: "layoutBreadcrumbUser" })
 
@@ -188,6 +209,9 @@ const onMenuClick = (command: string) => {
     case "doc":
       onDocClick()
       break
+    case "doc-c":
+      onDoccClick()
+      break
     case "logOut":
       onLogOutClick()
       break
@@ -221,6 +245,38 @@ const onScreenfullClick = () => {
 // 布局配置 icon 点击时
 const onLayoutSettingClick = () => {
   mittBus.emit('openSettingsDrawer');
+};
+// 深色模式切换
+const onToggleDark = (e: MouseEvent) => {
+  const isDark = themeConfig.value.isIsDark;
+  const nextTheme = isDark ? 'light' : 'dark';
+  if (!document.startViewTransition) {
+    onAddDarkChange(nextTheme);
+    return;
+  }
+  const transition = document.startViewTransition(() => {
+    onAddDarkChange(nextTheme);
+  });
+  transition.ready.then(() => {
+    const { clientX, clientY } = e;
+    const radius = Math.hypot(
+      Math.max(clientX, innerWidth - clientX),
+      Math.max(clientY, innerHeight - clientY)
+    );
+    document.documentElement.animate(
+      {
+        clipPath: [
+          `circle(0% at ${clientX}px ${clientY}px)`,
+          `circle(${radius}px at ${clientX}px ${clientY}px)`,
+        ],
+      },
+      {
+        duration: 500,
+        easing: 'ease-in-out',
+        pseudoElement: '::view-transition-new(root)',
+      }
+    );
+  });
 };
 // 布局配置 icon 点击时
 const onLockScreen = () => {
@@ -275,7 +331,11 @@ const onGithubClick = () => {
 }
 // doc文档
 const onDocClick = () => {
-  window.open('https://github.com/rebort-hub');
+  window.open('http://106.54.166.76/N-Tester/');
+}
+//用户文档手册
+const onDoccClick = () => {
+  window.open('https://jxhli2te5ov.feishu.cn/wiki/WXBGwHAWCi7LszkWLQxc2PkPnPg');
 }
 // 个人中心
 const onUserCenterClick = () => {
@@ -462,7 +522,20 @@ onMounted(() => {
 </style>
 
 <style lang="scss">
-// 定义晃动动画
+
+::view-transition-new(root),
+::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 9999;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+
 @keyframes shake {
   0%, 100% {
     transform-origin: top;
@@ -486,7 +559,7 @@ onMounted(() => {
 
 
 .bell-button {
-  // 晃动动画类
+  // 晃动
   &:hover {
     .shake-animation {
       transition: all 0.1s; // 添加过渡效果

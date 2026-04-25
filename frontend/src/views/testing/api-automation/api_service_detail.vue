@@ -32,6 +32,15 @@
 			<el-tab-pane label="用例管理" name="case">
 				<ApiCaseManagement :serviceId="currentServiceId" :envId="selectedEnvId" />
 			</el-tab-pane>
+			<el-tab-pane label="脚本中心" name="script">
+				<ScriptCenter :serviceId="currentServiceId" />
+			</el-tab-pane>
+			<el-tab-pane label="数据查询" name="querydb">
+				<QueryDbTab :serviceId="currentServiceId" />
+			</el-tab-pane>
+			<el-tab-pane label="精准测试" name="precision">
+				<PrecisionTestTab :serviceId="currentServiceId" />
+			</el-tab-pane>
 			<el-tab-pane label="执行结果" name="result">
 				<ApiResultList :serviceId="currentServiceId" />
 			</el-tab-pane>
@@ -112,6 +121,8 @@ import { useApiAutomationApi } from '/@/api/v1/api_automation';
 import ApiManagePanel from './ApiManagePanel.vue';
 import ApiResultList from './api_result_list.vue';
 import ApiCodegen from './api_codegen.vue';
+import ScriptCenter from './ScriptCenter.vue';
+import QueryDbTab from './QueryDbTab.vue';
 
 // api_case_management.vue will be created in task 9 - use async import with fallback
 const ApiCaseManagement = defineAsyncComponent({
@@ -123,6 +134,14 @@ const ApiCaseManagement = defineAsyncComponent({
 	timeout: 5000,
 });
 
+const PrecisionTestTab = defineAsyncComponent({
+	loader: () => import('/@/views/testing/precision-test/PrecisionTestTab.vue'),
+	errorComponent: {
+		template: '<div style="padding: 20px; color: #909399;">精准测试组件加载中，请稍后...</div>',
+	},
+	delay: 200,
+	timeout: 5000,
+});
 const props = defineProps<{
 	serviceId: number;
 	serviceName: string;
@@ -132,7 +151,7 @@ const emit = defineEmits<{
 	(e: 'back'): void;
 }>();
 
-const activeTab = ref<'manage' | 'case' | 'result' | 'codegen'>('manage');
+const activeTab = ref<'manage' | 'case' | 'script' | 'querydb' | 'precision' | 'result' | 'codegen'>('manage');
 const selectedEnvId = ref<number | null>(null);
 
 const currentServiceId = ref<number>(props.serviceId);

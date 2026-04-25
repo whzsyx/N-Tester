@@ -1,10 +1,8 @@
 <template>
 	<div class="report-page" v-loading="loading" element-loading-text="报告加载中...">
-
-		<!-- 顶部 Header -->
 		<div class="report-header">
 			<div class="report-header-brand">
-				<span class="brand-icon">></span>
+				<span class="brand-icon"></span>
 				<span class="brand-name">接口测试报告</span>
 			</div>
 			<div class="report-header-meta">
@@ -29,10 +27,7 @@
 				</span>
 			</div>
 		</div>
-
-		<!-- 汇总统计 -->
 		<div class="report-summary">
-			<!-- 环形进度 -->
 			<div class="summary-donut">
 				<el-progress
 					type="circle"
@@ -49,40 +44,36 @@
 					</template>
 				</el-progress>
 			</div>
-
-			<!-- 统计卡片 -->
 			<div class="summary-cards">
 				<div class="scard scard-total">
-					<div class="scard-icon">></div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ result_form.result?.total ?? 0 }}</div>
 						<div class="scard-label">接口总数</div>
 					</div>
 				</div>
 				<div class="scard scard-pass">
-					<div class="scard-icon">√</div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ result_form.result?.pass ?? 0 }}</div>
 						<div class="scard-label">通过</div>
 					</div>
 				</div>
 				<div class="scard scard-fail">
-					<div class="scard-icon">X</div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ result_form.result?.fail ?? 0 }}</div>
 						<div class="scard-label">失败</div>
 					</div>
 				</div>
 				<div class="scard scard-skip">
-					<div class="scard-icon">></div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ Math.max(0, (result_form.result?.total ?? 0) - (result_form.result?.pass ?? 0) - (result_form.result?.fail ?? 0)) }}</div>
 						<div class="scard-label">跳过</div>
 					</div>
 				</div>
 			</div>
-
-			<!-- 进度条 -->
 			<div class="summary-bar-wrap">
 				<div class="bar-title">执行进度</div>
 				<div class="bar-track">
@@ -95,10 +86,7 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- 主体：左侧用例列表 + 右侧详情 -->
 		<div class="report-body">
-			<!-- 左侧用例列表 -->
 			<div class="case-sidebar">
 				<div class="sidebar-header">
 					<span class="sidebar-title">用例列表</span>
@@ -128,10 +116,7 @@
 					</div>
 				</div>
 			</div>
-
-			<!-- 右侧详情 -->
 			<div class="detail-panel">
-				<!-- 当前用例信息栏 -->
 				<div class="detail-header">
 					<div class="detail-title">{{ name || '请选择用例' }}</div>
 					<div class="detail-meta">
@@ -143,10 +128,7 @@
 						<span class="dm-item fail-text"><span class="dm-label">失败</span>{{ run_fail }}</span>
 					</div>
 				</div>
-
-				<!-- 步骤 + 日志 -->
 				<div class="detail-content">
-					<!-- 步骤时间线 -->
 					<div class="steps-panel">
 						<div class="panel-title">
 							<span class="panel-title-icon">⚡</span> 执行步骤
@@ -182,8 +164,6 @@
 							<div v-if="!run_result_list.length" class="steps-empty">暂无执行步骤</div>
 						</div>
 					</div>
-
-					<!-- 执行日志 -->
 					<div class="log-panel">
 						<div class="panel-title">
 							<span class="panel-title-icon">📄</span> 执行日志
@@ -202,8 +182,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- 请求详情抽屉 -->
 		<el-drawer v-model="detail_drawer" title="请求详情" size="1100px" destroy-on-close>
 			<ApiDetail
 				v-if="(detail?.res ?? detail?.response ?? detail?.res_info) && (detail?.req ?? detail?.request ?? detail?.req_info)"
@@ -373,10 +351,8 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-/* ── 整体 ── */
-.report-page { min-height: 100vh; background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-/* ── Header ── */
+.report-page { min-height: 100vh; background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
 .report-header-brand { display: flex; align-items: center; gap: 10px; }
 .brand-icon { font-size: 22px; }
@@ -387,7 +363,7 @@ onMounted(() => {
 .meta-val { color: #fff; font-weight: 500; }
 .meta-sep { color: rgba(255,255,255,.3); }
 
-/* ── 汇总 ── */
+
 .report-summary { display: flex; align-items: center; gap: 20px; padding: 20px 24px; background: #fff; border-bottom: 1px solid #e8eaed; flex-wrap: wrap; }
 .summary-donut { flex-shrink: 0; }
 .donut-inner { display: flex; flex-direction: column; align-items: center; }
@@ -395,10 +371,10 @@ onMounted(() => {
 .donut-label { font-size: 11px; color: #909399; }
 .summary-cards { display: flex; gap: 12px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .scard { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 10px; flex: 1; min-width: 100px; }
-.scard-total { background: linear-gradient(135deg, #667eea, #764ba2); }
-.scard-pass  { background: linear-gradient(135deg, #56ab2f, #a8e063); }
-.scard-fail  { background: linear-gradient(135deg, #f7971e, #ffd200); }
-.scard-skip  { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.scard-total { background: linear-gradient(135deg, #123bf1, #764ba2); }
+.scard-pass  { background: linear-gradient(135deg, #a7b4a1, #a8e063); }
+.scard-fail  { background: linear-gradient(135deg, #f72703, #ffd200); }
+.scard-skip  { background: linear-gradient(135deg, #175286, #00f2fe); }
 .scard-icon { font-size: 24px; }
 .scard-val { font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
 .scard-label { font-size: 12px; color: rgba(255,255,255,.8); margin-top: 2px; }
@@ -411,10 +387,10 @@ onMounted(() => {
 .legend-pass { color: #52c41a; }
 .legend-fail { color: #ff4d4f; }
 
-/* ── 主体 ── */
+
 .report-body { display: flex; gap: 0; height: calc(100vh - 220px); min-height: 500px; }
 
-/* ── 左侧用例列表 ── */
+
 .case-sidebar { width: 260px; flex-shrink: 0; background: #fff; border-right: 1px solid #e8eaed; display: flex; flex-direction: column; overflow: hidden; }
 .sidebar-header { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
 .sidebar-title { font-size: 13px; font-weight: 600; color: #1a1a2e; display: block; margin-bottom: 8px; }
@@ -441,7 +417,7 @@ onMounted(() => {
 .cs-fail { color: #ff4d4f; }
 .case-arrow { font-size: 12px; color: #c0c4cc; flex-shrink: 0; }
 
-/* ── 右侧详情 ── */
+
 .detail-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .detail-header { padding: 12px 20px; background: #fff; border-bottom: 1px solid #e8eaed; flex-shrink: 0; }
 .detail-title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
@@ -452,7 +428,7 @@ onMounted(() => {
 .fail-text { color: #ff4d4f; font-weight: 600; }
 .detail-content { flex: 1; min-height: 0; display: flex; gap: 0; overflow: hidden; }
 
-/* ── 步骤面板 ── */
+
 .steps-panel { width: 380px; flex-shrink: 0; border-right: 1px solid #e8eaed; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
 .panel-title { padding: 10px 16px; font-size: 13px; font-weight: 600; color: #1a1a2e; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .panel-title-icon { font-size: 14px; }
@@ -476,7 +452,7 @@ onMounted(() => {
 .step-action { }
 .steps-empty { text-align: center; color: #c0c4cc; padding: 40px 0; font-size: 13px; }
 
-/* ── 日志面板 ── */
+
 .log-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #1e1e1e; }
 .log-body { flex: 1; overflow-y: auto; padding: 10px 14px; font-family: 'Consolas','Monaco',monospace; }
 .log-empty { color: #555; font-size: 13px; padding: 20px 0; }

@@ -1,12 +1,10 @@
 <template>
 	<div class="report-page" v-loading="loading" element-loading-text="报告加载中...">
-
-		<!-- 顶部 Header -->
 		<div class="report-header">
 			<div class="report-header-brand">
-				<span class="brand-icon">></span>
+				<span class="brand-icon"></span>
 				<span class="brand-name">UI 测试报告</span>
-				<span class="brand-sub">Web 自动化</span>
+				<span class="brand-sub">playwright自动化</span>
 			</div>
 			<div class="report-header-meta">
 				<span class="meta-item">
@@ -30,8 +28,6 @@
 				</span>
 			</div>
 		</div>
-
-		<!-- 汇总统计 -->
 		<div class="report-summary">
 			<div class="summary-donut">
 				<el-progress
@@ -49,38 +45,36 @@
 					</template>
 				</el-progress>
 			</div>
-
 			<div class="summary-cards">
 				<div class="scard scard-total">
-					<div class="scard-icon">></div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ res_form.total ?? 0 }}</div>
 						<div class="scard-label">脚本总数</div>
 					</div>
 				</div>
 				<div class="scard scard-pass">
-					<div class="scard-icon">√</div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ (res_form.total ?? 0) - (res_form.total_fail ?? 0) }}</div>
 						<div class="scard-label">通过</div>
 					</div>
 				</div>
 				<div class="scard scard-fail">
-					<div class="scard-icon">X</div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ res_form.total_fail ?? 0 }}</div>
 						<div class="scard-label">失败</div>
 					</div>
 				</div>
 				<div class="scard scard-browser">
-					<div class="scard-icon">></div>
+					<div class="scard-icon"></div>
 					<div class="scard-body">
 						<div class="scard-val">{{ browser_list.length }}</div>
 						<div class="scard-label">浏览器</div>
 					</div>
 				</div>
 			</div>
-
 			<div class="summary-bar-wrap">
 				<div class="bar-title">执行进度</div>
 				<div class="bar-track">
@@ -93,10 +87,7 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- 主体 -->
 		<div class="report-body">
-			<!-- 左侧脚本列表 -->
 			<div class="case-sidebar">
 				<div class="sidebar-header">
 					<span class="sidebar-title">脚本列表</span>
@@ -122,10 +113,7 @@
 					</div>
 				</div>
 			</div>
-
-			<!-- 右侧详情 -->
 			<div class="detail-panel">
-				<!-- 浏览器切换 Tab -->
 				<div class="browser-tabs" v-if="browser_list.length">
 					<span
 						v-for="b in browser_list"
@@ -137,8 +125,6 @@
 						{{ b.name }}
 					</span>
 				</div>
-
-				<!-- 信息栏 -->
 				<div class="detail-header">
 					<div class="detail-title">{{ script_list[selectedIndex]?.name || '请选择脚本' }}</div>
 					<div class="detail-meta">
@@ -153,10 +139,7 @@
 						</span>
 					</div>
 				</div>
-
-				<!-- 步骤 + 日志 -->
 				<div class="detail-content">
-					<!-- 步骤时间线 -->
 					<div class="steps-panel">
 						<div class="panel-title">
 							<span class="panel-title-icon">⚡</span> 执行步骤
@@ -198,8 +181,6 @@
 						</div>
 						<el-image-viewer v-if="img_show" :url-list="pre_img" @close="close_img" />
 					</div>
-
-					<!-- 日志 -->
 					<div class="log-panel">
 						<div class="panel-title">
 							<span class="panel-title-icon">📄</span> 执行日志
@@ -352,10 +333,10 @@ onMounted(() => { get_result_report(); });
 .donut-label { font-size: 11px; color: #909399; }
 .summary-cards { display: flex; gap: 12px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .scard { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 10px; flex: 1; min-width: 100px; }
-.scard-total   { background: linear-gradient(135deg, #667eea, #764ba2); }
-.scard-pass    { background: linear-gradient(135deg, #56ab2f, #a8e063); }
-.scard-fail    { background: linear-gradient(135deg, #f7971e, #ffd200); }
-.scard-browser { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.scard-total   { background: linear-gradient(135deg, #062fe7, #764ba2); }
+.scard-pass    { background: linear-gradient(135deg, #45583c, #a8e063); }
+.scard-fail    { background: linear-gradient(135deg, #ee2005, #ffd200); }
+.scard-browser { background: linear-gradient(135deg, #083257, #00f2fe); }
 .scard-icon { font-size: 24px; }
 .scard-val { font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
 .scard-label { font-size: 12px; color: rgba(255,255,255,.8); margin-top: 2px; }

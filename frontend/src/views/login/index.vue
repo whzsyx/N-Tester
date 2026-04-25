@@ -1,6 +1,7 @@
 <template>
   <div class="login-page">
     <div class="login-brand">
+      <ParticleCanvas />
       <div class="brand-logo">
         <img :src="logos.white" alt="Logo" class="brand-logo-img" />
         <span class="brand-name">N-Tester</span>
@@ -18,8 +19,6 @@
         </div>
       </div>
     </div>
-
-  
     <div class="login-form-area">
       <div class="login-toolbar">
         <div class="theme-colors">
@@ -43,19 +42,17 @@
           />
         </div>
         <el-tooltip :content="getThemeConfig.isIsDark ? '切换浅色' : '切换深色'" placement="bottom">
-          <button class="dark-toggle" @click="toggleDark">
+          <button class="dark-toggle" @click="toggleDark($event)">
             <el-icon v-if="getThemeConfig.isIsDark"><ele-Sunny /></el-icon>
             <el-icon v-else><ele-Moon /></el-icon>
           </button>
         </el-tooltip>
       </div>
-
       <div class="login-form-card">
         <div class="login-form-header">
           <h2 class="login-form-title">欢迎回来</h2>
           <p class="login-form-sub">输入您的账号和密码登录系统</p>
         </div>
-
         <div class="login-form-body">
           <div v-if="!state.isScan">
             <el-tabs v-model="state.tabsActiveName" class="login-tabs">
@@ -68,8 +65,6 @@
           <Scan v-if="state.isScan" />
         </div>
       </div>
-
-  
       <div class="login-copyright">
         <span>N-Tester平台</span>
         <span class="sep">|</span>
@@ -92,13 +87,11 @@ const Account = defineAsyncComponent(() => import('/@/views/login/component/acco
 const Mobile = defineAsyncComponent(() => import('/@/views/login/component/mobile.vue'));
 const Scan = defineAsyncComponent(() => import('/@/views/login/component/scan.vue'));
 const OAuth = defineAsyncComponent(() => import('/@/views/login/component/oauth.vue'));
-
+const ParticleCanvas = defineAsyncComponent(() => import('/@/views/login/component/ParticleCanvas.vue'));
 const storesThemeConfig = useThemeConfig();
 const { themeConfig } = storeToRefs(storesThemeConfig);
 const state = reactive({ tabsActiveName: 'account', isScan: false });
-
 const getThemeConfig = computed(() => themeConfig.value);
-
 const themePresets = [
   { color: '#409eff', name: '默认蓝' },
   { color: 'hsl(245 82% 67%)', name: '紫罗兰' },
@@ -114,8 +107,40 @@ const switchTheme = (preset: { color: string }) => {
   onColorPickerChange(preset.color);
 };
 
-const toggleDark = () => {
-  onAddDarkChange(getThemeConfig.value.isIsDark ? 'light' : 'dark');
+const toggleDark = (e: MouseEvent) => {
+  const isDark = getThemeConfig.value.isIsDark;
+  const nextTheme = isDark ? 'light' : 'dark';
+
+
+  if (!document.startViewTransition) {
+    onAddDarkChange(nextTheme);
+    return;
+  }
+
+  const transition = document.startViewTransition(() => {
+    onAddDarkChange(nextTheme);
+  });
+
+  transition.ready.then(() => {
+    const { clientX, clientY } = e;
+    const radius = Math.hypot(
+      Math.max(clientX, innerWidth - clientX),
+      Math.max(clientY, innerHeight - clientY)
+    );
+    document.documentElement.animate(
+      {
+        clipPath: [
+          `circle(0% at ${clientX}px ${clientY}px)`,
+          `circle(${radius}px at ${clientX}px ${clientY}px)`,
+        ],
+      },
+      {
+        duration: 500,
+        easing: 'ease-in-out',
+        pseudoElement: '::view-transition-new(root)',
+      }
+    );
+  });
 };
 
 const isActiveTheme = (color: string) => {
@@ -143,6 +168,7 @@ onMounted(() => { NextLoading.done(); });
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.3s ease;
 
   &::before {
     content: '';
@@ -153,6 +179,7 @@ onMounted(() => { NextLoading.done(); });
     height: 420px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(99,102,241,.18) 0%, rgba(59,130,246,.08) 60%, transparent 100%);
+    transition: background 0.3s ease;
   }
 
   &::after {
@@ -164,6 +191,59 @@ onMounted(() => { NextLoading.done(); });
     height: 280px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(14,165,233,.12) 0%, transparent 70%);
+    transition: background 0.3s ease;
+  }
+}
+
+
+[data-theme="dark"] .login-brand {
+  background: linear-gradient(145deg, #1a1d2e 0%, #16213e 40%, #0f1729 70%, #0a0e1a 100%);
+
+  &::before {
+    background: radial-gradient(circle, rgba(99,102,241,.25) 0%, rgba(59,130,246,.15) 60%, transparent 100%);
+  }
+
+  &::after {
+    background: radial-gradient(circle, rgba(14,165,233,.2) 0%, transparent 70%);
+  }
+
+  .brand-name {
+    color: #93c5fd;
+    text-shadow:
+      1px 1px 0 #1e3a8a,
+      2px 2px 0 #1d4ed8,
+      3px 3px 0 #2563eb,
+      4px 4px 0 #1e40af,
+      5px 5px 0 #172554,
+      2px 2px 8px rgba(147, 197, 253, 0.4);
+  }
+
+  .brand-tag {
+    color: #818cf8;
+  }
+
+  .brand-title {
+    color: #e2e8f0;
+    text-shadow:
+      1px 1px 0 #312e81,
+      2px 2px 0 #3730a3,
+      3px 3px 0 #4338ca,
+      4px 4px 0 #312e81,
+      5px 5px 0 #1e1b4b,
+      6px 6px 0 #0f0e1a,
+      3px 3px 12px rgba(99, 102, 241, 0.5);
+  }
+
+  .brand-desc {
+    color: #94a3b8;
+  }
+
+  .dot {
+    background: #475569;
+  }
+
+  .dot-active {
+    background: #818cf8;
   }
 }
 
@@ -177,7 +257,6 @@ onMounted(() => { NextLoading.done(); });
   padding: 48px 56px;
   width: 100%;
 }
-
 .brand-logo {
   position: absolute;
   top: 32px;
@@ -185,6 +264,7 @@ onMounted(() => { NextLoading.done(); });
   display: flex;
   align-items: center;
   gap: 12px;
+  z-index: 1;
 }
 
 .brand-logo-img {
@@ -196,9 +276,18 @@ onMounted(() => { NextLoading.done(); });
 
 .brand-name {
   font-size: 26px;
-  font-weight: 700;
-  color: #1e40af;
-  letter-spacing: .5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow:
+    1px 1px 0 #0a5abf,
+    2px 2px 0 #0848a0,
+    3px 3px 0 #063880,
+    4px 4px 0 #042a60,
+    5px 5px 0 #021840,
+    2px 2px 8px rgba(0, 0, 0, 0.45);
+  transform: perspective(200px) rotateX(5deg);
+  display: inline-block;
 }
 
 .brand-hero {
@@ -217,10 +306,20 @@ onMounted(() => { NextLoading.done(); });
 
 .brand-title {
   font-size: 38px;
-  font-weight: 700;
-  color: #1e293b;
+  font-weight: 800;
   line-height: 1.25;
   margin: 0 0 18px;
+  color: #fff;
+  text-shadow:
+    1px 1px 0 #1e3a8a,
+    2px 2px 0 #1e40af,
+    3px 3px 0 #1d4ed8,
+    4px 4px 0 #1e3a8a,
+    5px 5px 0 #172554,
+    6px 6px 0 #0f172a,
+    3px 3px 12px rgba(30, 58, 138, 0.5);
+  transform: perspective(300px) rotateX(4deg);
+  display: inline-block;
 }
 
 .brand-desc {
@@ -490,4 +589,18 @@ onMounted(() => { NextLoading.done(); });
     justify-content: center;
   }
 }
+
+
+:global(::view-transition-new(root)),
+:global(::view-transition-old(root)) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:global(::view-transition-new(root)) {
+  z-index: 9999;
+}
+:global(::view-transition-old(root)) {
+  z-index: 1;
+}
 </style>
+

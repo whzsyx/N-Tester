@@ -1,6 +1,5 @@
 <template>
   <div class="result-list-container">
-    <!-- 搜索栏 -->
     <el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
       <el-form :inline="true" :model="searchParams.search">
         <el-form-item label="名称">

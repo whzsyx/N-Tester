@@ -6,8 +6,8 @@
       <el-icon class="notice-icon"><Bell /></el-icon>
       <div class="notice-track-wrap">
         <div class="notice-track">
-          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！持续优化中</span>
-          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！持续优化中</span>
+          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！点击右上角通知图标进入交流群，持续优化中</span>
+          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！点击右上角通知图标进入交流群，持续优化中</span>
         </div>
       </div>
     </div>
@@ -157,7 +157,7 @@ import { useApiAutomationApi } from '/@/api/v1/api_automation';
 import { useWebManagementApi } from '/@/api/v1/web_management';
 
 const dashboardApi = useDashboardApi();
-const { api_service, get_api_script_result_list } = useApiAutomationApi();
+const { get_api_script_result_list } = useApiAutomationApi();
 const { get_web_result_list } = useWebManagementApi();
 const router = useRouter();
 const userStore = useUserStore();
@@ -320,29 +320,30 @@ const initReviewStatsChart = async () => {
 const initApiInterfaceChart = async () => {
   apiInterfaceLoading.value = true;
   try {
-    // 获取所有服务列表
-    const r: any = await api_service({ page: 1, pageSize: 200, search: {} });
-    const raw = r?.data;
-    const list: any[] = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+    const r: any = await dashboardApi.getApiInterfaceStats();
+    const stats: { method: string; count: number }[] = r?.data?.method_stats || [];
+    const total: number = r?.data?.total || 0;
 
-    // 按文档类型分组统计
-    const typeMap: Record<string, number> = { swagger: 0, apifox: 0, '未配置': 0 };
-    // 按拉取状态统计
-    const statusMap: Record<string, number> = { '未拉取': 0, '拉取成功': 0, '拉取失败': 0 };
+    const METHOD_COLORS: Record<string, string> = {
+      GET:     '#10b981',
+      POST:    '#6366f1',
+      PUT:     '#f59e0b',
+      DELETE:  '#ef4444',
+      PATCH:   '#0ea5e9',
+      OPTIONS: '#8b5cf6',
+      OTHER:   '#94a3b8',
+    };
 
-    list.forEach((s: any) => {
-      const t = s.source_type || '未配置';
-      typeMap[t] = (typeMap[t] || 0) + 1;
-      const st = s.last_pull_status;
-      if (st === 1) statusMap['拉取成功']++;
-      else if (st === 2) statusMap['拉取失败']++;
-      else statusMap['未拉取']++;
-    });
+    const labels = stats.map(s => s.method);
+    const values = stats.map(s => s.count);
+    const colors = labels.map(l => METHOD_COLORS[l] || '#94a3b8');
 
-    // 拉取状态数据用于 tooltip 展示
-    const statusLabels = ['未拉取', '拉取成功', '拉取失败'];
-    const statusValues = [statusMap['未拉取'], statusMap['拉取成功'], statusMap['拉取失败']];
-    const statusColors = ['#94a3b8', '#10b981', '#ef4444'];
+    if (!stats.length) {
+      initChart(apiInterfaceChart.value, {
+        graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: '暂无接口数据', fill: '#94a3b8', fontSize: 14 } }],
+      });
+      return;
+    }
 
     initChart(apiInterfaceChart.value, {
       tooltip: {
@@ -350,43 +351,39 @@ const initApiInterfaceChart = async () => {
         axisPointer: { type: 'shadow' },
         formatter: (params: any) => {
           const p = params[0];
-          const name = p.name;
-          const val = p.value;
-          const idx = Object.keys(typeMap).indexOf(name);
-          return `${name}<br/>服务数：<b>${val}</b>`;
+          const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : '0';
+          return `<b>${p.name}</b><br/>接口数：<b>${p.value}</b>（${pct}%）`;
         },
       },
-      grid: { top: 16, bottom: 60, left: 50, right: 20 },
-      xAxis: { type: 'category', data: Object.keys(typeMap), axisLabel: { color: '#6b7280', fontSize: 12 } },
-      yAxis: { type: 'value', name: '服务数', minInterval: 1, axisLabel: { color: '#6b7280' } },
-      series: [
-        {
-          name: '文档类型分布',
-          type: 'bar',
-          data: Object.values(typeMap),
-          itemStyle: { color: (p: any) => ['#6366f1','#0ea5e9','#94a3b8'][p.dataIndex] || '#94a3b8', borderRadius: [6,6,0,0] },
-          barMaxWidth: 50,
-          label: { show: true, position: 'top', fontSize: 12, color: '#374151' },
-        },
-      ],
+      grid: { top: 20, bottom: 36, left: 44, right: 16 },
+      xAxis: {
+        type: 'category',
+        data: labels,
+        axisLabel: { color: '#6b7280', fontSize: 12, fontWeight: 600 },
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+        axisTick: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: '#6b7280', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#f3f4f6' } },
+      },
+      series: [{
+        type: 'bar',
+        data: values.map((v, i) => ({
+          value: v,
+          itemStyle: { color: colors[i], borderRadius: [6, 6, 0, 0] },
+        })),
+        barMaxWidth: 48,
+        label: { show: true, position: 'top', fontSize: 12, color: '#374151', formatter: '{c}' },
+      }],
     });
-
-    // 在图表下方单独展示拉取状态（不用 graphic 避免遮挡）
-    // 通过 legend 附加说明
-    const statusEl = (apiInterfaceChart.value as HTMLElement)?.parentElement?.querySelector('.status-legend');
-    if (!statusEl) {
-      const div = document.createElement('div');
-      div.className = 'status-legend';
-      div.style.cssText = 'display:flex;gap:12px;justify-content:center;padding:4px 0 8px;font-size:11px;';
-      statusLabels.forEach((l, i) => {
-        const span = document.createElement('span');
-        span.style.cssText = `color:${statusColors[i]};display:flex;align-items:center;gap:3px;`;
-        span.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${statusColors[i]};display:inline-block"></span>${l} ${statusValues[i]}`;
-        div.appendChild(span);
-      });
-      (apiInterfaceChart.value as HTMLElement)?.parentElement?.appendChild(div);
-    }
-  } catch (e) { console.error(e); } finally { apiInterfaceLoading.value = false; }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    apiInterfaceLoading.value = false;
+  }
 };
 
 const refreshExecutionTrends = () => initExecutionTrendChart();

@@ -77,6 +77,38 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
 					icon: 'ele-Document',
 				},
 			},
+			// API 用例工作流编辑器
+			{
+				path: '/testing/api-automation/workflow/:caseId/:serviceId?',
+				name: 'ApiCaseWorkflowEditor',
+				component: () => import('/src/views/testing/api-automation/workflow/WorkflowEditor.vue'),
+				meta: {
+					title: '工作流编辑器',
+					isLink: '',
+					isHide: true,
+					isKeepAlive: false,
+					isAffix: false,
+					isIframe: false,
+					roles: ['admin', 'common'],
+					icon: 'ele-Connection',
+				},
+			},
+			// 精准测试 — 覆盖率详情页
+			{
+				path: '/testing/precision-test/coverage/:reportId',
+				name: 'CoverageDetailViewer',
+				component: () => import('/src/views/testing/precision-test/CoverageDetailViewer.vue'),
+				meta: {
+					title: '覆盖率详情',
+					isLink: '',
+					isHide: true,
+					isKeepAlive: false,
+					isAffix: false,
+					isIframe: false,
+					roles: ['admin', 'common'],
+					icon: 'ele-Document',
+				},
+			},
 			{
 				path: '/system',
 				name: 'system',

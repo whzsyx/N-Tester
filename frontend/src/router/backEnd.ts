@@ -52,6 +52,11 @@ export async function initBackEndControlRoutes() {
 		// 存储接口原始路由（未处理component），根据需求选择使用
 		await useRequestOldRoutes().setRequestOldRoutes(JSON.parse(JSON.stringify(menuData)));
 		
+		// 保留静态隐藏路由（isHide: true 且无需后端配置的页面，如工作流编辑器、报告页等）
+		const staticHiddenRoutes = (dynamicRoutes[0].children as RouteRecordRaw[]).filter(
+			(r: any) => r.meta?.isHide === true
+		);
+
 		// 清空动态路由的children，避免与静态路由冲突
 		dynamicRoutes[0].children = [];
 		
@@ -59,6 +64,16 @@ export async function initBackEndControlRoutes() {
 		const processedRoutes = await backEndComponent(menuData);
 		if (processedRoutes && processedRoutes.length > 0) {
 			dynamicRoutes[0].children = processedRoutes;
+		}
+
+		// 将静态隐藏路由合并回去（去重，避免后端也返回了同名路由）
+		for (const staticRoute of staticHiddenRoutes) {
+			const alreadyExists = (dynamicRoutes[0].children as RouteRecordRaw[]).some(
+				(r: any) => r.name === staticRoute.name || r.path === staticRoute.path
+			);
+			if (!alreadyExists) {
+				(dynamicRoutes[0].children as RouteRecordRaw[]).push(staticRoute);
+			}
 		}
 		
 		// 添加动态路由

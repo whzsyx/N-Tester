@@ -10,14 +10,6 @@ const postApiAutomation = <T = any>(url: string, data?: any) => {
 
 export function useApiAutomationApi() {
   return {
-    // ---------- 项目 ----------
-    api_project: (data: { page?: number; pageSize?: number } = {}) => postApiAutomation('/v1/api_automation/api_project', data),
-    add_api_project: (data: { name: string; img?: string | null; description?: string | null }) =>
-      postApiAutomation('/v1/api_automation/add_api_project', data),
-    edit_api_project: (data: { id: number; name?: string; img?: string | null; description?: string | null }) =>
-      postApiAutomation('/v1/api_automation/edit_api_project', data),
-    del_api_project: (data: { id: number }) => postApiAutomation('/v1/api_automation/del_api_project', data),
-
     // ---------- 服务 ----------
     api_service: (data: { page?: number; pageSize?: number; search?: { api_project_id?: number | null; name?: string; manager?: number | null; business_id?: number | null } } = {}) =>
       postApiAutomation('/v1/api_automation/api_service', data),
@@ -73,9 +65,6 @@ export function useApiAutomationApi() {
     edit_api_params: (data: { id: number; name?: string; value?: Record<string, any> }) => postApiAutomation('/v1/api_automation/edit_api_params', data),
     del_api_params: (data: { id: number }) => postApiAutomation('/v1/api_automation/del_api_params', data),
     api_params: (data: Record<string, any> = {}) => postApiAutomation('/v1/api_automation/api_params', data),
-    add_params: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/add_params', data),
-    edit_params: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/edit_params', data),
-    del_params: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/del_params', data),
     params_select: (data: Record<string, any> = {}) => postApiAutomation('/v1/api_automation/params_select', data),
 
     // ---------- 公共函数 ----------
@@ -84,9 +73,6 @@ export function useApiAutomationApi() {
     edit_api_function: (data: { id: number; name?: string; description?: string | null }) => postApiAutomation('/v1/api_automation/edit_api_function', data),
     del_api_function: (data: { id: number }) => postApiAutomation('/v1/api_automation/del_api_function', data),
     api_function: (data: Record<string, any> = {}) => postApiAutomation('/v1/api_automation/api_function', data),
-    add_function: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/add_function', data),
-    edit_function: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/edit_function', data),
-    del_function: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/del_function', data),
 
     // ---------- 错误码 ----------
     api_code_list: (data: Record<string, any> = {}) => postApiAutomation('/v1/api_automation/api_code_list', data),
@@ -105,7 +91,7 @@ export function useApiAutomationApi() {
       doc_content?: Record<string, any>;
     }) => postApiAutomation('/v1/api_automation/pull_api_doc', data),
 
-    // ---------- 场景/执行 ----------
+    // ---------- 用例/执行 ----------
     api_script_list: (data: { page?: number; pageSize?: number } = {}) => postApiAutomation('/v1/api_automation/api_script_list', data),
     add_api_script: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/add_api_script', data),
     edit_api_script: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/edit_api_script', data),
@@ -165,9 +151,9 @@ export function useApiAutomationApi() {
     // ---------- 用例（Case）----------
     api_case_list: (data: { suite_id: number }) =>
       postApiAutomation('/v1/api_automation/api_case_list', data),
-    add_api_case: (data: { name: string; description?: string; suite_id: number; script?: any[]; case_type?: number }) =>
+    add_api_case: (data: { name: string; description?: string; suite_id: number; script?: any[]; case_type?: number; step_rely?: number }) =>
       postApiAutomation('/v1/api_automation/add_api_case', data),
-    edit_api_case: (data: { id: number; name?: string; description?: string; script?: any[]; case_type?: number }) =>
+    edit_api_case: (data: { id: number; name?: string; description?: string; script?: any[]; case_type?: number; step_rely?: number }) =>
       postApiAutomation('/v1/api_automation/edit_api_case', data),
     del_api_case: (data: { id: number }) =>
       postApiAutomation('/v1/api_automation/del_api_case', data),
@@ -175,6 +161,24 @@ export function useApiAutomationApi() {
       postApiAutomation('/v1/api_automation/run_api_case', data),
     save_api_case_to_suite: (data: { name: string; description?: string; suite_id: number; script?: any[]; case_type?: number }) =>
       postApiAutomation('/v1/api_automation/save_api_case_to_suite', data),
+
+    // ---------- 公共脚本（NtestScript）----------
+    ntest_script_list: (data: { api_service_id: number }) =>
+      postApiAutomation('/v1/api_automation/ntest_script_list', data),
+    add_ntest_script: (data: { name: string; description?: string; code?: string; api_service_id: number }) =>
+      postApiAutomation('/v1/api_automation/add_ntest_script', data),
+    edit_ntest_script: (data: { id: number; name?: string; description?: string; code?: string }) =>
+      postApiAutomation('/v1/api_automation/edit_ntest_script', data),
+    del_ntest_script: (data: { id: number }) =>
+      postApiAutomation('/v1/api_automation/del_ntest_script', data),
+
+    // ---------- 数据查询（QueryDB）----------
+    get_db_databases: (data: { db_id: number }) =>
+      postApiAutomation('/v1/api_automation/get_db_databases', data),
+    get_db_tables: (data: { db_id: number; database: string }) =>
+      postApiAutomation('/v1/api_automation/get_db_tables', data),
+    execute_db_query: (data: { db_id: number; sql: string }) =>
+      postApiAutomation('/v1/api_automation/execute_db_query', data),
   };
 }
 export const apiAutomationApi = useApiAutomationApi();

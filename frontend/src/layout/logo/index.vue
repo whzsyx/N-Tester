@@ -1,7 +1,7 @@
 <template>
   <div class="layout-logo" v-if="setShowLogo" @click="onThemeConfigChange">
     <img :src="getLogo" class="layout-logo-medium-img"/>
-    <!--    <span>{{ themeConfig.globalTitle }}</span>-->
+    <span class="layout-logo-title">N-Tester平台</span>
   </div>
   <div class="layout-logo-size" v-else @click="onThemeConfigChange">
     <img :src="getLogo" class="layout-logo-size-img"/>
@@ -75,6 +75,24 @@ const onThemeConfigChange = () => {
     max-height: 40px;
     margin-right: 5px;
     object-fit: contain;
+  }
+
+  &-title {
+    font-size: 18px;
+    font-weight: 800;
+    white-space: nowrap;
+    margin-left: 6px;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow:
+      1px 1px 0 #0a5abf,
+      2px 2px 0 #0848a0,
+      3px 3px 0 #063880,
+      4px 4px 0 #042a60,
+      5px 5px 0 #021840,
+      2px 2px 6px rgba(0, 0, 0, 0.5);
+    transform: perspective(200px) rotateX(5deg);
+    display: inline-block;
   }
 }
 
