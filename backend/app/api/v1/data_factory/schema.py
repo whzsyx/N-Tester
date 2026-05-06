@@ -1,6 +1,6 @@
-"""
-数据工厂Schema
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime

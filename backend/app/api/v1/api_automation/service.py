@@ -1,6 +1,6 @@
-"""
-接口自动化模块
-"""
+﻿#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from __future__ import annotations
 
@@ -232,6 +232,38 @@ class ApiAutomationService:
     def _clear_api_script_cancel(result_id: str) -> None:
         with ApiAutomationService._api_script_cancel_lock:
             ApiAutomationService._api_script_cancel_ids.discard(str(result_id))
+        # 清理步骤上下文缓存
+        if hasattr(ApiAutomationService, '_step_ctx_cache'):
+            keys = [k for k in ApiAutomationService._step_ctx_cache if k.startswith(str(result_id))]
+            for k in keys:
+                del ApiAutomationService._step_ctx_cache[k]
+
+    @staticmethod
+    async def _load_env_vars(db: AsyncSession, env_id: int) -> Dict[str, Any]:
+        """加载环境变量为字典，供 VariableContext 使用。"""
+        if not env_id:
+            return {}
+        try:
+            env_row = (
+                await db.execute(
+                    select(ApiEnvironmentModel).where(
+                        ApiEnvironmentModel.id == int(env_id),
+                        ApiEnvironmentModel.enabled_flag == 1,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not env_row:
+                return {}
+            result: Dict[str, Any] = {}
+            for item in (env_row.config or []):
+                if item.get("name"):
+                    result[item["name"]] = item.get("value")
+            for item in (env_row.variable or []):
+                if item.get("key"):
+                    result[item["key"]] = item.get("value")
+            return result
+        except Exception:
+            return {}
 
     @staticmethod
     async def _api_script_delay_seconds(result_id: str, seconds: float) -> None:
@@ -252,19 +284,6 @@ class ApiAutomationService:
             pass
 
    
-    @staticmethod
-    async def get_projects(db: AsyncSession, user_id: int) -> Dict[str, Any]:
-        stmt = (
-            select(ApiProjectModel)
-            .where(ApiProjectModel.enabled_flag == 1, ApiProjectModel.created_by == user_id)
-            .order_by(ApiProjectModel.id.desc())
-        )
-        rows = (await db.execute(stmt)).scalars().all()
-        data = [r.__dict__ for r in rows]
-        for d in data:
-            d.pop("_sa_instance_state", None)
-        return {"content": data, "total": len(data)}
-
     @staticmethod
     async def get_services(db: AsyncSession, project_id: Optional[int], user_id: int) -> Dict[str, Any]:
         stmt = select(ApiServiceModel).where(ApiServiceModel.enabled_flag == 1, ApiServiceModel.created_by == user_id)
@@ -291,27 +310,6 @@ class ApiAutomationService:
             if v is not None and str(v).strip():
                 return str(v).strip()
         return None
-
-    @staticmethod
-    async def get_projects_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        page, page_size = ApiAutomationService._extract_page(body)
-        search = body.get("search") or {}
-        name_like = ApiAutomationService._extract_contains(search, "name__contains", "name__icontains", "name")
-        stmt = select(ApiProjectModel).where(ApiProjectModel.enabled_flag == 1, ApiProjectModel.created_by == user_id)
-        if name_like:
-            stmt = stmt.where(ApiProjectModel.name.like(f"%{name_like}%"))
-        stmt = stmt.order_by(ApiProjectModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        total = len(rows)
-        start = (page - 1) * page_size
-        end = start + page_size
-        page_rows = rows[start:end]
-        content = []
-        for r in page_rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            content.append(d)
-        return {"content": content, "total": total, "page": page, "pageSize": page_size}
 
     @staticmethod
     async def get_services_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
@@ -344,41 +342,6 @@ class ApiAutomationService:
             d.pop("_sa_instance_state", None)
             content.append(d)
         return {"content": content, "total": total, "page": page, "pageSize": page_size}
-
-    @staticmethod
-    async def add_project(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
-        proj = ApiProjectModel(
-            name=str(body["name"]),
-            img=str(body.get("img") or ""),
-            description=str(body.get("description") or ""),
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(proj)
-        await db.commit()
-
-    @staticmethod
-    async def edit_project(db: AsyncSession, project_id: int, body: Dict[str, Any], user_id: int) -> None:
-        await db.execute(
-            update(ApiProjectModel)
-            .where(ApiProjectModel.id == int(project_id), ApiProjectModel.enabled_flag == 1, ApiProjectModel.created_by == user_id)
-            .values(
-                name=body.get("name"),
-                img=body.get("img"),
-                description=body.get("description"),
-                updated_by=user_id,
-            )
-        )
-        await db.commit()
-
-    @staticmethod
-    async def delete_project(db: AsyncSession, project_id: int, user_id: int) -> None:
-        await db.execute(
-            update(ApiProjectModel)
-            .where(ApiProjectModel.id == int(project_id), ApiProjectModel.enabled_flag == 1, ApiProjectModel.created_by == user_id)
-            .values(enabled_flag=0, updated_by=user_id)
-        )
-        await db.commit()
 
     @staticmethod
     async def add_service(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
@@ -486,6 +449,7 @@ class ApiAutomationService:
         row = ApiFunctionModel(
             name=str(body["name"]),
             description=str(body.get("description") or ""),
+            code=body.get("code") or "",
             created_by=user_id,
             updated_by=user_id,
         )
@@ -494,10 +458,14 @@ class ApiAutomationService:
 
     @staticmethod
     async def edit_function(db: AsyncSession, function_id: int, body: Dict[str, Any], user_id: int) -> None:
+        values: Dict[str, Any] = {"updated_by": user_id}
+        for field in ("name", "description", "code"):
+            if field in body:
+                values[field] = body[field]
         await db.execute(
             update(ApiFunctionModel)
             .where(ApiFunctionModel.id == int(function_id), ApiFunctionModel.enabled_flag == 1, ApiFunctionModel.created_by == user_id)
-            .values(name=body.get("name"), description=body.get("description"), updated_by=user_id)
+            .values(**values)
         )
         await db.commit()
 
@@ -835,9 +803,16 @@ class ApiAutomationService:
 
     @staticmethod
     async def add_database(db: AsyncSession, data: Dict[str, Any], user_id: int) -> None:
+        cfg = data.get("config") or {}
         model = ApiDatabaseModel(
             name=data["name"],
-            config=data.get("config") or {},
+            config=cfg,
+            db_type=data.get("db_type") or cfg.get("db_type") or "mysql",
+            host=cfg.get("host") or "",
+            port=int(cfg.get("port") or 3306),
+            database_name=cfg.get("database") or "",
+            username=cfg.get("user") or cfg.get("username") or "",
+            password=cfg.get("password") or "",
             created_by=user_id,
             updated_by=user_id,
         )
@@ -846,6 +821,23 @@ class ApiAutomationService:
 
     @staticmethod
     async def edit_database(db: AsyncSession, db_id: int, data: Dict[str, Any], user_id: int) -> None:
+        cfg = data.get("config") or {}
+        values: Dict[str, Any] = {
+            "name": data.get("name"),
+            "config": cfg,
+            "updated_by": user_id,
+        }
+        # 同步展开 config 字段到独立列
+        if cfg:
+            values["db_type"] = data.get("db_type") or cfg.get("db_type") or "mysql"
+            values["host"] = cfg.get("host") or ""
+            values["port"] = int(cfg.get("port") or 3306)
+            values["database_name"] = cfg.get("database") or ""
+            values["username"] = cfg.get("user") or cfg.get("username") or ""
+            # 密码留空则不修改
+            new_pwd = cfg.get("password")
+            if new_pwd:
+                values["password"] = new_pwd
         await db.execute(
             update(ApiDatabaseModel)
             .where(
@@ -853,11 +845,7 @@ class ApiAutomationService:
                 ApiDatabaseModel.enabled_flag == 1,
                 ApiDatabaseModel.created_by == user_id,
             )
-            .values(
-                name=data.get("name"),
-                config=data.get("config"),
-                updated_by=user_id,
-            )
+            .values(**values)
         )
         await db.commit()
 
@@ -2405,7 +2393,37 @@ class ApiAutomationService:
 
     @staticmethod
     async def _res_assert(rule: Dict[str, Any], res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Dict[str, Any]:
-        """res_assert：比较期望值和实际值"""
+        """
+        res_assert：支持新版 AssertEditor 格式（rules 数组）和旧版格式。
+
+        新版格式（AssertEditor）：
+          rule = {
+            "rules": [
+              {"target": "response_json", "path": "$.code", "comparator": "eq", "expect": "200"},
+              ...
+            ]
+          }
+
+        旧版格式：
+          rule = {"name": "$.code", "res_type": 1, "value": "200"}
+        """
+        # ---- 新版格式：rules 数组 ----
+        rules = rule.get("rules")
+        if isinstance(rules, list):
+            results = []
+            all_pass = True
+            for r in rules:
+                result = await ApiAutomationService._eval_assert_rule(r, res, header, body)
+                results.append(result)
+                if not result.get("pass"):
+                    all_pass = False
+            return {
+                "status": 1 if all_pass else 0,
+                "message": "断言全部通过" if all_pass else "断言存在失败项",
+                "details": results,
+            }
+
+        # ---- 旧版格式：单条 eq 断言 ----
         try:
             ok, actual = ApiAutomationService._jsonpath_value_advanced(rule, res, header, body)
             expect = str(rule.get("value", ""))
@@ -2429,6 +2447,195 @@ class ApiAutomationService:
                 "status": 0,
                 "message": f"断言 {rule.get('name')} = {rule.get('value')} 失败，原因：{str(e)}",
             }
+
+    @staticmethod
+    def _extract_assert_target(target: str, path: str, res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Tuple[bool, Any]:
+        """
+        根据 target 和 path 提取断言目标值。
+        返回 (success, value)
+        """
+        import re as _re
+        try:
+            if target == "response_json":
+                if not path:
+                    return True, body
+                from jsonpath_ng import parse as jp_parse
+                matches = [m.value for m in jp_parse(path).find(body or {})]
+                if not matches:
+                    return False, f"JSONPath '{path}' 未匹配到结果"
+                return True, matches[0]
+
+            elif target == "response_text":
+                raw = res.get("raw") or res.get("text") or ""
+                if isinstance(body, (dict, list)):
+                    import json as _json
+                    raw = _json.dumps(body, ensure_ascii=False)
+                return True, str(raw)
+
+            elif target == "response_xml":
+                raw = res.get("raw") or res.get("text") or ""
+                if not path:
+                    return True, raw
+                try:
+                    import xml.etree.ElementTree as ET
+                    root = ET.fromstring(raw)
+                    found = root.findall(path)
+                    if not found:
+                        return False, f"XPath '{path}' 未匹配到结果"
+                    return True, found[0].text or ""
+                except Exception as xe:
+                    return False, f"XML 解析失败：{xe}"
+
+            elif target == "response_header":
+                if not path:
+                    return True, header
+                val = header.get(path) or header.get(path.lower()) or header.get(path.upper())
+                if val is None:
+                    return False, f"响应头 '{path}' 不存在"
+                return True, str(val)
+
+            elif target == "response_cookie":
+                cookies = res.get("cookies") or {}
+                if isinstance(cookies, list):
+                    cookies = {c.get("name", ""): c.get("value", "") for c in cookies}
+                if not path:
+                    return True, cookies
+                val = cookies.get(path)
+                if val is None:
+                    return False, f"Cookie '{path}' 不存在"
+                return True, str(val)
+
+            elif target == "http_code":
+                return True, res.get("code") or res.get("status_code") or 0
+
+            elif target == "response_time":
+                return True, res.get("res_time") or res.get("response_time") or 0
+
+            elif target in ("env_var", "global_var"):
+                # Variables are resolved before execution; here we just return the path as-is
+                # In practice the variable should already be substituted
+                return True, path
+
+            else:
+                return False, f"未知断言目标：{target}"
+
+        except Exception as e:
+            return False, f"提取断言目标值失败：{e}"
+
+    @staticmethod
+    def _compare_assert(actual: Any, comparator: str, expect: str) -> Tuple[bool, str]:
+        """执行比较，返回 (pass, message)"""
+        import re as _re
+
+        # Comparators that don't need expect value
+        if comparator == "exists":
+            return True, f"值存在：{actual}"
+        if comparator == "not_exists":
+            return False, f"值存在但期望不存在：{actual}"
+        if comparator == "is_empty":
+            ok = actual is None or str(actual).strip() == ""
+            return ok, ("值为空，断言通过" if ok else f"值不为空：{actual}")
+        if comparator == "not_empty":
+            ok = actual is not None and str(actual).strip() != ""
+            return ok, ("值不为空，断言通过" if ok else "值为空，断言失败")
+
+        # Convert for numeric comparisons
+        actual_str = str(actual) if actual is not None else ""
+
+        if comparator == "eq":
+            ok = actual_str == expect
+            return ok, (f"等于 {expect}，通过" if ok else f"期望 {expect}，实际 {actual_str}")
+        if comparator == "ne":
+            ok = actual_str != expect
+            return ok, (f"不等于 {expect}，通过" if ok else f"期望不等于 {expect}，但实际相等")
+        if comparator in ("gt", "gte", "lt", "lte"):
+            try:
+                a_num = float(actual_str)
+                e_num = float(expect)
+                if comparator == "gt":
+                    ok = a_num > e_num
+                elif comparator == "gte":
+                    ok = a_num >= e_num
+                elif comparator == "lt":
+                    ok = a_num < e_num
+                else:
+                    ok = a_num <= e_num
+                op_map = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}
+                return ok, (f"{actual_str} {op_map[comparator]} {expect}，通过" if ok else f"{actual_str} 不满足 {op_map[comparator]} {expect}")
+            except ValueError:
+                return False, f"数值比较失败：{actual_str} 或 {expect} 不是有效数字"
+        if comparator == "contains":
+            ok = expect in actual_str
+            return ok, (f"包含 '{expect}'，通过" if ok else f"不包含 '{expect}'，实际：{actual_str}")
+        if comparator == "not_contains":
+            ok = expect not in actual_str
+            return ok, (f"不包含 '{expect}'，通过" if ok else f"包含了 '{expect}'，实际：{actual_str}")
+        if comparator == "startswith":
+            ok = actual_str.startswith(expect)
+            return ok, (f"以 '{expect}' 开头，通过" if ok else f"不以 '{expect}' 开头，实际：{actual_str}")
+        if comparator == "endswith":
+            ok = actual_str.endswith(expect)
+            return ok, (f"以 '{expect}' 结尾，通过" if ok else f"不以 '{expect}' 结尾，实际：{actual_str}")
+        if comparator == "regex":
+            try:
+                ok = bool(_re.search(expect, actual_str))
+                return ok, (f"正则 '{expect}' 匹配，通过" if ok else f"正则 '{expect}' 不匹配，实际：{actual_str}")
+            except _re.error as re_err:
+                return False, f"正则表达式错误：{re_err}"
+
+        return False, f"未知比较符：{comparator}"
+
+    @staticmethod
+    async def _eval_assert_rule(rule: Dict[str, Any], res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Dict[str, Any]:
+        """
+        执行单条 AssertEditor 规则。
+        rule = {"target": str, "path": str, "comparator": str, "expect": str}
+        """
+        target = rule.get("target", "response_json")
+        path = rule.get("path", "")
+        comparator = rule.get("comparator", "eq")
+        expect = str(rule.get("expect", ""))
+
+        # For exists/not_exists, check if extraction succeeds
+        if comparator == "not_exists":
+            ok, _ = ApiAutomationService._extract_assert_target(target, path, res, header, body)
+            passed = not ok
+            return {
+                "pass": passed,
+                "target": target,
+                "path": path,
+                "comparator": comparator,
+                "expect": expect,
+                "actual": None,
+                "message": "值不存在，通过" if passed else f"值存在但期望不存在",
+            }
+
+        ok, actual = ApiAutomationService._extract_assert_target(target, path, res, header, body)
+        if not ok:
+            if comparator == "exists":
+                return {
+                    "pass": False,
+                    "target": target, "path": path, "comparator": comparator,
+                    "expect": expect, "actual": None,
+                    "message": f"值不存在：{actual}",
+                }
+            return {
+                "pass": False,
+                "target": target, "path": path, "comparator": comparator,
+                "expect": expect, "actual": None,
+                "message": f"提取失败：{actual}",
+            }
+
+        passed, msg = ApiAutomationService._compare_assert(actual, comparator, expect)
+        return {
+            "pass": passed,
+            "target": target,
+            "path": path,
+            "comparator": comparator,
+            "expect": expect,
+            "actual": str(actual) if actual is not None else None,
+            "message": msg,
+        }
 
     @staticmethod
     async def _local_db_execute(db_model: ApiDatabaseModel, table: str, where: str) -> Any:
@@ -2579,8 +2786,9 @@ class ApiAutomationService:
     ) -> List[Dict[str, Any]]:
         """
         handle_assert：
-        - type=1: 响应结果断言
+        - type=1: 响应结果断言（支持新版 rules 数组格式 和 旧版格式）
         - type=4: 直连数据库断言
+        - type=5: 自定义断言（Python 脚本）
         """
         results: List[Dict[str, Any]] = []
         for op in ops or []:
@@ -2605,6 +2813,27 @@ class ApiAutomationService:
                             r["message"] = "直连-数据库断言执行完成，断言出现错误"
                             break
                     results.append(r)
+                elif t == 5:
+                    # 自定义断言脚本
+                    script = op.get("custom_script") or ""
+                    if not script.strip():
+                        results.append({"status": 1, "message": "自定义断言：脚本为空，跳过", "type": t})
+                        continue
+                    try:
+                        import json as _json
+                        exec_globals = {
+                            "response": body,
+                            "status_code": res.get("code") or res.get("status_code") or 0,
+                            "headers": header,
+                            "res_time": res.get("res_time") or 0,
+                            "assert": __builtins__["assert"] if isinstance(__builtins__, dict) else getattr(__builtins__, "assert", None),
+                        }
+                        exec(script, exec_globals)
+                        results.append({"status": 1, "message": "自定义断言：执行通过", "type": t})
+                    except AssertionError as ae:
+                        results.append({"status": 0, "message": f"自定义断言失败：{ae}", "type": t})
+                    except Exception as se:
+                        results.append({"status": 0, "message": f"自定义断言脚本执行错误：{se}", "type": t})
                 else:
                     results.append({"status": 0, "message": f"未知断言类型：{t}", "type": t})
             except Exception as e:
@@ -2894,18 +3123,42 @@ class ApiAutomationService:
                     step["uuid"] = step_uuid
 
                     await ApiAutomationService._write_log_line(
-                        case_uuid, result_id, f"开始执行接口-{step.get('name')}"
+                        case_uuid, result_id, f"开始执行步骤-{step.get('name')}"
                     )
 
-                    success, api_req, api_res = await ApiAutomationService._execute_script_step(
+                    # 使用 StepExecutor 支持多步骤类型
+                    from .step_executor import StepExecutor, VariableContext
+                    if not hasattr(ApiAutomationService, '_step_ctx_cache'):
+                        ApiAutomationService._step_ctx_cache = {}
+                    ctx_key = f"{result_id}_{case_uuid}"
+                    # step_rely 从 case 配置中读取，默认为 True（步骤间共享变量）
+                    step_rely = bool(int(case.get("config", {}).get("step_rely", 1)))
+                    if ctx_key not in ApiAutomationService._step_ctx_cache:
+                        env_vars = await ApiAutomationService._load_env_vars(db, env_id)
+                        ApiAutomationService._step_ctx_cache[ctx_key] = VariableContext(env_vars)
+                    ctx = ApiAutomationService._step_ctx_cache[ctx_key]
+
+                    async def _log_fn(msg: str):
+                        await ApiAutomationService._write_log_line(case_uuid, result_id, msg)
+
+                    executor = StepExecutor(
                         db=db,
-                        step=step,
-                        result_id=result_id,
-                        menu_uuid=case_uuid,
                         env_id=env_id,
-                        params_id=params_id,
                         user_id=user_id,
+                        result_id=result_id,
+                        ctx=ctx,
+                        log_fn=_log_fn,
+                        cancel_fn=lambda: ApiAutomationService._is_api_script_result_cancel_requested(result_id),
+                        step_rely=step_rely,
                     )
+
+                    step_result = await executor.execute(step)
+                    success = step_result.success
+                    api_req = step_result.request
+                    api_res = step_result.response
+                    # 写入日志
+                    for log_line in step_result.logs:
+                        await ApiAutomationService._write_log_line(case_uuid, result_id, log_line)
 
                     if success:
                         case["pass"] += 1
@@ -4075,6 +4328,7 @@ class ApiAutomationService:
             script=body.get("script") or [],
             status=0,
             case_type=int(body.get("case_type") or 1),
+            step_rely=int(body.get("step_rely", 1)),
             created_by=user_id,
             updated_by=user_id,
         )
@@ -4089,7 +4343,7 @@ class ApiAutomationService:
     async def edit_case(db: AsyncSession, case_id: int, body: Dict[str, Any], user_id: int) -> None:
         from .model import ApiCaseModel
         values: Dict[str, Any] = {"updated_by": user_id}
-        for field in ("name", "description", "script", "case_type"):
+        for field in ("name", "description", "script", "case_type", "step_rely"):
             if field in body and body[field] is not None:
                 values[field] = body[field]
         await db.execute(
@@ -4139,7 +4393,7 @@ class ApiAutomationService:
             run_list.append({
                 "name": case.name,  # 显示原始名称
                 "script": case.script or [],
-                "config": {"env_id": env_id, "params_id": params_id, "case_id": case.id},
+                "config": {"env_id": env_id, "params_id": params_id, "case_id": case.id, "step_rely": getattr(case, 'step_rely', 1)},
             })
             case_id_map[case_name] = case.id
 
@@ -4200,3 +4454,193 @@ class ApiAutomationService:
 
         total_count = len(cases)
         return {"result_id": str(result_id), "total": total_count, "pass": pass_count, "fail": fail_count}
+
+    # ─── 脚本中心（NtestScript）CRUD ──────────────────────────────────────────
+
+    @staticmethod
+    async def get_ntest_scripts(db: AsyncSession, api_service_id: int, user_id: int) -> List[Dict]:
+        """查询指定服务下的公共脚本列表（仅返回未软删除的记录）"""
+        from .model import NtestScriptModel
+        rows = (await db.execute(
+            select(NtestScriptModel).where(
+                NtestScriptModel.api_service_id == api_service_id,
+                NtestScriptModel.enabled_flag == 1,
+            ).order_by(NtestScriptModel.id.desc())
+        )).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "name": r.name,
+                "description": r.description,
+                "code": r.code,
+                "api_service_id": r.api_service_id,
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    async def add_ntest_script(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
+        """新增公共脚本"""
+        from .model import NtestScriptModel
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise ValueError("脚本名称不能为空")
+        api_service_id = body.get("api_service_id")
+        if not api_service_id:
+            raise ValueError("api_service_id 不能为空")
+        script = NtestScriptModel(
+            name=name,
+            description=body.get("description") or "",
+            code=body.get("code") or "",
+            api_service_id=int(api_service_id),
+            created_by=user_id,
+            enabled_flag=1,
+        )
+        db.add(script)
+        await db.commit()
+
+    @staticmethod
+    async def edit_ntest_script(db: AsyncSession, script_id: int, body: Dict[str, Any], user_id: int) -> None:
+        """编辑公共脚本"""
+        name = (body.get("name") or "").strip()
+        if "name" in body and not name:
+            raise ValueError("脚本名称不能为空")
+        values: Dict[str, Any] = {"updated_by": user_id}
+        if name:
+            values["name"] = name
+        if "description" in body:
+            values["description"] = body["description"] or ""
+        if "code" in body:
+            values["code"] = body["code"] or ""
+        from .model import NtestScriptModel
+        await db.execute(
+            update(NtestScriptModel)
+            .where(NtestScriptModel.id == script_id, NtestScriptModel.enabled_flag == 1)
+            .values(**values)
+        )
+        await db.commit()
+
+    @staticmethod
+    async def delete_ntest_script(db: AsyncSession, script_id: int, user_id: int) -> None:
+        """软删除公共脚本（将 enabled_flag 置为 0）"""
+        from .model import NtestScriptModel
+        await db.execute(
+            update(NtestScriptModel)
+            .where(NtestScriptModel.id == script_id, NtestScriptModel.enabled_flag == 1)
+            .values(enabled_flag=0, updated_by=user_id)
+        )
+        await db.commit()
+
+    # ─── 数据查询（QueryDB）─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _is_select_only(sql: str) -> bool:
+        """校验所有 SQL 语句是否均为 SELECT（支持多条语句，以 ; 分隔）"""
+        import re
+        # 去除注释
+        cleaned = re.sub(r'--[^\n]*', '', sql)
+        cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
+        # 按分号拆分，过滤空语句
+        stmts = [s.strip() for s in cleaned.split(';') if s.strip()]
+        if not stmts:
+            return False
+        for stmt in stmts:
+            first_word = stmt.split()[0].upper() if stmt.split() else ''
+            if first_word != 'SELECT':
+                return False
+        return True
+
+    @staticmethod
+    async def execute_db_query(db: AsyncSession, db_id: int, sql: str) -> List[Dict]:
+        """执行一条或多条 SELECT 查询，返回所有结果行的合并列表"""
+        import re
+        import pymysql
+        import pymysql.cursors
+
+        if not ApiAutomationService._is_select_only(sql):
+            raise ValueError("仅支持 SELECT 查询语句")
+
+        cfg = await ApiAutomationService._get_db_config(db, db_id)
+        conn = pymysql.connect(
+            host=cfg["host"], port=cfg["port"],
+            user=cfg["user"], password=cfg["password"],
+            database=cfg["database"] or None,
+            connect_timeout=10,
+            cursorclass=pymysql.cursors.DictCursor,
+        )
+
+        # 拆分多条语句
+        cleaned = re.sub(r'--[^\n]*', '', sql)
+        cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
+        stmts = [s.strip() for s in cleaned.split(';') if s.strip()]
+
+        all_results: List[Dict] = []
+        try:
+            with conn.cursor() as cur:
+                for stmt in stmts:
+                    cur.execute(stmt)
+                    rows = cur.fetchall()
+                    all_results.extend([dict(r) for r in rows])
+        finally:
+            conn.close()
+
+        return all_results
+
+    @staticmethod
+    async def _get_db_config(db: AsyncSession, db_id: int) -> Dict[str, Any]:
+        """从 ApiDatabaseModel 获取数据库连接配置"""
+        from .model import ApiDatabaseModel
+        row = (await db.execute(
+            select(ApiDatabaseModel).where(
+                ApiDatabaseModel.id == db_id,
+                ApiDatabaseModel.enabled_flag == 1,
+            )
+        )).scalars().first()
+        if not row:
+            raise ValueError("数据库配置不存在")
+        return {
+            "host": row.host or "",
+            "port": int(row.port or 3306),
+            "user": row.username or "",
+            "password": row.password or "",
+            "database": row.database_name or "",
+            "db_type": (row.db_type or "mysql").lower(),
+        }
+
+    @staticmethod
+    async def get_db_databases(db: AsyncSession, db_id: int) -> List[Dict]:
+        """获取指定数据库连接下的所有数据库名"""
+        import pymysql
+        cfg = await ApiAutomationService._get_db_config(db, db_id)
+        conn = pymysql.connect(
+            host=cfg["host"], port=cfg["port"],
+            user=cfg["user"], password=cfg["password"],
+            connect_timeout=10,
+        )
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SHOW DATABASES")
+                rows = cur.fetchall()
+            return [{"name": r[0], "type": "database", "hasChildren": True} for r in rows]
+        finally:
+            conn.close()
+
+    @staticmethod
+    async def get_db_tables(db: AsyncSession, db_id: int, database: str) -> List[Dict]:
+        """获取指定数据库下的所有表名"""
+        import pymysql
+        cfg = await ApiAutomationService._get_db_config(db, db_id)
+        conn = pymysql.connect(
+            host=cfg["host"], port=cfg["port"],
+            user=cfg["user"], password=cfg["password"],
+            database=database,
+            connect_timeout=10,
+        )
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SHOW TABLES")
+                rows = cur.fetchall()
+            return [{"name": r[0], "type": "table", "isLeaf": True} for r in rows]
+        finally:
+            conn.close()
+

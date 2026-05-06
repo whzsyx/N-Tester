@@ -1,6 +1,6 @@
-"""
-在线用户监控数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional
 from pydantic import BaseModel

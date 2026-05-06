@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-OAuth API - OAuth 接口层
-"""
+# @author: Rebort
+
 import logging
 
 from fastapi import APIRouter, HTTPException, Request

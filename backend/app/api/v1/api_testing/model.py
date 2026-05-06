@@ -1,6 +1,6 @@
-"""
-API测试模块数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from sqlalchemy import Column, BigInteger, String, Text, Integer, Float, DateTime, JSON, Boolean
 from sqlalchemy.orm import relationship
 from app.models.base import Base

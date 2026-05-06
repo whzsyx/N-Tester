@@ -1,7 +1,6 @@
-"""
-测试数据生成工具
-生成各种测试数据，包括姓名、手机号、邮箱、地址、身份证号等
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import random
 import string
 from typing import Dict, Any

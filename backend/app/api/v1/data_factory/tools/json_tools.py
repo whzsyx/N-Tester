@@ -1,7 +1,6 @@
-"""
-JSON工具
-提供JSON格式化、校验、转换、对比、查询等功能
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import json
 import yaml
 import xml.etree.ElementTree as ET

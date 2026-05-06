@@ -1,13 +1,12 @@
-"""
-首页看板控制器
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, and_, text
-
 from app.db.sqlalchemy import get_db
 from app.core.dependencies import get_current_user_id
 from app.common.response import success_response, error_response
@@ -587,77 +586,46 @@ async def get_api_interface_stats(
     current_user_id: int = Depends(get_current_user_id)
 ):
     """
-    获取API测试接口树统计
+    按 HTTP 请求方法统计接口数量
     """
     try:
-        # 获取API项目及其接口统计
-        api_projects_query = text("""
-            SELECT 
-                p.name as project_name,
-                COUNT(DISTINCT r.id) as interface_count,
-                COUNT(DISTINCT CASE WHEN h.status_code >= 200 AND h.status_code < 300 THEN h.id END) as success_count,
-                COUNT(DISTINCT CASE WHEN h.status_code >= 400 OR h.error_message IS NOT NULL THEN h.id END) as failed_count
-            FROM api_projects p
-            LEFT JOIN api_collections c ON p.id = c.api_project_id AND c.enabled_flag = 1
-            LEFT JOIN api_requests r ON c.id = r.collection_id AND r.enabled_flag = 1
-            LEFT JOIN api_request_histories h ON r.id = h.request_id
-            WHERE p.enabled_flag = 1
-            GROUP BY p.id, p.name
-            HAVING interface_count > 0
-            ORDER BY interface_count DESC
-            LIMIT 10
+        METHOD_MAP = {1: "GET", 2: "POST", 3: "PUT", 4: "DELETE", 5: "PATCH", 6: "OPTIONS"}
+
+        query = text("""
+            SELECT
+                JSON_UNQUOTE(JSON_EXTRACT(req, '$.method')) AS method_int,
+                COUNT(*) AS cnt
+            FROM api_automation_apis
+            WHERE enabled_flag = 1
+            GROUP BY method_int
         """)
-        api_projects_result = await db.execute(api_projects_query)
-        api_projects_data = api_projects_result.fetchall()
-        
-        # 构建统计数据
-        interface_stats = []
-        for row in api_projects_data:
-            total_interfaces = row.interface_count or 0
-            success_count = row.success_count or 0
-            failed_count = row.failed_count or 0
-            
-            interface_stats.append({
-                "project_name": row.project_name,
-                "total_interfaces": total_interfaces,
-                "success_count": success_count,
-                "failed_count": failed_count,
-                "success_rate": round((success_count / (success_count + failed_count) * 100), 1) if (success_count + failed_count) > 0 else 0
-            })
-        
-        # 获取总体统计
-        total_stats_query = text("""
-            SELECT 
-                COUNT(DISTINCT p.id) as total_projects,
-                COUNT(DISTINCT r.id) as total_interfaces,
-                COUNT(DISTINCT CASE WHEN h.status_code >= 200 AND h.status_code < 300 THEN h.id END) as total_success,
-                COUNT(DISTINCT CASE WHEN h.status_code >= 400 OR h.error_message IS NOT NULL THEN h.id END) as total_failed
-            FROM api_projects p
-            LEFT JOIN api_collections c ON p.id = c.api_project_id AND c.enabled_flag = 1
-            LEFT JOIN api_requests r ON c.id = r.collection_id AND r.enabled_flag = 1
-            LEFT JOIN api_request_histories h ON r.id = h.request_id
-            WHERE p.enabled_flag = 1
-        """)
-        total_stats_result = await db.execute(total_stats_query)
-        total_stats_data = total_stats_result.fetchone()
-        
-        total_interfaces = total_stats_data.total_interfaces or 0
-        total_success = total_stats_data.total_success or 0
-        total_failed = total_stats_data.total_failed or 0
-        
-        stats_data = {
-            "interface_stats": interface_stats,
-            "total_stats": {
-                "total_projects": total_stats_data.total_projects or 0,
-                "total_interfaces": total_interfaces,
-                "total_success": total_success,
-                "total_failed": total_failed,
-                "overall_success_rate": round((total_success / (total_success + total_failed) * 100), 1) if (total_success + total_failed) > 0 else 0
-            }
-        }
-        
-        return success_response(data=stats_data, message="获取API接口统计成功")
-        
+        result = await db.execute(query)
+        rows = result.fetchall()
+
+        method_counts: dict = {name: 0 for name in METHOD_MAP.values()}
+        total = 0
+        for row in rows:
+            try:
+                m = int(row.method_int) if row.method_int is not None else 2
+            except (ValueError, TypeError):
+                m = 2
+            name = METHOD_MAP.get(m, "OTHER")
+            method_counts[name] = method_counts.get(name, 0) + int(row.cnt)
+            total += int(row.cnt)
+
+        stats = [
+            {"method": k, "count": v}
+            for k, v in method_counts.items()
+            if v > 0
+        ]
+        # 按数量降序
+        stats.sort(key=lambda x: x["count"], reverse=True)
+
+        return success_response(
+            data={"method_stats": stats, "total": total},
+            message="获取API接口统计成功"
+        )
+
     except Exception as e:
         logger.error(f"[首页看板] 获取API接口统计失败: {str(e)}")
         return error_response(message=f"获取API接口统计失败: {str(e)}")

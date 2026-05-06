@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-用例评审AI服务
-"""
+# @author: Rebort
+
 import json
 import logging
 from typing import Dict, List, Any, Optional

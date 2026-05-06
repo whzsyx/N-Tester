@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 OAuth 核心模块
-提供第三方 OAuth 认证功能
 """
 from app.core.oauth.base_oauth_service import BaseOAuthService
 

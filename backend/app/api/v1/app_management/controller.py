@@ -1,6 +1,6 @@
-"""
-APP管理模块控制器，处理APP自动化测试、脚本管理、执行监控等相关API请求
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form

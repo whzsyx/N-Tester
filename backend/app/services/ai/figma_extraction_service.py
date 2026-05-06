@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 """
 Figma提取服务 - 支持简化和完整两种模式
 """

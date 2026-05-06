@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-知识库全局向量配置模型
-"""
+# @author: Rebort
 
 from sqlalchemy import Boolean, Column, Integer, String, Text, BigInteger, ForeignKey, Index
 from app.models.base import Base

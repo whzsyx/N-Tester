@@ -1,17 +1,16 @@
-"""
-接口自动化模块
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger, Float
 from sqlalchemy.sql import func
-
 from app.models.base import Base
 
 
 class ApiProjectModel(Base):
-    """API项目模型"""
+    """API项目模型（内部使用，不对外暴露CRUD接口）"""
     __tablename__ = 'api_automation_projects'
-    
+
     name = Column(String(255), nullable=False, comment='项目名称')
     img = Column(String(255), comment='项目图标')
     description = Column(Text, comment='项目描述')
@@ -171,6 +170,7 @@ class ApiFunctionModel(Base):
 
     name = Column(String(255), nullable=False, comment="公共函数名称")
     description = Column(String(255), comment="公共函数描述")
+    code = Column(Text, comment="Python 函数代码")
 
 
 class ApiUpdateModel(Base):
@@ -202,3 +202,14 @@ class ApiCaseModel(Base):
     script = Column(JSON, comment='步骤列表（接口步骤数组）')
     status = Column(Integer, default=0, comment='状态：0=未执行，1=通过，2=失败')
     case_type = Column(Integer, default=1, comment='用例类型：1=正向，2=负向，3=边界值，4=安全性，5=其他')
+    step_rely = Column(Integer, default=1, comment='步骤依赖：1=是（步骤间共享变量），0=否（每步骤独立）')
+
+
+class NtestScriptModel(Base):
+    """公共脚本（脚本中心）"""
+    __tablename__ = 'api_automation_ntest_scripts'
+
+    name = Column(String(255), nullable=False, comment='脚本名称')
+    description = Column(Text, nullable=True, comment='脚本描述')
+    code = Column(Text, nullable=True, comment='Python代码')
+    api_service_id = Column(BigInteger, nullable=False, comment='所属服务ID')

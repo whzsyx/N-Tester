@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
 统一响应格式
 """

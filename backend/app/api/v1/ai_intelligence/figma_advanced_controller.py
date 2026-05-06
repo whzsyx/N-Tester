@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Figma高级功能Controller
-"""
+# @author: Rebort
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession

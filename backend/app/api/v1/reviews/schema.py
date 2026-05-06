@@ -1,4 +1,6 @@
-# 用例评审模块 - 数据传输对象层
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime

@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
-Web管理模块（Web UI自动化）
+Web UI自动化
 """

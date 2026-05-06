@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-知识库全局配置 Schema
-"""
+# @author: Rebort
 
 from typing import Optional
 from pydantic import BaseModel, Field

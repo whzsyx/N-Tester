@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-AI 模块 API
-"""
+# @author: Rebort
+
 from fastapi import APIRouter
 from .llm_config import router as llm_config_router
 from .conversation import router as conversation_router

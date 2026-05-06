@@ -1,7 +1,7 @@
-"""
-测试框架代码生成器
-支持：pytest / unittest / TestNG / Jest
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 from __future__ import annotations
 
 import json

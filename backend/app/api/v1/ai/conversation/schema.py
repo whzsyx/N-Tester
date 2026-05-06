@@ -1,6 +1,7 @@
-"""
-对话管理 Schema
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime

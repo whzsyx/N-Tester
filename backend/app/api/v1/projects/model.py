@@ -1,6 +1,6 @@
-"""
-项目管理数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Text, Integer, JSON, Boolean, Index, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship

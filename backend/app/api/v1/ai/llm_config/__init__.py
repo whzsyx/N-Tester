@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-LLM 配置模块
-"""
+# @author: Rebort
+
 from .controller import router
 
 __all__ = ['router']

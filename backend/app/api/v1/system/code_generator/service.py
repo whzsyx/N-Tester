@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-编码生成器服务
-"""
+# @author: Rebort
+
 import random
 import string
 import uuid

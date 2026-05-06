@@ -1,4 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 编码生成器模块
 """

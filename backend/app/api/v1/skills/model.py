@@ -1,9 +1,8 @@
-"""
-Skill 管理数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Text, JSON, Boolean, Index, BigInteger, ForeignKey
-
 from app.models.base import Base
 
 

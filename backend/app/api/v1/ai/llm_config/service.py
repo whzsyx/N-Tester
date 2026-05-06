@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-LLM 配置服务
-"""
+# @author: Rebort
+
 import time
 import logging
 from typing import List, Optional, Dict, Any
@@ -296,11 +296,20 @@ class LLMConfigService:
                 "max_tokens": 100
             }
             
-            # 确定端点
-            if provider in ["openai", "custom"]:
-                endpoint = f"{base_url}/chat/completions" if base_url else "https://api.openai.com/v1/chat/completions"
-            else:
-                endpoint = f"{base_url}/chat/completions"
+            # 规范化 base_url，与 llm_service_langchain 保持一致
+            import re as _re
+            clean_url = (base_url or "").rstrip('/')
+            # 去掉用户可能粘贴的完整端点路径
+            for ep in ['/chat/completions', '/completions']:
+                if clean_url.endswith(ep):
+                    clean_url = clean_url[:-len(ep)].rstrip('/')
+                    break
+            # 没有版本号时补 /v1
+            if clean_url and not _re.search(r'/v\d+(/|$)', clean_url) \
+                    and not clean_url.endswith('/compatible-mode/v1'):
+                clean_url = clean_url + '/v1'
+            
+            endpoint = f"{clean_url}/chat/completions" if clean_url else "https://api.openai.com/v1/chat/completions"
             
             # 发送请求
             async with httpx.AsyncClient(timeout=30.0) as client:

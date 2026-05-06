@@ -1,6 +1,6 @@
-"""
-APP自动化模块数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, BigInteger, UniqueConstraint
 from sqlalchemy.sql import func

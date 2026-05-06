@@ -1,7 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
-UI自动化测试变量解析器
-支持在测试步骤的输入值中使用动态函数表达式
-语法：${function_name(args)}
+UI自动化测试变量解析器支持在测试步骤的输入值中使用动态函数表达式语法：${function_name(args)}
 """
 import re
 import random

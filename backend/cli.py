@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 """
-数据库迁移等命令行工具
+数据库迁移命令行工具
 """
 
 import os
@@ -381,14 +382,15 @@ try:
     from app.api.v1.api_automation import model as api_automation_model
     from app.api.v1.ui_automation import model as ui_automation_model
     from app.api.v1.app_management import model as app_management_model
-    from app.api.v1.app_mitmproxy import model as app_mitmproxy_model
     from app.api.v1.web_management import model as web_management_model
     from app.api.v1.notifications import model as notifications_model
     from app.api.v1.task_scheduler import model as task_scheduler_model
     from app.api.v1.reviews import model as reviews_model
     from app.api.v1.assistant import model as assistant_model
-    from app.api.v1.cloud_device import model as cloud_device_model
     from app.api.v1.data_factory import model as data_factory_model
+    from app.api.v1.precision_test import model as precision_test_model
+    from app.api.v1.desktop_automation import model as desktop_automation_model
+    from app.api.v1.miniprogram_automation import model as miniprogram_automation_model
     
     print(f"成功导入 {len(target_metadata.tables)} 个表")
     

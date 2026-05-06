@@ -1,7 +1,6 @@
-"""
-Skill execution job models (production runner support).
-We keep these models under skills module to avoid coupling with MCP tables.
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, func
 

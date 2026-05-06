@@ -1,6 +1,6 @@
-"""
-处理定时任务管理、通知配置等相关API请求
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.sqlalchemy import get_db

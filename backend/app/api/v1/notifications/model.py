@@ -1,6 +1,6 @@
-"""
-统一通知系统数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Text, Integer, Boolean, JSON, BigInteger, Index
 from sqlalchemy.orm import relationship

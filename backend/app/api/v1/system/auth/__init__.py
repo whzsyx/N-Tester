@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 认证授权模块
 """

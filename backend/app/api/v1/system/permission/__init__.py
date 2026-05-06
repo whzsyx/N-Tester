@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
 权限管理模块
 """

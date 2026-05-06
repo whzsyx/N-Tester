@@ -1,6 +1,6 @@
-"""
-数据工厂工具列表定义
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 TOOL_LIST = [
     # 测试数据工具（11个）

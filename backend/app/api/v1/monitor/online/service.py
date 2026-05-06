@@ -1,6 +1,6 @@
-"""
-在线用户监控服务
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 import json
 from datetime import datetime, timedelta

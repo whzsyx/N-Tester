@@ -1,6 +1,6 @@
-"""
-统一通知系统数据库操作
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, and_, or_, desc, func, update

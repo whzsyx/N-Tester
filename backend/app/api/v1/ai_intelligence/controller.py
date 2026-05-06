@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-AI智能化模块控制器
-"""
+# @author: Rebort
 
 import logging
 from typing import List, Optional

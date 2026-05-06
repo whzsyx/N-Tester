@@ -1,7 +1,6 @@
-"""
-随机工具
-提供各种随机数据生成功能
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import random
 import string
 import uuid

@@ -1,6 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
-文档文本提取工具
-支持PDF、DOCX、TXT、MD等格式
+文档文本提取工具支持PDF、DOCX、TXT、MD等格式
 """
 import logging
 from typing import Optional

@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 # @author: rebort
 """
-上下文变量管理
-
-保留必要的上下文变量，移除已弃用的AccessToken
+上下文变量管理保留必要的上下文变量，移除已弃用的AccessToken
 """
 from contextvars import ContextVar
 from typing import Optional

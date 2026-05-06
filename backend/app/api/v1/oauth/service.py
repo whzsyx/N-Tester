@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-OAuth Service - OAuth 业务逻辑层
-"""
+# @author: Rebort
+
 import logging
 from typing import Dict, Type
 

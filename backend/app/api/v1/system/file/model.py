@@ -1,6 +1,6 @@
-"""
-文件管理数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, LargeBinary
 from app.models.base import Base

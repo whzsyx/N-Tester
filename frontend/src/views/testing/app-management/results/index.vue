@@ -5,7 +5,6 @@ import { app_result, app_result_detail, get_result_list } from "@/api/api_app/ap
 import { TabsPaneContext } from "element-plus";
 import { MsgError, MsgSuccess } from "@/utils/koi";
 import * as echarts from "echarts";
-import { app_view_device } from "@/api/api_app/device";
 import { ElLoading } from 'element-plus';
 
 const route = useRoute();

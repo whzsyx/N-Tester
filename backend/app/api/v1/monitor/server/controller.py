@@ -1,6 +1,6 @@
-"""
-服务器监控控制器
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from fastapi import APIRouter, Depends
 from app.common.response import success_response

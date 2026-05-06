@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 from fastapi import APIRouter
 from .controller import router as knowledge_config_router
 

@@ -1,6 +1,6 @@
-"""
-数据工厂模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from sqlalchemy import Column, String, Integer, Boolean, Text, Index, JSON
 from sqlalchemy.orm import relationship
 from app.models.base import Base

@@ -1,6 +1,6 @@
-"""
-UI自动化模块 - 同步执行引擎使用同步 Playwright 避免 Windows asyncio subprocess 问题
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import time
 import logging
 import traceback

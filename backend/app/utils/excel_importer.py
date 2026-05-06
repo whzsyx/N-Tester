@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 """
-Excel导入工具
-支持导入AI智能浏览器测试用例
+Excel导入工具支持导入AI智能浏览器测试用例
 """
 
 import pandas as pd

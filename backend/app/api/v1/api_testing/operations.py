@@ -1,6 +1,6 @@
-"""
-API测试模块前置/后置操作执行器支持多种操作类型：脚本、数据库、等待、导入等
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import asyncio
 import time
 import json

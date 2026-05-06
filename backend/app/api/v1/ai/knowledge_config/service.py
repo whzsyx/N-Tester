@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-知识库全局向量配置服务
-"""
+# @author: Rebort
 
 from typing import Any, Dict
 import httpx

@@ -1,6 +1,6 @@
-"""
-Selenium 执行引擎包装器
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import time
 import logging
 import traceback

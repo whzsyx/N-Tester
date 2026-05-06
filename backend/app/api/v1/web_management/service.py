@@ -1,6 +1,6 @@
-"""
-Web管理模块业务逻辑服务
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from __future__ import annotations
 from typing import List, Optional, Dict, Any, Tuple

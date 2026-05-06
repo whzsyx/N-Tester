@@ -1,4 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 LLM 配置数据模型
 """

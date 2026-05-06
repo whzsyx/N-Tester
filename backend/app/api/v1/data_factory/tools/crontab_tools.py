@@ -1,7 +1,6 @@
-"""
-Crontab工具
-提供Crontab表达式生成、解析、验证等功能
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import re
 from datetime import datetime, timedelta
 from typing import Dict, Any, List

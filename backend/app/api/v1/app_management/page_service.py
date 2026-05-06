@@ -1,4 +1,6 @@
-"""APP 页面与元素"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple

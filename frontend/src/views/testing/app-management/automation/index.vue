@@ -20,7 +20,6 @@ import {
   view_script_list,
   app_correction
 } from "@/api/api_app/app.ts";
-import { app_view_device, get_device_list } from "@/api/api_app/device.ts";
 import { file_list } from "@/api/api_file/file.ts";
 import * as echarts from "echarts";
 import { img_select } from "@/api/api_app/img.ts";

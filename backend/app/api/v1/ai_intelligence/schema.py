@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-AI智能化模块数据模式
-"""
+# @author: Rebort
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime

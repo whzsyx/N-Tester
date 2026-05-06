@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-APP 自动化执行器（Airtest 子进程入口）
-"""
+# @author: Rebort
 from __future__ import annotations
 
 import asyncio
@@ -33,7 +32,6 @@ from .airtest_common import (
 )
 from .executor import _log_result, _release_device
 from .model import AppResultListModel, AppResultModel
-from app.api.v1.cloud_device.model import AppDevice
 
 
 async def _task_end_legacy(
@@ -97,14 +95,8 @@ async def _task_end_legacy(
             row.end_time = datetime.now()
             await db.commit()
 
-        dn = (
-            await db.execute(
-                select(AppDevice.device_name).where(
-                    AppDevice.device_id == deviceid, AppDevice.user_id == user_id, AppDevice.enabled_flag == 1
-                )
-            )
-        ).scalar_one_or_none()
-        device_name = str(dn or deviceid)
+        dn = None
+        device_name = str(deviceid)
         data = {
             "device_name": device_name,
             "result_id": result_id,

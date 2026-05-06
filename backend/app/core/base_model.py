@@ -1,6 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
-基础数据模型
-提供通用字段和方法
+基础数据模型提供通用字段和方法
 """
 
 from datetime import datetime

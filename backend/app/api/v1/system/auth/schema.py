@@ -1,6 +1,6 @@
-"""
-认证授权数据验证模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional, List
 from pydantic import Field, field_validator

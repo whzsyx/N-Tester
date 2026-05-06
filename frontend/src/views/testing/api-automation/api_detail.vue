@@ -35,7 +35,7 @@
 
 				<div class="api-detail-body">
 					<!-- 请求区 -->
-					<div class="request-section">
+					<div class="request-section" :style="resCollapsed ? 'flex: 1 1 auto' : ''">
 						<div class="panel-card">
 							<el-tabs v-model="req_active" class="apifox-tabs" style="height: 100%">
 								<!-- Params -->
@@ -205,247 +205,55 @@
 									<template #label>
 										<el-badge :show-zero="false" :value="req.before.length" :offset="[10, 2]" type="danger">前置操作</el-badge>
 									</template>
-									<div class="op-pane">
-										<div class="op-scroll">
-											<el-collapse accordion>
-												<el-collapse-item v-for="(pre, index) in req.before" :key="index">
-													<template #title>
-														<span style="display:flex;align-items:center">
-															<el-button type="text" size="small" style="color:#f56c6c;margin-right:8px" @click.stop="removeBefore(index)"><el-icon><Delete /></el-icon></el-button>
-															<span v-if="pre.type===1"><el-icon class="header-icon"><Connection /></el-icon>{{ index+1+'. 预请求接口：'+pre.title }}</span>
-															<span v-if="pre.type===2"><el-icon class="header-icon"><Operation /></el-icon>{{ index+1+'. 预设变量：'+pre.name+' 赋值等于 '+pre.value }}</span>
-															<span v-if="pre.type===3"><el-icon class="header-icon"><Clock /></el-icon>{{ index+1+'. 设置等待时长：'+pre.wait_time+'秒' }}</span>
-															<span v-if="pre.type===4"><el-icon class="header-icon"><EditPen /></el-icon>{{ index+1+'. 自定义脚本：'+pre.title }}</span>
-															<span v-if="pre.type===5"><el-icon class="header-icon"><Coin /></el-icon>{{ index+1+'. 数据库操作：'+(pre.db_name||'未选择数据库') }}</span>
-															<span v-if="pre.type===6"><el-icon class="header-icon"><Document /></el-icon>{{ index+1+'. 脚本库：'+(pre.func_name||'未选择脚本') }}</span>
-														</span>
-													</template>
-													<div v-if="pre.type===1">
-														<el-form inline>
-															<el-form-item label="操作名称："><el-input style="width:300px" v-model="pre.title" placeholder="请输入前置名称"></el-input></el-form-item>
-															<el-form-item label="选择环境："><el-select placeholder="请选择环境" v-model="pre.env_id" style="width:300px"><el-option v-for="(env,i) in env_list" :key="i" :label="env.name" :value="env.id"></el-option></el-select></el-form-item>
-															<el-form-item label="选择接口："><el-cascader :options="tree_list" v-model="pre.api_id" :props="{value:'id',label:'name',children:'children'}" style="width:705px"></el-cascader></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="pre.type===2">
-														<el-form inline>
-															<el-form-item label="变量名："><el-input style="width:200px" v-model="pre.name" placeholder="请输入变量名"></el-input></el-form-item>
-															<el-form-item label="变量类型："><el-select placeholder="请选择变量类型" v-model="pre.env_type" style="width:200px"><el-option v-for="(t,i) in val_type_list" :key="i" :label="t.name" :value="t.value"></el-option></el-select></el-form-item>
-															<el-form-item label="预期值："><el-input style="width:200px" v-model="pre.value" placeholder="请输入预期值"></el-input></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="pre.type===3"><el-form inline><el-form-item label="等待时间(秒)："><el-input-number style="width:200px" :min="0" :max="60" v-model="pre.wait_time"></el-input-number></el-form-item></el-form></div>
-													<div v-if="pre.type===4">
-														<div class="code-editor-wrap">
-															<div class="code-editor-lang">Python</div>
-															<textarea v-model="pre.code" class="code-textarea" placeholder="# 请输入 Python 代码" spellcheck="false" style="min-height:120px"></textarea>
-														</div>
-													</div>
-													<div v-if="pre.type===5">
-														<el-form inline>
-															<el-form-item label="操作名称："><el-input v-model="pre.title" style="width:240px" placeholder="请输入操作名称" /></el-form-item>
-															<el-form-item label="选择数据库："><el-select v-model="pre.db_id" style="width:240px" placeholder="请选择数据库" @change="(v) => { const db = local_db_list.find((d) => d.id===v); pre.db_name=db?.name||'' }"><el-option v-for="db in local_db_list" :key="db.id" :label="db.name" :value="db.id" /></el-select></el-form-item>
-															<el-form-item label="SQL语句：" style="width:100%"><el-input v-model="pre.sql" type="textarea" :rows="4" placeholder="请输入SQL语句" style="width:600px;font-family:monospace;font-size:13px" /></el-form-item>
-															<el-form-item label="结果提取变量："><el-input v-model="pre.result_var" style="width:240px" placeholder="将查询结果存入变量名（可选）" /></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="pre.type===6">
-														<el-form inline>
-															<el-form-item label="选择脚本："><el-select v-model="pre.func_id" style="width:300px" placeholder="请选择脚本库函数" filterable @change="(v) => { const fn = functionList.find((f) => f.id===v); pre.func_name=fn?.name||'' }"><el-option v-for="fn in functionList" :key="fn.id" :label="fn.name" :value="fn.id" /></el-select></el-form-item>
-															<el-form-item label="传入参数（JSON）："><el-input v-model="pre.func_params" style="width:300px;font-family:monospace" placeholder='{"key":"value"}' /></el-form-item>
-															<el-form-item label="结果存入变量："><el-input v-model="pre.result_var" style="width:200px" placeholder="变量名（可选）" /></el-form-item>
-														</el-form>
-													</div>
-												</el-collapse-item>
-											</el-collapse>
-										</div>
-										<div class="op-footer">
-											<el-dropdown>
-												<el-button type="primary" size="small">添加前置操作 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-												<template #dropdown>
-													<el-dropdown-menu>
-														<el-dropdown-item @click="addBefore(1)">预请求接口</el-dropdown-item>
-														<el-dropdown-item @click="addBefore(2)">预设变量</el-dropdown-item>
-														<el-dropdown-item @click="addBefore(3)">等待时长</el-dropdown-item>
-														<el-dropdown-item @click="addBefore(4)">自定义脚本</el-dropdown-item>
-														<el-dropdown-item @click="addBefore(5)">数据库操作</el-dropdown-item>
-														<el-dropdown-item @click="addBefore(6)">脚本库</el-dropdown-item>
-													</el-dropdown-menu>
-												</template>
-											</el-dropdown>
-										</div>
+									<div class="op-scroll-wrap">
+										<OperationPanel
+											:items="req.before"
+											mode="before"
+											:env-list="env_list"
+											:tree-list="tree_list"
+											:db-list="effectiveDbList"
+											:script-list="scriptList"
+											:res-type-list="res_type_list"
+											:val-type-list="val_type_list"
+										/>
 									</div>
 								</el-tab-pane>
 
-								<!-- 后置操作 -->
-								<el-tab-pane name="after">
-									<template #label>
-										<el-badge :show-zero="false" :value="req.after.length" :offset="[10, 2]" type="danger">后置操作</el-badge>
-									</template>
-									<div class="op-pane">
-										<div class="op-scroll">
-											<el-collapse accordion>
-												<el-collapse-item v-for="(after, index) in req.after" :key="index">
-													<template #title>
-														<span style="display:flex;align-items:center">
-															<el-button type="text" size="small" style="color:#f56c6c;margin-right:8px" @click.stop="removeAfter(index)"><el-icon><Delete /></el-icon></el-button>
-															<span v-if="after.type===1"><el-icon class="header-icon"><Operation /></el-icon>{{ index+1+'. 提取变量：提取 '+after.name+' 赋值给 '+after.value }}</span>
-															<span v-if="after.type===2"><el-icon class="header-icon"><Clock /></el-icon>{{ index+1+'. 设置等待时长：'+after.wait_time+'秒' }}</span>
-															<span v-if="after.type===3"><el-icon class="header-icon"><CircleCheck /></el-icon>{{ index+1+'. 断言：'+(after.assert_name||'响应断言') }}</span>
-															<span v-if="after.type===4"><el-icon class="header-icon"><Coin /></el-icon>{{ index+1+'. 数据库操作：'+(after.db_name||'未选择数据库') }}</span>
-															<span v-if="after.type===5"><el-icon class="header-icon"><EditPen /></el-icon>{{ index+1+'. 自定义脚本' }}</span>
-															<span v-if="after.type===6"><el-icon class="header-icon"><Document /></el-icon>{{ index+1+'. 脚本库：'+(after.func_name||'未选择脚本') }}</span>
-															<span v-if="after.type===7"><el-icon class="header-icon"><Connection /></el-icon>{{ index+1+'. 从其他接口引入：'+(after.import_title||'未选择接口') }}</span>
-														</span>
-													</template>
-													<div v-if="after.type===1">
-														<el-form inline>
-															<el-form-item><template #label><el-tooltip :content="tips" raw-content><el-button type="text" style="color:#000" :icon="InfoFilled"></el-button></el-tooltip>路径:</template><el-input style="width:300px" v-model="after.name" placeholder="请输入路径"></el-input></el-form-item>
-															<el-form-item label="提取目标:"><el-select placeholder="请选择提取目标" v-model="after.res_type" style="width:300px"><el-option v-for="(r,i) in res_type_list" :key="i" :label="r.name" :value="r.value"></el-option></el-select></el-form-item>
-															<el-form-item label="变量类型:"><el-select placeholder="请选择变量类型" v-model="after.env_type" style="width:300px"><el-option v-for="(t,i) in val_type_list" :key="i" :label="t.name" :value="t.value"></el-option></el-select></el-form-item>
-															<el-form-item label="变量名:"><el-input style="width:300px" v-model="after.value" placeholder="请输入变量名"></el-input></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="after.type===2"><el-form inline><el-form-item label="等待时间(秒)："><el-input-number style="width:200px" :min="0" :max="60" v-model="after.wait_time"></el-input-number></el-form-item></el-form></div>
-													<div v-if="after.type===3">
-														<el-form inline>
-															<el-form-item label="断言名称："><el-input v-model="after.assert_name" style="width:240px" placeholder="请输入断言名称" /></el-form-item>
-															<el-form-item><template #label><el-tooltip :content="tips" raw-content><el-button type="text" style="color:#000" :icon="InfoFilled" /></el-tooltip>路径:</template><el-input v-model="after.assert_path" style="width:240px" placeholder="JSONPath 表达式" /></el-form-item>
-															<el-form-item label="断言对象:"><el-select v-model="after.res_type" style="width:200px" placeholder="请选择"><el-option v-for="r in res_type_list" :key="r.value" :label="r.name" :value="r.value" /></el-select></el-form-item>
-															<el-form-item label="预期值:"><el-input v-model="after.assert_value" style="width:240px" placeholder="请输入预期值" /></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="after.type===4">
-														<el-form inline>
-															<el-form-item label="操作名称："><el-input v-model="after.title" style="width:240px" placeholder="请输入操作名称" /></el-form-item>
-															<el-form-item label="选择数据库："><el-select v-model="after.db_id" style="width:240px" placeholder="请选择数据库" @change="(v) => { const db = local_db_list.find((d) => d.id===v); after.db_name=db?.name||'' }"><el-option v-for="db in local_db_list" :key="db.id" :label="db.name" :value="db.id" /></el-select></el-form-item>
-															<el-form-item label="SQL语句：" style="width:100%"><el-input v-model="after.sql" type="textarea" :rows="4" placeholder="请输入SQL语句" style="width:600px;font-family:monospace;font-size:13px" /></el-form-item>
-															<el-form-item label="结果提取变量："><el-input v-model="after.result_var" style="width:240px" placeholder="将查询结果存入变量名（可选）" /></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="after.type===5">
-														<div class="code-editor-wrap">
-															<div class="code-editor-lang">Python</div>
-															<textarea v-model="after.code" class="code-textarea" placeholder="# 请输入 Python 代码" spellcheck="false" style="min-height:120px"></textarea>
-														</div>
-													</div>
-													<div v-if="after.type===6">
-														<el-form inline>
-															<el-form-item label="选择脚本："><el-select v-model="after.func_id" style="width:300px" placeholder="请选择脚本库函数" filterable @change="(v) => { const fn = functionList.find((f) => f.id===v); after.func_name=fn?.name||'' }"><el-option v-for="fn in functionList" :key="fn.id" :label="fn.name" :value="fn.id" /></el-select></el-form-item>
-															<el-form-item label="传入参数（JSON）："><el-input v-model="after.func_params" style="width:300px;font-family:monospace" placeholder='{"key":"value"}' /></el-form-item>
-															<el-form-item label="结果存入变量："><el-input v-model="after.result_var" style="width:200px" placeholder="变量名（可选）" /></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="after.type===7">
-														<el-form inline>
-															<el-form-item label="操作名称："><el-input v-model="after.import_title" style="width:240px" placeholder="请输入名称" /></el-form-item>
-															<el-form-item label="选择环境："><el-select v-model="after.env_id" style="width:240px" placeholder="请选择环境"><el-option v-for="env in env_list" :key="env.id" :label="env.name" :value="env.id" /></el-select></el-form-item>
-															<el-form-item label="选择接口："><el-cascader :options="tree_list" v-model="after.api_id" :props="{value:'id',label:'name',children:'children'}" style="width:500px" placeholder="请选择接口" /></el-form-item>
-														</el-form>
-													</div>
-												</el-collapse-item>
-											</el-collapse>
-										</div>
-										<div class="op-footer">
-											<el-dropdown>
-												<el-button type="primary" size="small">添加后置操作 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-												<template #dropdown>
-													<el-dropdown-menu>
-														<el-dropdown-item @click="addAfter(1)">提取变量</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(2)">等待时长</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(3)">断言</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(4)">数据库操作</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(5)">自定义脚本</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(6)">脚本库</el-dropdown-item>
-														<el-dropdown-item @click="addAfter(7)">从其他接口引入</el-dropdown-item>
-													</el-dropdown-menu>
-												</template>
-											</el-dropdown>
-										</div>
-									</div>
-								</el-tab-pane>
+<!-- 后置操作 -->
+<el-tab-pane name="after">
+<template #label>
+<el-badge :show-zero="false" :value="req.after.length" :offset="[10, 2]" type="danger">后置操作</el-badge>
+</template>
+<div class="op-scroll-wrap">
+<OperationPanel
+:items="req.after"
+mode="after"
+:env-list="env_list"
+:tree-list="tree_list"
+:db-list="effectiveDbList"
+:script-list="scriptList"
+:res-type-list="res_type_list"
+:val-type-list="val_type_list"
+/>
+</div>
+</el-tab-pane>
 
-								<!-- 断言 -->
-								<el-tab-pane name="assert">
-									<template #label>
-										<el-badge :show-zero="false" :value="req.assert.length" :offset="[10, 2]" type="danger">断言</el-badge>
-									</template>
-									<div class="op-pane">
-										<div class="op-scroll">
-											<el-collapse accordion>
-												<el-collapse-item v-for="(assert, index) in req.assert" :key="index">
-													<template #title>
-														<span style="display:flex;align-items:center">
-															<el-button type="text" size="small" style="color:#f56c6c;margin-right:8px" @click.stop="removeAssert(index)"><el-icon><Delete /></el-icon></el-button>
-															<span v-if="assert.type===1"><el-icon class="header-icon"><CircleCheck /></el-icon>{{ index+1+'. 响应断言：断言 '+assert.name+' 等于 '+assert.value }}</span>
-															<span v-if="assert.type===2"><el-icon class="header-icon"><Coin /></el-icon>{{ index+1+'. Db断言：查询表 '+assert.ops_db_table+' 条件：'+assert.ops_db_where }}</span>
-															<span v-if="assert.type===3"><el-icon class="header-icon"><Coin /></el-icon>{{ index+1+'. Redis断言：查询key '+assert.ops_redis_key }}</span>
-															<span v-if="assert.type===4"><el-icon class="header-icon"><Coin /></el-icon>{{ index+1+'. 直连-数据库断言：查询表 '+assert.local_db_table+' 条件：'+assert.local_db_where }}</span>
-															<span v-if="assert.type===5"><el-icon class="header-icon"><EditPen /></el-icon>{{ index+1+'. 自定义断言' }}</span>
-														</span>
-													</template>
-													<div v-if="assert.type===1">
-														<el-form inline>
-															<el-form-item label="路径:"><el-input style="width:220px" v-model="assert.name" placeholder="如 $.code"></el-input></el-form-item>
-															<el-form-item label="断言对象:"><el-select placeholder="请选择断言对象" v-model="assert.res_type" style="width:220px"><el-option v-for="(r,i) in res_type_list" :key="i" :label="r.name" :value="r.value"></el-option></el-select></el-form-item>
-															<el-form-item label="预期值:"><el-input style="width:220px" v-model="assert.value" placeholder="请输入预期值"></el-input></el-form-item>
-														</el-form>
-													</div>
-													<div v-if="assert.type===2">
-														<el-form inline>
-															<el-form-item label="查询表："><el-input v-model="assert.ops_db_table" style="width:200px" placeholder="表名" /></el-form-item>
-															<el-form-item label="查询条件："><el-input v-model="assert.ops_db_where" style="width:300px" placeholder="WHERE 条件，如 id=1" /></el-form-item>
-															<el-form-item label="断言字段：" style="width:100%">
-																<div v-for="(a,ai) in (assert.ops_db_assert||[])" :key="ai" style="display:flex;gap:8px;margin-bottom:6px">
-																	<el-input v-model="a.field" placeholder="字段名" style="width:160px" size="small" />
-																	<el-input v-model="a.value" placeholder="预期值" style="width:200px" size="small" />
-																	<el-button type="danger" link size="small" @click="assert.ops_db_assert.splice(ai,1)">删除</el-button>
-																</div>
-																<el-button type="primary" link size="small" @click="assert.ops_db_assert.push({field:'',value:''})">+ 添加断言字段</el-button>
-															</el-form-item>
-														</el-form>
-													</div>
-													<div v-if="assert.type===4">
-														<el-form inline>
-															<el-form-item label="选择数据库："><el-select v-model="assert.local_db" style="width:220px" placeholder="请选择数据库"><el-option v-for="db in local_db_list" :key="db.id" :label="db.name" :value="db.id" /></el-select></el-form-item>
-															<el-form-item label="查询表："><el-input v-model="assert.local_db_table" style="width:200px" placeholder="表名" /></el-form-item>
-															<el-form-item label="查询条件："><el-input v-model="assert.local_db_where" style="width:300px" placeholder="WHERE 条件，如 id=1" /></el-form-item>
-															<el-form-item label="断言字段：" style="width:100%">
-																<div v-for="(a,ai) in (assert.local_db_assert||[])" :key="ai" style="display:flex;gap:8px;margin-bottom:6px">
-																	<el-input v-model="a.field" placeholder="字段名" style="width:160px" size="small" />
-																	<el-input v-model="a.value" placeholder="预期值" style="width:200px" size="small" />
-																	<el-button type="danger" link size="small" @click="assert.local_db_assert.splice(ai,1)">删除</el-button>
-																</div>
-																<el-button type="primary" link size="small" @click="assert.local_db_assert.push({field:'',value:''})">+ 添加断言字段</el-button>
-															</el-form-item>
-														</el-form>
-													</div>
-													<div v-if="assert.type===5">
-														<el-form label-width="90px">
-															<el-form-item label="断言名称："><el-input v-model="assert.custom_name" style="width:300px" placeholder="请输入断言名称" /></el-form-item>
-															<el-form-item label="断言脚本："><el-input v-model="assert.custom_script" type="textarea" :rows="6" placeholder="请输入断言脚本（Python），可使用 response、status_code、headers 等变量" style="width:600px;font-family:monospace;font-size:13px" /></el-form-item>
-															<el-form-item label="预期结果："><el-input v-model="assert.custom_expect" style="width:300px" placeholder="预期返回值（可选）" /></el-form-item>
-														</el-form>
-													</div>
-												</el-collapse-item>
-											</el-collapse>
-										</div>
-										<div class="op-footer">
-											<el-dropdown>
-												<el-button type="primary" size="small">添加断言 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-												<template #dropdown>
-													<el-dropdown-menu>
-														<el-dropdown-item @click="addAssert(1)"><el-icon><CircleCheck /></el-icon>响应结果断言</el-dropdown-item>
-														<el-dropdown-item @click="addAssert(2)"><el-icon><Coin /></el-icon>Db断言</el-dropdown-item>
-														<el-dropdown-item @click="addAssert(3)"><el-icon><Coin /></el-icon>Redis断言</el-dropdown-item>
-														<el-dropdown-item @click="addAssert(4)"><el-icon><Coin /></el-icon>直连-数据库断言</el-dropdown-item>
-														<el-dropdown-item @click="addAssert(5)"><el-icon><EditPen /></el-icon>自定义断言</el-dropdown-item>
-													</el-dropdown-menu>
-												</template>
-											</el-dropdown>
-										</div>
-									</div>
-								</el-tab-pane>
+<!-- 断言 -->
+<el-tab-pane name="assert">
+<template #label>
+<el-badge :show-zero="false" :value="req.assert.length" :offset="[10, 2]" type="danger">断言</el-badge>
+</template>
+<div class="op-scroll-wrap">
+<OperationPanel
+:items="req.assert"
+mode="assert"
+:db-list="effectiveDbList"
+:res-type-list="res_type_list"
+:val-type-list="val_type_list"
+/>
+</div>
+</el-tab-pane>
+
 								<!-- 配置 -->
 								<el-tab-pane label="配置" name="config">
 									<div>
@@ -482,8 +290,8 @@
 										</div>
 										<div class="settings-item">
 											<div class="settings-label">
-												<span>URL 自动编码</span>
-												<el-tooltip content="发送前对 URL 中的特殊字符进行 percent-encoding" placement="top">
+												<span>URL 编码</span>
+												<el-tooltip content="开启后对 URL 中的特殊字符进行编码" placement="top">
 													<el-icon class="settings-help"><InfoFilled /></el-icon>
 												</el-tooltip>
 											</div>
@@ -495,88 +303,8 @@
 						</div>
 					</div>
 
-				<!-- 证书管理弹窗 -->
-				<el-dialog v-model="certDialogVisible" title="证书管理" width="560px" destroy-on-close class="cert-dialog">
-					<div v-if="certPage==='list'">
-						<!-- CA 证书 -->
-						<div class="cert-section">
-							<div class="cert-section-header">
-								<div>
-									<div class="cert-section-title">CA 证书</div>
-									<div class="cert-section-sub">选择信任的 CA 证书</div>
-								</div>
-								<el-switch v-model="caEnabled" active-text="开启" />
-							</div>
-							<div v-if="caEnabled" class="cert-field-row">
-								<span class="cert-field-label">PEM 文件</span>
-								<el-upload :show-file-list="false" :auto-upload="false" :on-change="onCaFileChange" accept=".pem,.crt,.cer">
-									<el-button size="small" plain>{{ caFileName || '请选择文件' }}</el-button>
-								</el-upload>
-							</div>
-						</div>
-						<!-- 客户端证书 -->
-						<div class="cert-section" style="margin-top:20px">
-							<div class="cert-section-header">
-								<div>
-									<div class="cert-section-title">客户端证书</div>
-									<div class="cert-section-sub">添加或管理 SSL 证书</div>
-								</div>
-								<el-button link size="small" style="color:#409eff" @click="certPage='add'">添加客户端证书</el-button>
-							</div>
-							<div v-if="clientCerts.length===0" class="cert-empty">暂无客户端证书</div>
-							<div v-for="(c,i) in clientCerts" :key="i" class="cert-client-item">
-								<div>
-									<span class="cert-client-domain">{{ c.host }}:{{ c.port }}</span>
-									<span v-if="c.crt" class="cert-client-tag">CRT</span>
-									<span v-if="c.pfx" class="cert-client-tag">PFX</span>
-								</div>
-								<el-button type="danger" link size="small" @click="clientCerts.splice(i,1)">删除</el-button>
-							</div>
-						</div>
-					</div>
-					<!-- 添加证书子页面 -->
-					<div v-else>
-						<div class="cert-breadcrumb">
-							<el-button link size="small" @click="certPage='list'">客户端证书</el-button>
-							<span style="color:#909399;margin:0 4px">/</span>
-							<span style="color:#303133;font-size:13px">添加证书</span>
-						</div>
-						<el-form :model="newCert" label-width="90px" style="margin-top:16px">
-							<el-form-item label="域名">
-								<div style="display:flex;align-items:center;gap:6px;width:100%">
-									<el-input v-model="newCert.host" placeholder="example.com" style="flex:1" />
-									<span style="color:#909399">:</span>
-									<el-input v-model="newCert.port" placeholder="443" style="width:90px" />
-								</div>
-							</el-form-item>
-							<el-form-item label="CRT 文件">
-								<el-upload :show-file-list="false" :auto-upload="false" :on-change="(f:any)=>newCert.crt=f.name" accept=".crt,.cer,.pem">
-									<el-button size="small" plain>{{ newCert.crt || '请选择文件' }}</el-button>
-								</el-upload>
-							</el-form-item>
-							<el-form-item label="KEY 文件">
-								<el-upload :show-file-list="false" :auto-upload="false" :on-change="(f:any)=>newCert.key=f.name" accept=".key,.pem">
-									<el-button size="small" plain>{{ newCert.key || '请选择文件' }}</el-button>
-								</el-upload>
-							</el-form-item>
-							<el-form-item label="PFX 文件">
-								<el-upload :show-file-list="false" :auto-upload="false" :on-change="(f:any)=>newCert.pfx=f.name" accept=".pfx,.p12">
-									<el-button size="small" plain>{{ newCert.pfx || '请选择文件' }}</el-button>
-								</el-upload>
-							</el-form-item>
-							<el-form-item label="密钥">
-								<el-input v-model="newCert.passphrase" type="password" show-password placeholder="证书密钥（可选）" />
-							</el-form-item>
-						</el-form>
-						<div style="display:flex;gap:10px;margin-top:8px">
-							<el-button type="primary" @click="addClientCert">添加</el-button>
-							<el-button @click="certPage='list'">取消</el-button>
-						</div>
-					</div>
-				</el-dialog>
-
-				<!-- 保存为用例弹窗 -->
-				<el-dialog v-model="saveCaseDialogVisible" title="保存为用例" width="480px" destroy-on-close>
+				<!-- 保存为用例对话框 -->
+				<el-dialog v-model="saveCaseDialogVisible" title="保存为测试用例" width="560px" destroy-on-close>
 					<el-form :model="saveCaseForm" label-width="80px">
 						<el-form-item label="用例名称" required>
 							<el-input v-model="saveCaseForm.name" placeholder="请输入用例名称" />
@@ -624,8 +352,76 @@
 					</template>
 				</el-dialog>
 
+				<!-- 证书管理对话框 -->
+				<el-dialog v-model="certDialogVisible" title="证书管理" width="600px" destroy-on-close>
+					<div v-if="certPage === 'list'">
+						<div style="margin-bottom:12px">
+							<div style="font-size:13px;font-weight:600;margin-bottom:8px">CA 证书</div>
+							<div style="display:flex;align-items:center;gap:10px">
+								<el-switch v-model="caEnabled" />
+								<span style="font-size:12px;color:#606266">{{ caEnabled ? '已启用自定义 CA 证书' : '使用系统默认 CA 证书' }}</span>
+								<el-upload v-if="caEnabled" :show-file-list="false" accept=".pem,.crt,.cer" :http-request="() => {}" :on-change="onCaFileChange">
+									<el-button size="small" type="primary" plain>选择 CA 文件</el-button>
+								</el-upload>
+								<span v-if="caFileName" style="font-size:12px;color:#67c23a">{{ caFileName }}</span>
+							</div>
+						</div>
+						<el-divider />
+						<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+							<span style="font-size:13px;font-weight:600">客户端证书</span>
+							<el-button size="small" type="primary" @click="certPage='add'">+ 添加证书</el-button>
+						</div>
+						<el-table :data="clientCerts" border size="small" empty-text="暂无客户端证书">
+							<el-table-column prop="host" label="域名" min-width="140" />
+							<el-table-column prop="port" label="端口" width="70" />
+							<el-table-column label="证书类型" width="90">
+								<template #default="{ row }">
+									<el-tag size="small" :type="row.pfx ? 'warning' : 'primary'">{{ row.pfx ? 'PFX' : 'PEM' }}</el-tag>
+								</template>
+							</el-table-column>
+							<el-table-column label="操作" width="70" align="center">
+								<template #default="{ _, $index }">
+									<el-button type="danger" link size="small" @click="clientCerts.splice($index, 1)">删除</el-button>
+								</template>
+							</el-table-column>
+						</el-table>
+					</div>
+					<div v-else>
+						<el-form label-width="90px">
+							<el-form-item label="域名" required>
+								<div style="display:flex;align-items:center;gap:6px;width:100%">
+									<el-input v-model="newCert.host" placeholder="example.com" style="flex:1" />
+									<span style="color:#909399">:</span>
+									<el-input v-model="newCert.port" placeholder="443" style="width:80px" />
+								</div>
+							</el-form-item>
+							<el-form-item label="CRT 文件">
+								<el-input v-model="newCert.crt" placeholder="证书文件路径（.crt / .pem）" />
+							</el-form-item>
+							<el-form-item label="KEY 文件">
+								<el-input v-model="newCert.key" placeholder="私钥文件路径（.key）" />
+							</el-form-item>
+							<el-form-item label="PFX 文件">
+								<el-input v-model="newCert.pfx" placeholder="PFX/P12 文件路径（可选，替代 CRT+KEY）" />
+							</el-form-item>
+							<el-form-item label="密钥">
+								<el-input v-model="newCert.passphrase" type="password" show-password placeholder="证书密钥（可选）" />
+							</el-form-item>
+						</el-form>
+					</div>
+					<template #footer>
+						<template v-if="certPage === 'list'">
+							<el-button @click="certDialogVisible = false">关闭</el-button>
+						</template>
+						<template v-else>
+							<el-button @click="certPage = 'list'">取消</el-button>
+							<el-button type="primary" @click="addClientCert">添加</el-button>
+						</template>
+					</template>
+				</el-dialog>
+
 				<!-- 响应区 -->
-				<div class="response-section">
+				<div class="response-section" :class="{ 'response-section--collapsed': resCollapsed }">
 					<div class="panel-card">
 						<div class="res-tab-header">
 							<el-tabs v-model="res_active" class="apifox-tabs res-tabs" style="flex:1;min-width:0">
@@ -642,6 +438,11 @@
 								<el-tag v-if="res.code>0" size="small" :type="res.code>=200&&res.code<300?'success':res.code>=400?'danger':'warning'" effect="light" class="res-meta-tag">{{ res.code }}</el-tag>
 								<el-tag v-if="res.res_time>0" size="small" type="info" effect="plain" class="res-meta-tag">{{ res.res_time }} ms</el-tag>
 								<el-tag v-if="res.size>0" size="small" type="info" effect="plain" class="res-meta-tag">{{ res.size >= 1024 ? (res.size/1024).toFixed(1)+'KB' : res.size+'B' }}</el-tag>
+								<el-tooltip :content="resCollapsed ? '展开响应区' : '收起响应区'" placement="top">
+									<el-button link size="small" style="margin-left:4px;color:#909399" @click="resCollapsed = !resCollapsed">
+										<el-icon :style="{ transform: resCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"><ArrowDown /></el-icon>
+									</el-button>
+								</el-tooltip>
 							</div>
 						</div>
 						<div class="res-content">
@@ -910,6 +711,7 @@ import 'vue-json-pretty/lib/styles.css';
 import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, Document, InfoFilled, View, Folder } from '@element-plus/icons-vue';
 import { api_send, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/api_automation';
 import { useFileApi } from '/@/api/v1/common/file';
+import OperationPanel from './components/OperationPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 const props = defineProps({
@@ -1117,6 +919,8 @@ const loadDebugHistory = async () => {
 };
 watch(mainTab, (v) => { if (v === 'history') loadDebugHistory(); });
 const functionList = ref<any[]>([]);
+const scriptList = ref<any[]>([]);  // 脚本中心的脚本列表
+const localDbList = ref<any[]>([]);  // 内部加载的数据库列表，优先级高于 props
 
 // 证书管理
 const certDialogVisible = ref(false);
@@ -1140,6 +944,31 @@ const loadFunctionList = async () => {
 		functionList.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
 	} catch { functionList.value = []; }
 };
+
+// 加载脚本中心的脚本列表（用于前置/后置操作的脚本库选择）
+const loadScriptList = async () => {
+	if (!props.serviceId) return;
+	try {
+		const res: any = await apiAutomationApi.ntest_script_list({ api_service_id: Number(props.serviceId) });
+		scriptList.value = Array.isArray(res?.data) ? res.data : [];
+	} catch { scriptList.value = []; }
+};
+// 内部加载数据库列表，不依赖父组件传入
+const loadLocalDbList = async () => {
+	try {
+		const res: any = await apiAutomationApi.api_db_list({});
+		const raw = res?.data;
+		localDbList.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
+	} catch { localDbList.value = []; }
+};
+
+// 合并 prop 和内部加载的数据库列表
+const effectiveDbList = computed(() => {
+	const internal = localDbList.value;
+	const fromProp = (props.local_db_list as any[]) || [];
+	// 内部加载优先，若内部为空则用 prop
+	return internal.length > 0 ? internal : fromProp;
+});
 
 const req = ref({
 	method: 1, url: '', params: [], header: [], body: '', body_type: 2,
@@ -1177,7 +1006,9 @@ const tips = ref<any>('路径示例，结果{"code":200,"info":{"username":"admi
 
 const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900);
 const onResize = () => { viewportH.value = window.innerHeight; };
-onMounted(() => { window.addEventListener('resize', onResize); loadFunctionList(); });
+const resCollapsed = ref(false);
+onMounted(() => { window.addEventListener('resize', onResize); loadFunctionList(); loadScriptList(); loadLocalDbList(); });
+watch(() => props.serviceId, (v) => { if (v) loadScriptList(); });
 onBeforeUnmount(() => window.removeEventListener('resize', onResize));
 
 const resJsonHeight = computed(() => Math.max(120, Math.floor(viewportH.value * 0.28)));
@@ -1370,7 +1201,7 @@ const confirmSaveAsCase = async () => {
 </script>
 
 <style lang="scss" scoped>
-.api-detail-container { height: calc(100vh - 100px); display: flex; flex-direction: column; padding: 0; margin: 0; overflow: hidden; background: var(--el-bg-color-page); }
+.api-detail-container { height: 100%; display: flex; flex-direction: column; padding: 0; margin: 0; overflow: hidden; background: var(--el-bg-color-page); }
 .api-detail-container.is-embedded { height: 100%; flex: 1; min-height: 0; }
 .api-detail-container.is-embedded .api-detail-card :deep(.el-card__body) { padding: 6px; }
 .api-detail-card { height: 100%; flex: 1; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; background: var(--el-bg-color-page); }
@@ -1388,8 +1219,11 @@ const confirmSaveAsCase = async () => {
 .action-btn { flex-shrink: 0; color: var(--el-text-color-regular); border-color: var(--el-border-color); }
 .action-btn:hover { color: #409eff; border-color: #409eff; }
 .api-detail-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.request-section { flex: 0 0 44%; min-height: 260px; }
-.response-section { flex: 1 1 56%; min-height: 300px; display: flex; flex-direction: column; }
+.request-section { flex: 0 0 44%; min-height: 260px; transition: flex 0.25s ease; }
+.response-section { flex: 1 1 56%; min-height: 300px; display: flex; flex-direction: column; transition: flex 0.25s ease, min-height 0.25s ease; }
+.response-section--collapsed { flex: 0 0 38px !important; min-height: 38px !important; overflow: hidden; }
+.response-section--collapsed ~ .request-section,
+.api-detail-body:has(.response-section--collapsed) .request-section { flex: 1 1 auto; }
 .panel-card { height: 100%; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.05); display: flex; flex-direction: column; overflow: hidden; }
 .apifox-tabs { height: 100%; display: flex; flex-direction: column; }
 .apifox-tabs :deep(.el-tabs__header) { margin: 0; background: var(--el-fill-color-light); border-bottom: 1px solid var(--el-border-color); padding: 0 8px; flex-shrink: 0; }
@@ -1400,6 +1234,12 @@ const confirmSaveAsCase = async () => {
 .apifox-tabs :deep(.el-tabs__active-bar) { height: 2px; background: linear-gradient(90deg,#409eff,#66b1ff); border-radius: 2px 2px 0 0; }
 .apifox-tabs :deep(.el-tabs__content) { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; }
 .apifox-tabs :deep(.el-tab-pane) { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+/* 前置/后置/断言 tab 内容自然流动，不限制高度 */
+.apifox-tabs :deep(.el-tab-pane[id*="pane-before"]),
+.apifox-tabs :deep(.el-tab-pane[id*="pane-after"]),
+.apifox-tabs :deep(.el-tab-pane[id*="pane-assert"]) { height: auto; min-height: 0; }
+/* 操作面板滚动容器：撑开内容，让父级 el-tabs__content 滚动 */
+.op-scroll-wrap { width: 100%; }
 .apifox-tabs :deep(.el-badge__content) { top: 6px; right: 0px; font-size: 9px; height: 14px; line-height: 14px; padding: 0 3px; min-width: 14px; border: none; }
 .res-badge :deep(.el-badge__content) { font-size: 9px; height: 13px; line-height: 13px; padding: 0 3px; min-width: 13px; border: none; }
 .res-meta-tag { font-size: 11px; font-weight: 600; padding: 0 6px; height: 20px; line-height: 20px; border-radius: 3px; }

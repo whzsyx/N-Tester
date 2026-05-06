@@ -1,7 +1,6 @@
-"""
-加密工具
-提供各种加密、哈希、密码强度分析等功能
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import hashlib
 import hmac
 import secrets

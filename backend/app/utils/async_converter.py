@@ -1,4 +1,6 @@
-"""Custom Celery worker pool."""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 # Future Imports
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""
-健康检查业务逻辑层
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 try:
     import psutil

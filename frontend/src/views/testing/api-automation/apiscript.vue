@@ -101,9 +101,9 @@
 		</div>
 
 		<!-- 新增/编辑用例弹窗 -->
-		<el-dialog v-model="caseDialogVisible" :title="caseDialogTitle" width="520px" destroy-on-close @close="resetCaseForm">
-			<el-form ref="caseFormRef" :model="caseForm" label-width="80px">
-				<el-form-item label="用例名称" required>
+		<el-dialog v-model="caseDialogVisible" :title="caseDialogTitle" width="860px" destroy-on-close @close="resetCaseForm">
+			<el-form ref="caseFormRef" :model="caseForm" :rules="caseFormRules" label-width="80px">
+				<el-form-item label="用例名称" prop="name">
 					<el-input v-model="caseForm.name" placeholder="请输入用例名称" />
 				</el-form-item>
 				<el-form-item label="用例类型">
@@ -112,7 +112,28 @@
 					</el-radio-group>
 				</el-form-item>
 				<el-form-item label="描述">
-					<el-input v-model="caseForm.description" type="textarea" :rows="2" placeholder="可选" />
+					<el-input v-model="caseForm.description" type="textarea" :rows="2" placeholder="请输入描述（可选）" />
+				</el-form-item>
+				<el-form-item label="步骤依赖">
+					<el-radio-group v-model="caseForm.step_rely">
+						<el-radio-button :value="1">
+							是
+							<el-tooltip content="步骤间共享变量：前一步骤提取的变量可在后续步骤中通过 ${变量名} 引用" placement="top">
+								<el-icon style="margin-left:4px;vertical-align:middle"><ele-InfoFilled /></el-icon>
+							</el-tooltip>
+						</el-radio-button>
+						<el-radio-button :value="0">
+							否
+							<el-tooltip content="每个步骤独立执行，不共享变量上下文" placement="top">
+								<el-icon style="margin-left:4px;vertical-align:middle"><ele-InfoFilled /></el-icon>
+							</el-tooltip>
+						</el-radio-button>
+					</el-radio-group>
+				</el-form-item>
+				<el-form-item label="步骤">
+					<div style="width:100%;max-height:480px;overflow-y:auto;padding-right:4px">
+					<StepEditor v-model="caseForm.steps" :service-id="selectedServiceId ?? 0" :depth="0" />
+					</div>
 				</el-form-item>
 			</el-form>
 			<template #footer>
@@ -264,10 +285,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import type { FormRules } from 'element-plus';
 import { DocumentCopy, Monitor, Folder } from '@element-plus/icons-vue';
 import { Session } from '/@/utils/storage';
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog';
 import ApiDetail from './api_detail.vue';
+import StepEditor from './components/step-editor/StepEditor.vue';
 import { useApiAutomationApi } from '/@/api/v1/api_automation';
 
 const {
@@ -275,6 +298,7 @@ const {
 	api_suite_list,
 	api_case_list,
 	add_api_case,
+	edit_api_case,
 	del_api_case,
 	api_env,
 	run_api_case,
@@ -399,34 +423,43 @@ const caseDialogVisible = ref(false);
 const caseDialogTitle = ref('新增用例');
 const caseSubmitting = ref(false);
 const caseFormRef = ref<any>(null);
-const caseForm = ref({ id: 0, name: '', description: '', case_type: 1, mode: 'add' as 'add' | 'edit' });
+const caseForm = ref<any>({ id: 0, name: '', description: '', steps: [], case_type: 1, step_rely: 1, mode: 'add' as 'add' | 'edit' });
+const caseFormRules: FormRules = { name: [{ required: true, message: '请输入用例名称', trigger: 'blur' }] };
 
 const openAddCaseDialog = () => {
 	if (!selectedSuiteId.value) { ElMessage.warning('请先选择用例集'); return; }
-	caseForm.value = { id: 0, name: '', description: '', case_type: 1, mode: 'add' };
+	caseForm.value = { id: 0, name: '', description: '', steps: [], case_type: 1, step_rely: 1, mode: 'add' };
 	caseDialogTitle.value = '新增用例';
 	caseDialogVisible.value = true;
 };
 
 const openEditCaseDialog = (row: any) => {
-	caseForm.value = { id: row.id, name: row.name, description: row.description || '', case_type: row.case_type || 1, mode: 'edit' };
+	caseForm.value = {
+		id: row.id, name: row.name, description: row.description || '',
+		steps: Array.isArray(row.script) ? row.script : [],
+		case_type: row.case_type || 1,
+		step_rely: row.step_rely ?? 1,
+		mode: 'edit',
+	};
 	caseDialogTitle.value = '编辑用例';
 	caseDialogVisible.value = true;
 };
 
 const resetCaseForm = () => {
-	caseForm.value = { id: 0, name: '', description: '', case_type: 1, mode: 'add' };
+	caseForm.value = { id: 0, name: '', description: '', steps: [], case_type: 1, step_rely: 1, mode: 'add' };
 };
 
 const submitCaseForm = async () => {
-	if (!caseForm.value.name.trim()) { ElMessage.warning('请输入用例名称'); return; }
+	const valid = await caseFormRef.value?.validate().catch(() => false);
+	if (!valid) return;
 	caseSubmitting.value = true;
 	try {
+		const script = caseForm.value.steps || [];
 		if (caseForm.value.mode === 'edit') {
-			await add_api_case({ id: caseForm.value.id, name: caseForm.value.name, description: caseForm.value.description, case_type: caseForm.value.case_type } as any);
+			await edit_api_case({ id: caseForm.value.id, name: caseForm.value.name, description: caseForm.value.description, script, case_type: caseForm.value.case_type, step_rely: caseForm.value.step_rely });
 			ElMessage.success('修改成功');
 		} else {
-			await add_api_case({ name: caseForm.value.name, description: caseForm.value.description, suite_id: selectedSuiteId.value!, case_type: caseForm.value.case_type });
+			await add_api_case({ name: caseForm.value.name, description: caseForm.value.description, suite_id: selectedSuiteId.value!, script, case_type: caseForm.value.case_type, step_rely: caseForm.value.step_rely });
 			ElMessage.success('新增成功');
 		}
 		caseDialogVisible.value = false;

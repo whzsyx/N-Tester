@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-编码生成器数据模型
-"""
+# @author: Rebort
+
 from typing import Optional, List
 from pydantic import BaseModel, Field
 

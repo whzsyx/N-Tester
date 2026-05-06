@@ -1,7 +1,6 @@
-"""
-Playwright自动化测试执行引擎
-用于驱动真实浏览器执行UI自动化测试
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import asyncio
 import base64
 import time

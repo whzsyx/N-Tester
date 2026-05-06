@@ -1,6 +1,6 @@
-"""
-项目管理Schema
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional, Dict, Any
 from datetime import datetime

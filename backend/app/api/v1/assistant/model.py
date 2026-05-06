@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, BigInteger, String, Text, DateTime, Boolean, Index
 from sqlalchemy.sql import func

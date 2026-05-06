@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-AI智能化模块业务逻辑层
-"""
+# @author: Rebort
 
 import json
 import httpx

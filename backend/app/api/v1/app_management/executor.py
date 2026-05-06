@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import asyncio
 import os
 import subprocess
@@ -11,7 +14,6 @@ from appium import webdriver
 from appium.options.android import UiAutomator2Options
 from appium.webdriver.common.appiumby import AppiumBy
 from app.db.sqlalchemy import async_session
-from app.api.v1.cloud_device.model import AppDevice
 from .model import AppResultModel, AppResultListModel
 from sqlalchemy import select, update
 
@@ -155,14 +157,7 @@ async def _update_summary(
 
 
 async def _release_device(deviceid: str, user_id: int) -> None:
-    """执行完成后释放设备：“执行结束自动置空闲”"""
-    async with async_session() as db:
-        await db.execute(
-            update(AppDevice)
-            .where(AppDevice.device_id == deviceid, AppDevice.user_id == user_id)
-            .values(device_status=1)
-        )
-        await db.commit()
+    pass
 
 
 def _platform_is_android(caps: Optional[Dict[str, Any]]) -> bool:

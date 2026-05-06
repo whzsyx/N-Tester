@@ -1,7 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-APP 自动化 Airtest 运行时公共函数
-"""
+# @author: Rebort
 from __future__ import annotations
 
 import os

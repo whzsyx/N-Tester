@@ -1,6 +1,6 @@
-"""
-API测试模块请求执行引擎
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import re
 import time
 import json

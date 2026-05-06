@@ -1,6 +1,6 @@
-"""
-APP管理模块业务逻辑服务
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from typing import List, Optional, Dict, Any
 import asyncio
 import os
@@ -13,7 +13,6 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, delete
 from sqlalchemy.orm.attributes import flag_modified
-from app.api.v1.cloud_device.model import AppDevice
 from app.api.v1.system.file.service import FileService
 
 from .model import (
@@ -406,13 +405,7 @@ class AppManagementService:
             exec_id = (ntest_ctx or {}).get("udid") or deviceid
             if not exec_id:
                 continue
-            await db.execute(
-                update(AppDevice)
-                .where(AppDevice.device_id == exec_id, AppDevice.user_id == user_id)
-                .values(device_status=2)
-            )
             device_name = str(d.get("name") or d.get("device_name") or "")
-            pkg = str(d.get("package") or script_config.get("package") or "")
             os_type = str(d.get("os_type") or "android")
             install_path = str(d.get("path") or script_config.get("path") or "")
             appium_url = AppManagementService._appium_server_url()
@@ -556,9 +549,6 @@ class AppManagementService:
             device_package = str(d.get("package") or "")
             os_type = str(d.get("os_type") or "android")
             install_path = str(d.get("path") or "")
-            await db.execute(
-                update(AppDevice).where(AppDevice.device_id == exec_id, AppDevice.user_id == user_id).values(device_status=2)
-            )
 
             appium_url = AppManagementService._appium_server_url()
             merged_steps: List[Dict[str, Any]] = []
@@ -1366,22 +1356,7 @@ class AppManagementService:
             row.end_time = datetime.now()
             flag_modified(row, "script_status")
 
-            await db.execute(
-                update(AppDevice)
-                .where(AppDevice.device_id == str(deviceid), AppDevice.user_id == user_id)
-                .values(device_status=1)
-            )
-
-            dn = (
-                await db.execute(
-                    select(AppDevice.device_name).where(
-                        AppDevice.device_id == str(deviceid),
-                        AppDevice.user_id == user_id,
-                        AppDevice.enabled_flag == 1,
-                    )
-                )
-            ).scalar_one_or_none()
-            device_name = str(dn or deviceid)
+            device_name = str(deviceid)
             await ApiAutomationService._send_notice(
                 db,
                 26,
@@ -1414,10 +1389,6 @@ class AppManagementService:
                     AppManagementService._proc_index.pop(int(pid_in_row), None)
             except Exception:
                 pass
-            if did:
-                await db.execute(
-                    update(AppDevice).where(AppDevice.device_id == did, AppDevice.user_id == user_id).values(device_status=1)
-                )
         row.end_time = datetime.now()
         ss = list(row.script_status or [])
         ss.append({"stopped": True, "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})

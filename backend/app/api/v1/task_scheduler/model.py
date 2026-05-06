@@ -1,6 +1,6 @@
-"""
-定时数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, Boolean, BigInteger
 from sqlalchemy.sql import func
 from app.models.base import Base

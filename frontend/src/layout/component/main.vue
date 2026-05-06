@@ -40,7 +40,10 @@ const {isTagsViewCurrenFull} = storeToRefs(storesTagsViewRoutes);
 
 // 设置 footer 显示/隐藏
 const isFooter = computed(() => {
-  return themeConfig.value.isFooter && !route.meta.isIframe;
+  // Hide footer for full-screen app routes (接口自动化, UI自动化 etc.)
+  const fullScreenPaths = ['/testing/', '/ai/']
+  const isFullScreen = fullScreenPaths.some(p => route.path.startsWith(p))
+  return themeConfig.value.isFooter && !route.meta.isIframe && !isFullScreen;
 });
 // 设置 header 固定
 const isFixedHeader = computed(() => {

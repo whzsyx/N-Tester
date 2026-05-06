@@ -1,6 +1,7 @@
-"""
-WebSocket 流式对话控制器
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query

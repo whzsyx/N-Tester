@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-OAuth Schema - OAuth 数据模型
-"""
+# @author: Rebort
+
 from typing import Optional
 
 from pydantic import BaseModel

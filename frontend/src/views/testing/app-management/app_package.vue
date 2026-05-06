@@ -210,7 +210,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { get_device_list, devices_install, devices_uninstall } from "@/api/api_app/device.ts";
 import { MsgSuccess, NoticeError } from "@/utils/koi";
 import { file_list } from "@/api/api_file/file";
 import { Plus, Delete, Search, Refresh, Download, Upload } from "@element-plus/icons-vue";

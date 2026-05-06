@@ -1,8 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-字符处理工具
-提供字符串处理、文本对比、正则测试等功能
-"""
+# @author: Rebort字符串处理、文本对比、正则测试等功能
+
 import re
 import json
 import difflib

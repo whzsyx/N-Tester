@@ -1,7 +1,6 @@
-"""
-认证依赖注入
-集成数据权限和接口权限
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, status

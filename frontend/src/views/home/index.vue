@@ -1,260 +1,408 @@
 <template>
-  <div class="dashboard-container app-container">
-
-    <!-- 公告滚动条 -->
+  <div class="home-page">
     <div class="notice-bar">
       <el-icon class="notice-icon"><Bell /></el-icon>
       <div class="notice-track-wrap">
         <div class="notice-track">
-          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！点击右上角通知图标进入交流群，持续优化中</span>
-          <span class="notice-text">N-Tester AI全栈测试平台，提供接口自动化，双引擎UI自动化，APP自动化，支持MCP，知识库，自定义管理Skill，一站式解决方案！点击右上角通知图标进入交流群，持续优化中</span>
+          <span class="notice-text">🚀 N-Tester AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
+          <span class="notice-text">🚀 N-Tester AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
         </div>
       </div>
     </div>
-
-    <!-- 欢迎 Hero 区域 -->
-    <div class="hero-section">
-      <div class="hero-bg"></div>
-      <div class="hero-content">
-        <div class="hero-left">
-          <div class="hero-greeting">{{ greetingText }}，{{ userInfo.nickname || '管理员' }}</div>
-          <div class="hero-sub">欢迎回到 N-Tester 全栈测试平台</div>
-          <div class="hero-meta">
-            <span class="hero-date"><el-icon class="meta-icon"><Calendar /></el-icon>{{ currentDate }}</span>
-            <span class="hero-time"><el-icon class="meta-icon"><Clock /></el-icon>{{ currentTime }}</span>
+    <div class="page-body">
+      <div class="hero-section">
+        <div class="hero-content">
+          <div class="hero-left">
+            <div class="hero-greeting">{{ greetingText }}，{{ userInfo.nickname || userInfo.username || '管理员' }}</div>
+            <div class="hero-sub">欢迎回到 N-Tester 全栈测试平台</div>
+            <div class="hero-meta">
+              <span class="hero-date"><el-icon class="meta-icon"><Calendar /></el-icon>{{ currentDate }}</span>
+              <span class="hero-time"><el-icon class="meta-icon"><Clock /></el-icon>{{ currentTime }}</span>
+            </div>
           </div>
-        </div>
-        <div class="hero-right">
-          <div class="hero-avatar-wrap">
-            <el-avatar :size="72" :src="userInfo.avatar || undefined" class="hero-avatar">
-              <el-icon :size="36"><User /></el-icon>
-            </el-avatar>
-            <div class="hero-avatar-ring"></div>
+          <div class="hero-right">
+            <div class="hero-avatar-wrap">
+              <el-avatar :size="64" :src="userInfo.avatar || undefined" class="hero-avatar">
+                <el-icon :size="30"><User /></el-icon>
+              </el-avatar>
+              <div class="hero-avatar-ring"></div>
+            </div>
           </div>
         </div>
       </div>
+      <el-row :gutter="16" class="stat-row">
+        <el-col :xs="12" :sm="8" :md="4" v-for="(card, i) in statCards" :key="i">
+          <div class="stat-card" :class="{ 'no-click': !card.path }" @click="card.path && goTo(card.path)">
+            <div class="stat-card-left">
+              <div class="stat-val">{{ card.value }}</div>
+              <div class="stat-label">{{ card.label }}</div>
+              <div class="stat-change" :class="card.changeType">
+                <el-icon v-if="card.changeType === 'up'"><Top /></el-icon>
+                <el-icon v-else-if="card.changeType === 'down'"><Bottom /></el-icon>
+                <span>{{ card.change }}</span>
+              </div>
+            </div>
+            <div class="stat-card-icon-wrap" :style="{ background: card.bgColor }">
+              <el-icon :size="24" :style="{ color: card.iconColor }"><component :is="card.icon" /></el-icon>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+      <el-row :gutter="16" class="mid-row">
+        <el-col :xs="24" :md="12">
+          <div class="panel">
+            <div class="panel-hd">
+              <span class="panel-title">执行趋势</span>
+              <el-select v-model="trendDays" size="small" style="width:90px" @change="initTrendChart">
+                <el-option label="近7天" :value="7" />
+                <el-option label="近14天" :value="14" />
+                <el-option label="近30天" :value="30" />
+              </el-select>
+            </div>
+            <div class="chart-wrap" ref="trendChartEl" v-loading="trendLoading"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :md="6">
+          <div class="panel">
+            <div class="panel-hd">
+              <span class="panel-title">测试类型分布</span>
+            </div>
+            <div class="chart-wrap" ref="typeChartEl" v-loading="typeLoading"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :md="6">
+          <div class="panel recent-panel">
+            <div class="panel-hd recent-tab-hd">
+              <div class="recent-tabs">
+                <span
+                  class="recent-tab"
+                  :class="{ active: recentTab === 'api' }"
+                  @click="switchRecentTab('api')"
+                >接口执行</span>
+                <span
+                  class="recent-tab"
+                  :class="{ active: recentTab === 'web' }"
+                  @click="switchRecentTab('web')"
+                >UI执行</span>
+              </div>
+              <span class="more-link" @click="goTo(recentTab === 'api' ? '/api-automation/results' : '/web/result')">更多 &gt;</span>
+            </div>
+            <div class="recent-scroll-wrap" ref="recentScrollWrap">
+              <el-empty v-if="!currentRecentList.length" description="暂无记录" :image-size="48" style="padding: 40px 0" />
+              <div v-else class="recent-scroll-track" ref="recentScrollTrack">
+                <template v-for="pass in 2" :key="pass">
+                  <div
+                    v-for="(item, i) in currentRecentList"
+                    :key="`${pass}-${i}`"
+                    class="recent-item"
+                  >
+                    <div class="recent-item-left">
+                      <el-icon class="recent-type-icon" :style="{ color: recentTab === 'api' ? '#6366f1' : '#0ea5e9' }">
+                        <component :is="recentTab === 'api' ? Connection : Monitor" />
+                      </el-icon>
+                      <div class="recent-item-info">
+                        <div class="recent-item-name">{{ item.name }}</div>
+                        <div class="recent-item-meta">{{ item.username || '-' }} · {{ item.time }}</div>
+                      </div>
+                    </div>
+                    <el-tag
+                      :type="item.statusTag"
+                      size="small"
+                      effect="light"
+                    >{{ item.statusText }}</el-tag>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+      <div class="panel review-stats-panel">
+        <div class="panel-hd">
+          <span class="panel-title">
+            <el-icon class="title-icon"><DataAnalysis /></el-icon>
+            用例评审统计
+          </span>
+          <span class="more-link" @click="goTo('/reviews/statistics')">更多 &gt;</span>
+        </div>
+        <div class="review-stats-body" v-loading="reviewStatsLoading">
+          <div class="review-num-grid">
+            <div class="review-num-card" @click="goTo('/reviews/index')">
+              <div class="review-num-val">{{ reviewStats.total_reviews }}</div>
+              <div class="review-num-label">总评审</div>
+            </div>
+            <div class="review-num-card pending-card" @click="goTo('/reviews/index')">
+              <div class="review-num-val">{{ reviewStats.pending_reviews }}</div>
+              <div class="review-num-label">待开始</div>
+            </div>
+            <div class="review-num-card progress-card" @click="goTo('/reviews/index')">
+              <div class="review-num-val">{{ reviewStats.in_progress_reviews }}</div>
+              <div class="review-num-label">进行中</div>
+            </div>
+            <div class="review-num-card done-card" @click="goTo('/reviews/index')">
+              <div class="review-num-val">{{ reviewStats.completed_reviews }}</div>
+              <div class="review-num-label">已完成</div>
+            </div>
+          </div>
+          <div class="review-charts">
+            <div class="review-chart-item">
+              <div class="review-chart-title">状态分布</div>
+              <div class="review-chart-el" ref="reviewStatusChartEl"></div>
+            </div>
+            <div class="review-chart-item">
+              <div class="review-chart-title">优先级分布</div>
+              <div class="review-chart-el" ref="reviewPriorityChartEl"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel quick-panel">
+        <div class="panel-hd">
+          <span class="panel-title">快速入口</span>
+        </div>
+        <div class="quick-grid">
+          <div v-for="(entry, i) in quickEntries" :key="i" class="quick-item" @click="goTo(entry.path)">
+            <div class="quick-icon-wrap" :style="{ background: entry.bgColor }">
+              <el-icon :size="22" :style="{ color: entry.iconColor }"><component :is="entry.icon" /></el-icon>
+            </div>
+            <div class="quick-item-info">
+              <div class="quick-item-name">{{ entry.name }}</div>
+              <div class="quick-item-desc">{{ entry.desc }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <el-row :gutter="16" class="bottom-row">
+        <el-col :xs="24" :md="8">
+          <div class="panel project-panel">
+            <div class="panel-hd">
+              <span class="panel-title">项目概览</span>
+              <span class="more-link" @click="goTo('/projects/list')">更多 &gt;</span>
+            </div>
+            <div class="project-list" v-loading="projectLoading">
+              <el-empty v-if="!activeProjects.length" description="暂无项目" :image-size="48" />
+              <div v-for="(p, i) in activeProjects.slice(0, 5)" :key="p.id" class="project-item">
+                <div class="project-rank" :class="i < 3 ? 'rank-gold' : ''">{{ i + 1 }}</div>
+                <div class="project-info">
+                  <div class="project-name">{{ p.name }}</div>
+                  <el-progress
+                    :percentage="p.activity_score"
+                    :show-text="false"
+                    :stroke-width="4"
+                    :color="getActivityColor(p.activity_score)"
+                    style="margin-top: 5px"
+                  />
+                </div>
+                <span class="project-score" :style="{ color: getActivityColor(p.activity_score) }">{{ p.activity_score }}%</span>
+              </div>
+            </div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :md="8">
+          <div class="panel">
+            <div class="panel-hd">
+              <span class="panel-title">通知中心</span>
+              <el-badge :value="unreadCount" :hidden="!unreadCount" :max="99">
+                <span class="more-link" @click="goTo('/notifications/histories')">更多 &gt;</span>
+              </el-badge>
+            </div>
+            <div class="todo-list">
+              <el-empty v-if="!notifications.length" description="暂无通知" :image-size="48" />
+              <div v-for="(n, i) in notifications" :key="i" class="todo-item">
+                <div class="todo-dot" :class="'dot-' + n.status"></div>
+                <div class="todo-content">
+                  <div class="todo-title">{{ n.title }}</div>
+                  <div class="todo-time">{{ formatTime(n.created_at) }}</div>
+                </div>
+                <el-tag :type="getStatusTag(n.status)" size="small" effect="plain">{{ getStatusText(n.status) }}</el-tag>
+              </div>
+            </div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :md="8">
+          <div class="panel df-panel">
+            <div class="panel-hd">
+              <span class="panel-title">数据工厂统计</span>
+              <span class="more-link" @click="goTo('/data-factory/tools')">更多 &gt;</span>
+            </div>
+            <div class="df-body" v-loading="dfStatsLoading">
+              <div class="df-total-row">
+                <div class="df-total-block">
+                  <div class="df-total-val">{{ dfStats.total_records }}</div>
+                  <div class="df-total-label">累计使用次数</div>
+                </div>
+                <div class="df-bar-chart" ref="dfBarChartEl"></div>
+              </div>
+              <div class="df-recent-title">最近使用</div>
+              <div class="df-recent-list">
+                <el-empty v-if="!dfStats.recent_tools.length" description="暂无记录" :image-size="36" />
+                <div
+                  v-for="(t, i) in dfStats.recent_tools.slice(0, 4)"
+                  :key="i"
+                  class="df-recent-item"
+                  @click="goTo('/data-factory/tools')"
+                >
+                  <div class="df-recent-icon">
+                    <el-icon :size="14" style="color:#6366f1"><DataAnalysis /></el-icon>
+                  </div>
+                  <div class="df-recent-info">
+                    <div class="df-recent-name">{{ dfToolNameMap[t.tool_name] || t.tool_scenario_display || t.tool_name }}</div>
+                    <div class="df-recent-meta">{{ t.tool_category_display }} · {{ formatTime(t.created_at) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-col>
+
+      </el-row>
     </div>
-
-    <!-- 核心统计卡片 -->
-    <el-row :gutter="16" class="stats-row">
-      <el-col :xs="12" :sm="12" :md="6" v-for="(card, i) in statCards" :key="i">
-        <div class="stat-card" :style="{'--card-color': card.color}" @click="goToPage(card.path)">
-          <div class="stat-card-bg"></div>
-          <el-icon class="stat-card-icon" :size="30"><component :is="card.icon" /></el-icon>
-          <div class="stat-card-body">
-            <div class="stat-card-val">{{ card.value }}</div>
-            <div class="stat-card-label">{{ card.label }}</div>
-            <div class="stat-card-sub">{{ card.sub }}</div>
-          </div>
-          <el-icon class="stat-card-arrow"><ArrowRight /></el-icon>
-        </div>
-      </el-col>
-    </el-row>
-
-    <!-- 图表区域 -->
-    <el-row :gutter="16" class="chart-row">
-      <el-col :xs="24" :md="16">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><TrendCharts /></el-icon>测试执行趋势</span>
-            <el-button text size="small" @click="refreshExecutionTrends"><el-icon><Refresh /></el-icon></el-button>
-          </div>
-          <div class="chart-box" ref="executionTrendChart" v-loading="executionTrendLoading"></div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :md="8">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><PieChart /></el-icon>评审进度</span>
-            <el-button text size="small" @click="goToPage('/reviews/statistics')"><el-icon><View /></el-icon></el-button>
-          </div>
-          <div class="chart-box" ref="reviewStatsChart" v-loading="reviewStatsLoading"></div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="16" class="chart-row">
-      <el-col :xs="24" :md="12">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><DataAnalysis /></el-icon>数据工厂统计</span>
-            <el-button text size="small" @click="goToPage('/data-factory/tools')"><el-icon><View /></el-icon></el-button>
-          </div>
-          <div class="chart-box" ref="dataFactoryChart" v-loading="dataFactoryLoading"></div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :md="12">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><Connection /></el-icon>API接口统计</span>
-            <el-button text size="small" @click="refreshApiInterfaceStats"><el-icon><Refresh /></el-icon></el-button>
-          </div>
-          <div class="chart-box" ref="apiInterfaceChart" v-loading="apiInterfaceLoading"></div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <!-- 底部信息区 -->
-    <el-row :gutter="16" class="bottom-row">
-      <!-- 通知中心 -->
-      <el-col :xs="24" :md="12">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><Bell /></el-icon>通知中心</span>
-            <el-badge :value="unreadNotifications" :hidden="!unreadNotifications">
-              <el-button text size="small" @click="goToPage('/notifications/histories')"><el-icon><View /></el-icon></el-button>
-            </el-badge>
-          </div>
-          <div class="list-body">
-            <el-empty v-if="!recentNotifications.length" description="暂无通知" :image-size="50" />
-            <div v-for="(n, i) in recentNotifications" :key="i" class="list-item">
-              <div class="list-item-dot" :class="'dot-' + n.status"></div>
-              <div class="list-item-content">
-                <div class="list-item-title">{{ n.title }}</div>
-                <div class="list-item-time">{{ formatTime(n.created_at) }}</div>
-              </div>
-              <el-tag :type="getNotificationTypeTag(n.status)" size="small" effect="plain">{{ getNotificationStatusText(n.status) }}</el-tag>
-            </div>
-          </div>
-        </div>
-      </el-col>
-
-      <!-- 项目活跃度 -->
-      <el-col :xs="24" :md="12">
-        <div class="panel">
-          <div class="panel-header">
-            <span class="panel-title"><el-icon class="title-icon"><Trophy /></el-icon>项目活跃度</span>
-            <el-button text size="small" @click="refreshProjectActivity"><el-icon><Refresh /></el-icon></el-button>
-          </div>
-          <div class="list-body" v-loading="activityLoading">
-            <el-empty v-if="!activeProjects.length" description="暂无活跃项目" :image-size="50" />
-            <div v-for="(p, i) in activeProjects" :key="p.id" class="list-item">
-              <div class="rank-badge" :class="i < 3 ? 'rank-top' : ''">{{ i + 1 }}</div>
-              <div class="list-item-content">
-                <div class="list-item-title">{{ p.name }}</div>
-                <el-progress :percentage="p.activity_score" :show-text="false" :stroke-width="5" :color="getActivityColor(p.activity_score)" style="margin-top:4px" />
-              </div>
-              <span class="activity-score-text" :style="{color: getActivityColor(p.activity_score)}">{{ p.activity_score }}%</span>
-            </div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
   </div>
 </template>
 
 <script setup lang="ts" name="home">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useUserStore } from '/@/stores/user';
 import { useThemeConfig } from '/@/stores/themeConfig';
 import * as echarts from 'echarts';
 import { useDashboardApi } from '/@/api/v1/dashboard';
-import { User, Refresh, View, Bell, Calendar, Clock, Folder, Document, MagicStick, UserFilled, TrendCharts, DataAnalysis, Connection, ArrowRight, Trophy, PieChart } from '@element-plus/icons-vue';
 import { useApiAutomationApi } from '/@/api/v1/api_automation';
 import { useWebManagementApi } from '/@/api/v1/web_management';
+import { getReviewStatistics } from '/@/api/v1/reviews';
+import {
+  Bell, Top, Bottom, Folder, Document, MagicStick, UserFilled,
+  Connection, DataAnalysis, Collection, Monitor,
+  List, TrendCharts, Files, VideoPlay, Phone, Calendar, Clock, User
+} from '@element-plus/icons-vue';
 
-const dashboardApi = useDashboardApi();
-const { get_api_script_result_list } = useApiAutomationApi();
-const { get_web_result_list } = useWebManagementApi();
 const router = useRouter();
 const userStore = useUserStore();
 const themeConfigStore = useThemeConfig();
 const { userInfos: userInfo } = storeToRefs(userStore);
 const { themeConfig } = storeToRefs(themeConfigStore);
+const dashboardApi = useDashboardApi();
+const { get_api_script_result_list } = useApiAutomationApi();
+const { get_web_result_list } = useWebManagementApi();
 
-const currentTime = ref('');
-const currentDate = ref('');
-const coreStats = ref({ projects: { total: 0, active: 0 }, test_cases: { total: 0, pass_rate: 0 }, ai_executions: { total: 0, success_rate: 0 }, users: { total: 0, online: 0 } });
-const recentNotifications = ref<any[]>([]);
-const unreadNotifications = ref(0);
-const activeProjects = ref<any[]>([]);
-const activityLoading = ref(false);
-const executionTrendChart = ref();
-const dataFactoryChart = ref();
-const reviewStatsChart = ref();
-const apiInterfaceChart = ref();
-const executionTrendLoading = ref(false);
-const dataFactoryLoading = ref(false);
-const reviewStatsLoading = ref(false);
-const apiInterfaceLoading = ref(false);
-
-const greetingText = computed(() => {
-  const h = new Date().getHours();
-  if (h < 6) return '凌晨好'; if (h < 9) return '早上好'; if (h < 12) return '上午好';
-  if (h < 14) return '中午好'; if (h < 17) return '下午好'; if (h < 19) return '傍晚好';
-  if (h < 22) return '晚上好'; return '夜深了';
-});
-
-const statCards = computed(() => [
-  { icon: Folder, label: '项目总数', value: coreStats.value.projects?.total || 0, sub: `活跃 ${coreStats.value.projects?.active || 0}`, color: '#6366f1', path: '/projects/list' },
-  { icon: Document, label: '测试用例', value: coreStats.value.test_cases?.total || 0, sub: `通过率 ${coreStats.value.test_cases?.pass_rate || 0}%`, color: '#0ea5e9', path: '/testing/testcases' },
-  { icon: MagicStick, label: 'AI执行', value: coreStats.value.ai_executions?.total || 0, sub: `成功率 ${coreStats.value.ai_executions?.success_rate || 0}%`, color: '#10b981', path: '/ai/intelligence/browser-use/cases' },
-  { icon: UserFilled, label: '用户总数', value: coreStats.value.users?.total || 0, sub: `在线 ${coreStats.value.users?.online || 0}`, color: '#f59e0b', path: '/system/user' },
-]);
 
 let timer: any = null;
+const currentTime = ref('');
+const currentDate = ref('');
+const greetingText = computed(() => {
+  const h = new Date().getHours();
+  if (h < 6) return '凌晨好';
+  if (h < 9) return '早上好';
+  if (h < 12) return '上午好';
+  if (h < 14) return '中午好';
+  if (h < 17) return '下午好';
+  if (h < 19) return '傍晚好';
+  if (h < 22) return '晚上好';
+  return '夜深了';
+});
+
 const updateTime = () => {
   const now = new Date();
   currentTime.value = now.toLocaleTimeString('zh-CN', { hour12: false });
   currentDate.value = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 };
 
-const goToPage = (path: string) => router.push(path);
-const formatTime = (t: string) => {
-  if (!t) return '';
-  const d = new Date(t), now = new Date(), diff = now.getTime() - d.getTime();
-  if (diff < 60000) return '刚刚'; if (diff < 3600000) return `${Math.floor(diff/60000)}分钟前`;
-  if (diff < 86400000) return `${Math.floor(diff/3600000)}小时前`; return d.toLocaleDateString('zh-CN');
-};
-const getNotificationTypeTag = (s: string) => ({ success: 'success', failed: 'danger', pending: 'warning' }[s] || 'info');
-const getNotificationStatusText = (s: string) => ({ success: '成功', failed: '失败', pending: '待处理' }[s] || '未知');
-const getActivityColor = (s: number) => s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : s >= 40 ? '#ef4444' : '#909399';
 
-const loadCoreStats = async () => {
-  try { const r = await dashboardApi.getOverview(); if (r.code === 200 && r.data) coreStats.value = r.data; } catch {}
-};
-const loadNotifications = async () => {
-  try { const r = await dashboardApi.getRecentNotifications({ limit: 5 }); if (r.code === 200) { recentNotifications.value = r.data.notifications; unreadNotifications.value = r.data.unread_count; } } catch {}
-};
-const loadProjectActivity = async () => {
-  activityLoading.value = true;
-  try { const r = await dashboardApi.getProjectActivity(); if (r.code === 200) activeProjects.value = r.data.active_projects; } catch {} finally { activityLoading.value = false; }
-};
+const coreStats = ref({
+  projects: { total: 0, active: 0, monthly_new: 0 },
+  test_cases: { total: 0, weekly_new: 0, pass_rate: 0 },
+  ai_executions: { total: 0, monthly_generated: 0, success_rate: 0 },
+  users: { total: 0, online: 0, monthly_active: 0 },
+});
 
-const initChart = (el: any, option: any) => {
-  if (!el) return; const c = echarts.init(el); c.setOption(option); window.addEventListener('resize', () => c.resize());
-};
+const statCards = computed(() => [
+  {
+    icon: Folder, label: '项目总数',
+    value: coreStats.value.projects?.total ?? 0,
+    change: `活跃 ${coreStats.value.projects?.active ?? 0}`,
+    changeType: 'neutral',
+    bgColor: '#ede9fe', iconColor: '#7c3aed',
+    path: '/projects/list',
+  },
+  {
+    icon: Document, label: '测试用例',
+    value: coreStats.value.test_cases?.total ?? 0,
+    change: `本周新增 ${coreStats.value.test_cases?.weekly_new ?? 0}`,
+    changeType: 'up',
+    bgColor: '#dbeafe', iconColor: '#2563eb',
+    path: '/testing/testcases',
+  },
+  {
+    icon: VideoPlay, label: '执行次数',
+    value: apiExecTotal.value + webExecTotal.value,
+    change: `API+Web`,
+    changeType: 'up',
+    bgColor: '#d1fae5', iconColor: '#059669',
+    path: '',
+  },
+  {
+    icon: MagicStick, label: 'AI执行',
+    value: coreStats.value.ai_executions?.total ?? 0,
+    change: `成功率 ${coreStats.value.ai_executions?.success_rate ?? 0}%`,
+    changeType: 'up',
+    bgColor: '#fce7f3', iconColor: '#db2777',
+    path: '/ai/intelligence/browser-use/cases',
+  },
+  {
+    icon: TrendCharts, label: '通过率',
+    value: `${coreStats.value.test_cases?.pass_rate ?? 0}%`,
+    change: `测试用例`,
+    changeType: coreStats.value.test_cases?.pass_rate >= 80 ? 'up' : 'down',
+    bgColor: '#fef3c7', iconColor: '#d97706',
+    path: '',
+  },
+  {
+    icon: UserFilled, label: '用户总数',
+    value: coreStats.value.users?.total ?? 0,
+    change: `在线 ${coreStats.value.users?.online ?? 0}`,
+    changeType: 'neutral',
+    bgColor: '#e0f2fe', iconColor: '#0284c7',
+    path: '/system/user',
+  },
+]);
 
-const initExecutionTrendChart = async () => {
-  executionTrendLoading.value = true;
+
+const trendChartEl = ref<HTMLElement>();
+const trendLoading = ref(false);
+const trendDays = ref(7);
+const apiExecTotal = ref(0);
+const webExecTotal = ref(0);
+let trendChartInstance: echarts.ECharts | null = null;
+
+const initTrendChart = async () => {
+  trendLoading.value = true;
   try {
-    // 并行获取 API 执行结果和 Web 执行结果
     const [apiRes, webRes] = await Promise.allSettled([
-      get_api_script_result_list({ page: 1, pageSize: 200 }),
-      get_web_result_list({ page: 1, pageSize: 200, search: {} }),
+      get_api_script_result_list({ page: 1, pageSize: 500, search: {} }),
+      get_web_result_list({ page: 1, pageSize: 500, search: {} }),
     ]);
-
     const apiList: any[] = apiRes.status === 'fulfilled' ? (apiRes.value?.data?.content || []) : [];
     const webList: any[] = webRes.status === 'fulfilled' ? (webRes.value?.data?.content || []) : [];
+    apiExecTotal.value = apiList.length;
+    webExecTotal.value = webList.length;
 
-    // 生成最近 7 天日期
     const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
+    const dayLabels: string[] = [];
+    for (let i = trendDays.value - 1; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      days.push(`${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')}`);
+      days.push(`${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`);
+      dayLabels.push(`${d.getMonth() + 1}/${d.getDate()}`);
     }
 
-    const countByDay = (list: any[], dateField = 'start_time') => {
+    const countByDay = (list: any[], field = 'start_time') => {
       const map: Record<string, number> = {};
       days.forEach(d => { map[d] = 0; });
       list.forEach((item: any) => {
-        const t = item[dateField] || item.creation_date || '';
+        const t = item[field] || item.creation_date || '';
         if (!t) return;
         const d = new Date(t);
-        const key = `${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')}`;
+        const key = `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`;
         if (map[key] !== undefined) map[key]++;
       });
       return days.map(d => map[d]);
@@ -262,201 +410,1257 @@ const initExecutionTrendChart = async () => {
 
     const apiData = countByDay(apiList, 'start_time');
     const webData = countByDay(webList, 'start_time');
+    const passData = apiData.map((v, i) => {
+      const total = v + webData[i];
+      return total > 0 ? Math.round((v / total) * 100) : 0;
+    });
 
-    initChart(executionTrendChart.value, {
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['API执行', 'Web执行'], bottom: 0 },
-      grid: { top: 20, bottom: 40, left: 40, right: 20 },
-      xAxis: { type: 'category', data: days, axisLine: { lineStyle: { color: '#d1d5db' } }, axisLabel: { color: '#6b7280', fontSize: 12 } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f3f4f6' } }, minInterval: 1, axisLabel: { color: '#6b7280' } },
+    await nextTick();
+    if (!trendChartEl.value) return;
+    if (!trendChartInstance) trendChartInstance = echarts.init(trendChartEl.value);
+    trendChartInstance.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { data: ['执行数', '通过率'], bottom: 0, itemWidth: 12, itemHeight: 12, textStyle: { fontSize: 12 } },
+      grid: { top: 16, bottom: 36, left: 40, right: 50 },
+      xAxis: {
+        type: 'category', data: dayLabels, boundaryGap: false,
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisTick: { show: false },
+      },
+      yAxis: [
+        { type: 'value', name: '次数', minInterval: 1, splitLine: { lineStyle: { color: '#f3f4f6' } }, axisLabel: { color: '#9ca3af', fontSize: 11 } },
+        { type: 'value', name: '通过率', min: 0, max: 100, axisLabel: { color: '#9ca3af', fontSize: 11, formatter: '{value}%' }, splitLine: { show: false } },
+      ],
       series: [
-        { name: 'API执行', type: 'line', data: apiData, smooth: true, areaStyle: { opacity: .12 }, itemStyle: { color: '#6366f1' }, lineStyle: { width: 2 } },
-        { name: 'Web执行', type: 'line', data: webData, smooth: true, areaStyle: { opacity: .12 }, itemStyle: { color: '#10b981' }, lineStyle: { width: 2 } },
+        {
+          name: '执行数', type: 'line', yAxisIndex: 0,
+          data: apiData.map((v, i) => v + webData[i]),
+          smooth: true, symbol: 'circle', symbolSize: 6,
+          itemStyle: { color: '#6366f1' },
+          lineStyle: { color: '#6366f1', width: 2 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(99,102,241,0.18)' }, { offset: 1, color: 'rgba(99,102,241,0)' }] } },
+        },
+        {
+          name: '通过率', type: 'line', yAxisIndex: 1,
+          data: passData,
+          smooth: true, symbol: 'circle', symbolSize: 6,
+          itemStyle: { color: '#10b981' },
+          lineStyle: { color: '#10b981', width: 2 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(16,185,129,0.12)' }, { offset: 1, color: 'rgba(16,185,129,0)' }] } },
+        },
       ],
     });
-  } catch (e) { console.error(e); } finally { executionTrendLoading.value = false; }
+  } catch (e) { console.error(e); } finally { trendLoading.value = false; }
 };
 
-const initDataFactoryChart = async () => {
-  dataFactoryLoading.value = true;
+
+const typeChartEl = ref<HTMLElement>();
+const typeLoading = ref(false);
+let typeChartInstance: echarts.ECharts | null = null;
+
+const initTypeChart = async () => {
+  typeLoading.value = true;
   try {
-    const r = await dashboardApi.getDataFactoryStats();
-    const dist = r.data?.category_distribution || [];
-    const names = dist.length ? dist.map((i: any) => i.category) : ['暂无数据'];
-    const values = dist.length ? dist.map((i: any) => i.percentage) : [0];
-    const colors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-    initChart(dataFactoryChart.value, {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}: {c}%' },
-      grid: { top: 16, bottom: 40, left: 50, right: 20 },
-      xAxis: { type: 'category', data: names, axisLabel: { color: '#6b7280', fontSize: 11, rotate: names.length > 4 ? 20 : 0 } },
-      yAxis: { type: 'value', name: '占比%', axisLabel: { color: '#6b7280', formatter: '{value}%' }, minInterval: 1 },
-      series: [{
-        type: 'bar',
-        data: values.map((v: number, i: number) => ({ value: v, itemStyle: { color: colors[i % colors.length], borderRadius: [6,6,0,0] } })),
-        barMaxWidth: 50,
-        label: { show: true, position: 'top', formatter: '{c}%', fontSize: 11, color: '#374151' },
-      }],
-    });
-  } catch {} finally { dataFactoryLoading.value = false; }
-};
+    const [apiRes, webRes] = await Promise.allSettled([
+      get_api_script_result_list({ page: 1, pageSize: 500, search: {} }),
+      get_web_result_list({ page: 1, pageSize: 500, search: {} }),
+    ]);
+    const apiCount = apiRes.status === 'fulfilled' ? (apiRes.value?.data?.content?.length || 0) : 0;
+    const webCount = webRes.status === 'fulfilled' ? (webRes.value?.data?.content?.length || 0) : 0;
+    const total = apiCount + webCount;
 
-const initReviewStatsChart = async () => {
-  reviewStatsLoading.value = true;
-  try {
-    const r = await dashboardApi.getReviewStats();
-    const d = r.data?.status_distribution || {};
-    initChart(reviewStatsChart.value, {
-      tooltip: { trigger: 'item' },
-      series: [{ name: '评审状态', type: 'pie', radius: '72%', data: [
-        { value: d.pending || 0, name: '待开始', itemStyle: { color: '#f59e0b' } },
-        { value: d.in_progress || 0, name: '进行中', itemStyle: { color: '#6366f1' } },
-        { value: d.completed || 0, name: '已完成', itemStyle: { color: '#10b981' } },
-        { value: d.cancelled || 0, name: '已取消', itemStyle: { color: '#ef4444' } },
-      ], emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,.2)' } } }]
-    });
-  } catch {} finally { reviewStatsLoading.value = false; }
-};
+    const pieData = [
+      { value: apiCount, name: `API测试 ${total > 0 ? Math.round(apiCount / total * 100) : 0}%`, itemStyle: { color: '#6366f1' } },
+      { value: webCount, name: `UI测试 ${total > 0 ? Math.round(webCount / total * 100) : 0}%`, itemStyle: { color: '#0ea5e9' } },
+    ].filter(d => d.value > 0);
 
-const initApiInterfaceChart = async () => {
-  apiInterfaceLoading.value = true;
-  try {
-    const r: any = await dashboardApi.getApiInterfaceStats();
-    const stats: { method: string; count: number }[] = r?.data?.method_stats || [];
-    const total: number = r?.data?.total || 0;
-
-    const METHOD_COLORS: Record<string, string> = {
-      GET:     '#10b981',
-      POST:    '#6366f1',
-      PUT:     '#f59e0b',
-      DELETE:  '#ef4444',
-      PATCH:   '#0ea5e9',
-      OPTIONS: '#8b5cf6',
-      OTHER:   '#94a3b8',
-    };
-
-    const labels = stats.map(s => s.method);
-    const values = stats.map(s => s.count);
-    const colors = labels.map(l => METHOD_COLORS[l] || '#94a3b8');
-
-    if (!stats.length) {
-      initChart(apiInterfaceChart.value, {
-        graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: '暂无接口数据', fill: '#94a3b8', fontSize: 14 } }],
-      });
-      return;
+    if (!pieData.length) {
+      pieData.push({ value: 1, name: '暂无数据', itemStyle: { color: '#e5e7eb' } });
     }
 
-    initChart(apiInterfaceChart.value, {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params: any) => {
-          const p = params[0];
-          const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : '0';
-          return `<b>${p.name}</b><br/>接口数：<b>${p.value}</b>（${pct}%）`;
+    await nextTick();
+    if (!typeChartEl.value) return;
+    if (!typeChartInstance) typeChartInstance = echarts.init(typeChartEl.value);
+    typeChartInstance.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+      legend: { orient: 'vertical', right: 8, top: 'center', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: '#6b7280' } },
+      series: [{
+        name: '测试类型', type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['38%', '50%'],
+        data: pieData,
+        label: {
+          show: true, position: 'center',
+          formatter: () => `总数\n${total}`,
+          fontSize: 13, fontWeight: 600, color: '#374151', lineHeight: 20,
         },
+        labelLine: { show: false },
+        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.15)' } },
+      }],
+    });
+  } catch (e) { console.error(e); } finally { typeLoading.value = false; }
+};
+
+const recentTab = ref<'api' | 'web'>('api');
+const apiRecentList = ref<any[]>([]);
+const webRecentList = ref<any[]>([]);
+
+const currentRecentList = computed(() =>
+  recentTab.value === 'api' ? apiRecentList.value : webRecentList.value
+);
+
+
+const mapApiStatus = (item: any) => {
+  const s = item.status ?? 0;
+
+  if (s === 1) return { statusTag: 'success', statusText: '通过' };
+  if (s === 2) return { statusTag: 'danger',  statusText: '失败' };
+  return { statusTag: 'warning', statusText: '运行中' };
+};
+const mapWebStatus = (item: any) => {
+  const s = item.status ?? 0;
+  if (s === 1) return { statusTag: 'success', statusText: '通过' };
+  if (s === 2) return { statusTag: 'danger',  statusText: '失败' };
+  return { statusTag: 'warning', statusText: '运行中' };
+};
+
+const loadRecentExecutions = async () => {
+  try {
+    const [apiRes, webRes] = await Promise.allSettled([
+      get_api_script_result_list({ page: 1, pageSize: 20, search: {} }),
+      get_web_result_list({ page: 1, pageSize: 20, search: {} }),
+    ]);
+
+    if (apiRes.status === 'fulfilled') {
+      const list = apiRes.value?.data?.content || [];
+      apiRecentList.value = list.map((item: any) => ({
+        name: item.name || item.script_name || '未命名',
+        username: item.username || '',
+        time: formatTime(item.start_time || ''),
+        ...mapApiStatus(item),
+      }));
+    }
+
+    if (webRes.status === 'fulfilled') {
+      const list = webRes.value?.data?.content || [];
+      webRecentList.value = list.map((item: any) => ({
+        name: item.task_name || item.name || '未命名',
+        username: item.username || '',
+        time: formatTime(item.start_time || ''),
+        ...mapWebStatus(item),
+      }));
+    }
+  } catch (e) { console.error(e); }
+};
+
+
+const recentScrollWrap = ref<HTMLElement>();
+const recentScrollTrack = ref<HTMLElement>();
+let scrollTimer: any = null;
+let scrollPos = 0;
+let scrollPaused = false;
+
+const startScroll = () => {
+  if (scrollTimer) clearInterval(scrollTimer);
+  scrollPos = 0;
+  if (recentScrollWrap.value) recentScrollWrap.value.scrollTop = 0;
+  scrollTimer = setInterval(() => {
+    if (scrollPaused || !recentScrollWrap.value || !recentScrollTrack.value) return;
+    const wrap = recentScrollWrap.value;
+    const track = recentScrollTrack.value;
+    const halfHeight = track.scrollHeight / 2;
+    if (halfHeight <= 0) return;
+    scrollPos += 0.6;
+    if (scrollPos >= halfHeight) scrollPos = 0;
+    wrap.scrollTop = scrollPos;
+  }, 16);
+};
+
+const stopScroll = () => {
+  if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+};
+
+const switchRecentTab = async (tab: 'api' | 'web') => {
+  recentTab.value = tab;
+
+  stopScroll();
+  scrollPos = 0;
+  if (recentScrollWrap.value) recentScrollWrap.value.scrollTop = 0;
+  await nextTick();
+  if (currentRecentList.value.length > 0) startScroll();
+};
+
+
+const reviewStatsLoading = ref(false);
+const reviewStats = ref({
+  total_reviews: 0,
+  pending_reviews: 0,
+  in_progress_reviews: 0,
+  completed_reviews: 0,
+  cancelled_reviews: 0,
+  status_distribution: {} as Record<string, number>,
+  priority_distribution: {} as Record<string, number>,
+});
+
+const reviewStatusChartEl = ref<HTMLElement>();
+const reviewPriorityChartEl = ref<HTMLElement>();
+let reviewStatusChart: echarts.ECharts | null = null;
+let reviewPriorityChart: echarts.ECharts | null = null;
+
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  pending:     { label: '待开始', color: '#f59e0b' },
+  in_progress: { label: '进行中', color: '#6366f1' },
+  completed:   { label: '已完成', color: '#10b981' },
+  cancelled:   { label: '已取消', color: '#ef4444' },
+};
+const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
+  low:    { label: '低',   color: '#10b981' },
+  medium: { label: '中',   color: '#6366f1' },
+  high:   { label: '高',   color: '#f59e0b' },
+  urgent: { label: '紧急', color: '#ef4444' },
+};
+
+const initReviewCharts = () => {
+
+  if (reviewStatusChartEl.value) {
+    if (!reviewStatusChart) reviewStatusChart = echarts.init(reviewStatusChartEl.value);
+    const dist = reviewStats.value.status_distribution || {};
+    const pieData = Object.entries(dist)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => ({
+        name: STATUS_MAP[k]?.label ?? k,
+        value: v,
+        itemStyle: { color: STATUS_MAP[k]?.color ?? '#94a3b8' },
+      }));
+    if (!pieData.length) pieData.push({ name: '暂无数据', value: 1, itemStyle: { color: '#e5e7eb' } });
+    reviewStatusChart.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: {
+        orient: 'vertical', right: 4, top: 'center',
+        itemWidth: 8, itemHeight: 8,
+        textStyle: { fontSize: 11, color: '#6b7280' },
       },
-      grid: { top: 20, bottom: 36, left: 44, right: 16 },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '68%'],
+        center: ['36%', '50%'],
+        data: pieData,
+        label: { show: false },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.15)' } },
+      }],
+    });
+  }
+
+ 
+  if (reviewPriorityChartEl.value) {
+    if (!reviewPriorityChart) reviewPriorityChart = echarts.init(reviewPriorityChartEl.value);
+    const dist = reviewStats.value.priority_distribution || {};
+    const order = ['low', 'medium', 'high', 'urgent'];
+    const labels = order.map(k => PRIORITY_MAP[k]?.label ?? k);
+    const values = order.map(k => dist[k] ?? 0);
+    const colors = order.map(k => PRIORITY_MAP[k]?.color ?? '#94a3b8');
+    reviewPriorityChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { top: 8, bottom: 28, left: 28, right: 8 },
       xAxis: {
-        type: 'category',
-        data: labels,
-        axisLabel: { color: '#6b7280', fontSize: 12, fontWeight: 600 },
+        type: 'category', data: labels,
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
         axisLine: { lineStyle: { color: '#e5e7eb' } },
         axisTick: { show: false },
       },
       yAxis: {
-        type: 'value',
-        minInterval: 1,
-        axisLabel: { color: '#6b7280', fontSize: 11 },
+        type: 'value', minInterval: 1,
+        axisLabel: { color: '#9ca3af', fontSize: 10 },
         splitLine: { lineStyle: { color: '#f3f4f6' } },
       },
       series: [{
-        type: 'bar',
+        type: 'bar', barMaxWidth: 32,
         data: values.map((v, i) => ({
           value: v,
-          itemStyle: { color: colors[i], borderRadius: [6, 6, 0, 0] },
+          itemStyle: { color: colors[i], borderRadius: [4, 4, 0, 0] },
         })),
-        barMaxWidth: 48,
-        label: { show: true, position: 'top', fontSize: 12, color: '#374151', formatter: '{c}' },
+        label: { show: true, position: 'top', fontSize: 11, color: '#374151' },
       }],
     });
-  } catch (e) {
-    console.error(e);
-  } finally {
-    apiInterfaceLoading.value = false;
   }
 };
 
-const refreshExecutionTrends = () => initExecutionTrendChart();
-const refreshProjectActivity = () => loadProjectActivity();
-const refreshApiInterfaceStats = () => initApiInterfaceChart();
+const loadReviewStats = async () => {
+  reviewStatsLoading.value = true;
+  try {
+    const res: any = await getReviewStatistics({});
+    if (res?.data) {
+      reviewStats.value = {
+        total_reviews:       res.data.total_reviews       ?? 0,
+        pending_reviews:     res.data.pending_reviews     ?? 0,
+        in_progress_reviews: res.data.in_progress_reviews ?? 0,
+        completed_reviews:   res.data.completed_reviews   ?? 0,
+        cancelled_reviews:   res.data.cancelled_reviews   ?? 0,
+        status_distribution:   res.data.status_distribution   ?? {},
+        priority_distribution: res.data.priority_distribution ?? {},
+      };
+    }
+  } catch (e) { console.error(e); } finally {
+    reviewStatsLoading.value = false;
+  }
+};
+
+
+const quickEntries = [
+  { name: '需求管理', desc: '上传与管理需求', icon: Files, bgColor: '#ede9fe', iconColor: '#7c3aed', path: '/ai/intelligence/requirement-analysis' },
+  { name: 'AI测试设计', desc: 'AI生成测试用例', icon: MagicStick, bgColor: '#d1fae5', iconColor: '#059669', path: '/ai/intelligence/browser-use/cases' },
+  { name: '测试用例', desc: '管理测试用例', icon: List, bgColor: '#dbeafe', iconColor: '#2563eb', path: '/testing/testcases' },
+  { name: 'API测试', desc: '接口自动化测试', icon: Connection, bgColor: '#fce7f3', iconColor: '#db2777', path: '/api-automation/index' },
+  { name: 'UI测试', desc: 'UI自动化测试', icon: Monitor, bgColor: '#fef3c7', iconColor: '#d97706', path: '/web/automation' },
+  { name: 'APP测试', desc: '移动端自动化', icon: Phone, bgColor: '#e0f2fe', iconColor: '#0284c7', path: '/testing/app-management/index?tab=device' },
+  { name: '数据工厂', desc: '测试数据生成', icon: DataAnalysis, bgColor: '#fef9c3', iconColor: '#ca8a04', path: '/data-factory/tools' },
+  { name: '用例生成', desc: 'AI生成用例', icon: TrendCharts, bgColor: '#f0fdf4', iconColor: '#16a34a', path: '/ai/intelligence/case-generation' },
+];
+
+
+const activeProjects = ref<any[]>([]);
+const projectLoading = ref(false);
+
+const loadProjectActivity = async () => {
+  projectLoading.value = true;
+  try {
+    const r = await dashboardApi.getProjectActivity();
+    if (r.code === 200) activeProjects.value = r.data?.active_projects || [];
+  } catch {} finally { projectLoading.value = false; }
+};
+
+const getActivityColor = (s: number) =>
+  s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : s >= 40 ? '#ef4444' : '#9ca3af';
+
+
+const notifications = ref<any[]>([]);
+const unreadCount = ref(0);
+
+const loadNotifications = async () => {
+  try {
+    const r = await dashboardApi.getRecentNotifications({ limit: 6 });
+    if (r.code === 200) {
+      notifications.value = r.data?.notifications || [];
+      unreadCount.value = r.data?.unread_count || 0;
+    }
+  } catch {}
+};
+
+const getStatusTag = (s: string) => ({ success: 'success', failed: 'danger', pending: 'warning' }[s] || 'info');
+const getStatusText = (s: string) => ({ success: '成功', failed: '失败', pending: '待处理' }[s] || '通知');
+
+
+const dfStatsLoading = ref(false);
+const dfStats = ref<{
+  total_records: number;
+  category_stats: Record<string, number>;
+  recent_tools: Array<{ tool_name: string; tool_category_display: string; tool_scenario_display: string; created_at: string }>;
+}>({
+  total_records: 0,
+  category_stats: {},
+  recent_tools: [],
+});
+
+const dfBarChartEl = ref<HTMLElement>();
+let dfBarChart: echarts.ECharts | null = null;
+
+const initDfBarChart = () => {
+  if (!dfBarChartEl.value) return;
+  if (!dfBarChart) dfBarChart = echarts.init(dfBarChartEl.value);
+  const stats = dfStats.value.category_stats || {};
+  const entries = Object.entries(stats).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const labels = entries.map(([k]) => dfCategoryNameMap.value[k] || k);
+  const values = entries.map(([, v]) => v);
+  const colors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444'];
+  dfBarChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { top: 4, bottom: 20, left: 4, right: 4, containLabel: true },
+    xAxis: {
+      type: 'category', data: labels,
+      axisLabel: { color: '#9ca3af', fontSize: 10, interval: 0, overflow: 'truncate', width: 48 },
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value', minInterval: 1,
+      axisLabel: { color: '#9ca3af', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#f3f4f6' } },
+    },
+    series: [{
+      type: 'bar', barMaxWidth: 24,
+      data: values.map((v, i) => ({
+        value: v,
+        itemStyle: { color: colors[i % colors.length], borderRadius: [3, 3, 0, 0] },
+      })),
+      label: { show: true, position: 'top', fontSize: 10, color: '#6b7280' },
+    }],
+  });
+};
+
+
+const dfToolNameMap = ref<Record<string, string>>({});
+const dfCategoryNameMap = ref<Record<string, string>>({});
+const loadDfStats = async () => {
+  dfStatsLoading.value = true;
+  try {
+    const { getStatistics, getToolCategories } = await import('/@/api/v1/data_factory');
+    const [statsRes, catsRes] = await Promise.allSettled([getStatistics(), getToolCategories()]);
+
+    if (catsRes.status === 'fulfilled' && catsRes.value?.data?.categories) {
+      const nameMap: Record<string, string> = {};
+      const catMap: Record<string, string> = {};
+      for (const cat of catsRes.value.data.categories) {
+        catMap[cat.category] = cat.name;
+        for (const tool of (cat.tools || [])) {
+          nameMap[tool.name] = tool.display_name || tool.name;
+        }
+      }
+      dfToolNameMap.value = nameMap;
+      dfCategoryNameMap.value = catMap;
+    }
+
+    if (statsRes.status === 'fulfilled' && statsRes.value?.data) {
+      const d = statsRes.value.data;
+      dfStats.value = {
+        total_records:  d.total_records  ?? 0,
+        category_stats: d.category_stats ?? {},
+        recent_tools:   d.recent_tools   ?? [],
+      };
+    }
+  } catch (e) { console.error(e); } finally {
+    dfStatsLoading.value = false;
+  }
+};
+
+
+const formatTime = (t: string) => {
+  if (!t) return '';
+  const d = new Date(t), now = new Date(), diff = now.getTime() - d.getTime();
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+  return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const goTo = (path: string) => {
+  if (!path) return;
+  if (path.includes('?')) {
+    const [p, qs] = path.split('?');
+    const query: Record<string, string> = {};
+    qs.split('&').forEach(pair => {
+      const [k, v] = pair.split('=');
+      if (k) query[k] = v ?? '';
+    });
+    router.push({ path: p, query });
+  } else {
+    router.push(path);
+  }
+};
+
+
+const handleResize = () => {
+  trendChartInstance?.resize();
+  typeChartInstance?.resize();
+  reviewStatusChart?.resize();
+  reviewPriorityChart?.resize();
+  dfBarChart?.resize();
+};
 
 onMounted(async () => {
-  if (themeConfig.value.isLockScreen) { themeConfig.value.isLockScreen = false; themeConfig.value.lockScreenTime = 0; }
-  updateTime(); timer = setInterval(updateTime, 1000);
-  await loadCoreStats(); await loadNotifications(); await loadProjectActivity();
+  if (themeConfig.value.isLockScreen) {
+    themeConfig.value.isLockScreen = false;
+    themeConfig.value.lockScreenTime = 0;
+  }
+
+ 
+  updateTime();
+  timer = setInterval(updateTime, 1000);
+
+
+  await Promise.allSettled([
+    (async () => {
+      try { const r = await dashboardApi.getOverview(); if (r.code === 200 && r.data) coreStats.value = r.data; } catch {}
+    })(),
+    loadNotifications(),
+    loadProjectActivity(),
+    loadDfStats(),
+    loadRecentExecutions(),
+    loadReviewStats(),
+  ]);
+
   await nextTick();
-  setTimeout(() => { initExecutionTrendChart(); initDataFactoryChart(); }, 100);
-  setTimeout(() => { initReviewStatsChart(); initApiInterfaceChart(); }, 300);
+  setTimeout(() => {
+    initTrendChart();
+    initTypeChart();
+    initReviewCharts();
+    initDfBarChart();
+    if (currentRecentList.value.length > 0) startScroll();
+  }, 100);
+
+
+  const wrap = recentScrollWrap.value;
+  if (wrap) {
+    wrap.addEventListener('mouseenter', () => { scrollPaused = true; });
+    wrap.addEventListener('mouseleave', () => { scrollPaused = false; });
+  }
+
+  window.addEventListener('resize', handleResize);
 });
-onUnmounted(() => { if (timer) clearInterval(timer); });
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+  stopScroll();
+  window.removeEventListener('resize', handleResize);
+  trendChartInstance?.dispose();
+  typeChartInstance?.dispose();
+  reviewStatusChart?.dispose();
+  reviewPriorityChart?.dispose();
+  dfBarChart?.dispose();
+});
 </script>
 
 <style scoped lang="scss">
-.dashboard-container { padding: 0 0 24px; background: var(--el-bg-color-page); min-height: 100vh; }
+.home-page {
+  background: var(--el-bg-color-page);
+  min-height: 100vh;
+}
 
-/* 公告滚动条 */
-.notice-bar { display: flex; align-items: center; background: #eef2ff; border-bottom: 1px solid #c7d2fe; color: #0bc5a4; padding: 0 16px; height: 36px; overflow: hidden; }
-.notice-icon { font-size: 16px; margin-right: 10px; flex-shrink: 0; color: #0bc5a4; }
-.notice-track-wrap { flex: 1; overflow: hidden; }
-.notice-track { display: flex; width: max-content; animation: marquee 22s linear infinite; }
-.notice-text { font-size: 13px; letter-spacing: .3px; color: #0bc5a4; padding-right: 80px; white-space: nowrap; }
-@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
-/* Hero 区域 */
-.hero-section { position: relative; margin: 16px 16px 0; border-radius: 16px; overflow: hidden; padding: 28px 28px; background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 50%, #dbeafe 100%); border: 1px solid #c7d2fe; }
-.hero-bg { position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
-.hero-content { position: relative; display: flex; align-items: center; justify-content: space-between; }
-.hero-greeting { font-size: 26px; font-weight: 700; color: #1e1b4b; margin-bottom: 6px; }
-.hero-sub { font-size: 14px; color: #4338ca; margin-bottom: 14px; }
-.hero-meta { display: flex; gap: 16px; }
-.hero-date, .hero-time { font-size: 13px; color: #6366f1; display: flex; align-items: center; gap: 4px; }
-.meta-icon { font-size: 13px; }
-.hero-avatar-wrap { position: relative; }
-.hero-avatar { border: 3px solid #a5b4fc; box-shadow: 0 0 0 6px rgba(99,102,241,.1); }
-.hero-avatar-ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px dashed #a5b4fc; animation: spin 12s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.notice-bar {
+  display: flex;
+  align-items: center;
+  background: var(--home-notice-bg, #eef2ff);
+  border-bottom: 1px solid var(--home-notice-border, #c7d2fe);
+  padding: 0 16px;
+  height: 36px;
+  overflow: hidden;
+}
+.notice-icon {
+  font-size: 15px;
+  color: #6366f1;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+.notice-track-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+.notice-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+}
+.notice-text {
+  font-size: 13px;
+  color: #34d399;
+  padding-right: 80px;
+  white-space: nowrap;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 
-/* 统计卡片 */
-.stats-row { padding: 16px 16px 0; }
-.stat-card { position: relative; border-radius: 14px; padding: 20px 18px; cursor: pointer; overflow: hidden; background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); transition: all .25s; margin-bottom: 16px; display: flex; align-items: center; gap: 14px; }
-.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.1); border-color: var(--card-color); }
-.stat-card-bg { position: absolute; right: -20px; top: -20px; width: 80px; height: 80px; border-radius: 50%; background: var(--card-color); opacity: .08; }
-.stat-card-icon { font-size: 30px; flex-shrink: 0; color: var(--card-color); }
-.stat-card-body { flex: 1; min-width: 0; }
-.stat-card-val { font-size: 28px; font-weight: 700; color: var(--card-color); line-height: 1; margin-bottom: 4px; }
-.stat-card-label { font-size: 13px; color: var(--el-text-color-regular); font-weight: 500; }
-.stat-card-sub { font-size: 11px; color: var(--el-text-color-placeholder); margin-top: 2px; }
-.stat-card-arrow { font-size: 16px; color: var(--card-color); opacity: .4; flex-shrink: 0; }
 
-/* 面板 */
-.chart-row, .bottom-row { padding: 0 16px; margin-top: 16px !important; }
-.panel { background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 14px; overflow: hidden; height: 100%; }
-.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--el-border-color-lighter); }
-.panel-title { font-size: 14px; font-weight: 600; color: var(--el-text-color-primary); display: flex; align-items: center; gap: 6px; }
-.title-icon { color: #6366f1; font-size: 15px; }
-.meta-icon { font-size: 13px; vertical-align: middle; }
-.chart-box { height: 240px; padding: 8px; }
+.page-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-/* 列表 */
-.list-body { padding: 8px 0; min-height: 200px; }
-.list-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; transition: background .15s; }
-.list-item:hover { background: var(--el-fill-color-lighter); }
-.list-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.dot-success { background: #10b981; } .dot-failed { background: #ef4444; } .dot-pending { background: #f59e0b; }
-.list-item-content { flex: 1; min-width: 0; }
-.list-item-title { font-size: 13px; color: var(--el-text-color-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.list-item-time { font-size: 11px; color: var(--el-text-color-placeholder); margin-top: 2px; }
-.rank-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--el-fill-color); color: var(--el-text-color-regular); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rank-badge.rank-top { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #fff; }
-.activity-score-text { font-size: 12px; font-weight: 600; flex-shrink: 0; }
+
+.hero-section {
+  background: var(--home-hero-bg, linear-gradient(135deg, #eef2ff 0%, #e0e7ff 50%, #dbeafe 100%));
+  border-radius: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--home-hero-border, #c7d2fe);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+.hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hero-left {
+  flex: 1;
+  min-width: 0;
+}
+.hero-greeting {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
+}
+.hero-sub {
+  font-size: 13px;
+  color: #34d399;
+  margin-bottom: 10px;
+}
+.hero-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.hero-date, .hero-time {
+  font-size: 12px;
+  color: #6366f1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.meta-icon {
+  font-size: 12px;
+}
+.hero-right {
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+.hero-avatar-wrap {
+  position: relative;
+}
+.hero-avatar {
+  border: 3px solid #a5b4fc;
+  box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.1);
+}
+.hero-avatar-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed #a5b4fc;
+  animation: spin 12s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+.stat-row {
+  margin: 0 !important;
+}
+.stat-card {
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border: 1px solid var(--el-border-color-lighter);
+  transition: all 0.2s;
+  margin-bottom: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  &.no-click {
+    cursor: default;
+    &:hover {
+      transform: none;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+  }
+}
+.stat-card-left {
+  flex: 1;
+  min-width: 0;
+}
+.stat-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  margin-bottom: 4px;
+}
+.stat-change {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  &.up { color: #10b981; }
+  &.down { color: #ef4444; }
+  &.neutral { color: var(--el-text-color-secondary); }
+}
+.stat-card-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+
+.panel {
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+.panel-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.more-link {
+  font-size: 12px;
+  color: #6366f1;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+}
+
+
+.mid-row {
+  margin: 0 !important;
+  align-items: stretch !important;
+}
+.chart-wrap {
+  height: 240px;
+  padding: 8px 4px;
+}
+.mid-row .panel {
+  height: 301px;
+  display: flex;
+  flex-direction: column;
+}
+.mid-row .chart-wrap {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+
+.recent-panel {
+
+  height: 301px;
+  display: flex;
+  flex-direction: column;
+}
+.recent-tab-hd {
+  padding: 0 16px;
+  height: 45px;
+  flex-shrink: 0;
+}
+.recent-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--el-fill-color);
+  border-radius: 8px;
+  padding: 3px;
+}
+.recent-tab {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+  user-select: none;
+
+  &.active {
+    background: var(--el-bg-color);
+    color: #6366f1;
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+  &:not(.active):hover {
+    color: var(--el-text-color-primary);
+  }
+}
+.recent-scroll-wrap {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  transition: background 0.15s;
+  gap: 8px;
+  cursor: default;
+
+  &:hover { background: var(--el-fill-color-lighter); }
+}
+.recent-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.recent-type-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.recent-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.recent-item-name {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-item-meta {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+
+
+.quick-panel {
+  .panel-hd {
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+}
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0;
+  padding: 12px 8px;
+
+  @media (max-width: 1200px) { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 768px) { grid-template-columns: repeat(2, 1fr); }
+}
+.quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+
+  &:hover {
+    background: #f5f7ff;
+    .quick-item-name { color: #6366f1; }
+  }
+}
+.quick-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.quick-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  transition: color 0.15s;
+}
+.quick-item-desc {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+
+
+.bottom-row {
+  margin: 0 !important;
+}
+
+.bottom-row .panel {
+  min-height: 240px;
+}
+
+
+.project-list {
+  padding: 4px 0;
+}
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  transition: background 0.15s;
+
+  &:hover { background: var(--el-fill-color-lighter); }
+}
+.project-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-regular);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.rank-gold {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    color: #fff;
+  }
+}
+.project-info {
+  flex: 1;
+  min-width: 0;
+}
+.project-name {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-score {
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+
+.todo-list {
+  padding: 4px 0;
+}
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  transition: background 0.15s;
+
+  &:hover { background: var(--el-fill-color-lighter); }
+}
+.todo-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.dot-success { background: #10b981; }
+  &.dot-failed { background: #ef4444; }
+  &.dot-pending { background: #f59e0b; }
+  &.dot- { background: #9ca3af; }
+}
+.todo-content {
+  flex: 1;
+  min-width: 0;
+}
+.todo-title {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.todo-time {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+
+
+.df-panel {
+  min-height: 240px;
+}
+.df-body {
+  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.df-total-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.df-total-block {
+  flex-shrink: 0;
+  text-align: center;
+  background: #f5f3ff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 72px;
+}
+.df-total-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: #6366f1;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.df-total-label {
+  font-size: 10px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.df-bar-chart {
+  flex: 1;
+  height: 80px;
+  min-width: 0;
+}
+.df-recent-title {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  padding-left: 2px;
+}
+.df-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.df-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #f5f3ff; }
+}
+.df-recent-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #ede9fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.df-recent-info {
+  flex: 1;
+  min-width: 0;
+}
+.df-recent-name {
+  font-size: 12px;
+  color: var(--el-text-color-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df-recent-meta {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-top: 1px;
+}
+
+
+:deep(.el-progress-bar__outer) {
+  background: var(--el-fill-color);
+}
+:deep(.el-empty__description p) {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+
+.review-stats-panel {
+  .panel-hd {
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .title-icon {
+      color: #6366f1;
+      font-size: 15px;
+    }
+  }
+}
+.review-stats-body {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 14px 16px;
+  min-height: 130px;
+}
+
+
+.review-num-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 280px;
+  flex-shrink: 0;
+  align-content: center;
+
+  @media (max-width: 900px) {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.review-num-card {
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+
+  &:hover {
+    border-color: #6366f1;
+    background: #f5f3ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+  }
+}
+.review-num-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+  line-height: 1;
+  margin-bottom: 5px;
+}
+.review-num-label {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+.pending-card .review-num-val  { color: #f59e0b; }
+.progress-card .review-num-val { color: #6366f1; }
+.done-card .review-num-val     { color: #10b981; }
+
+
+.review-charts {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  min-width: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--el-border-color-lighter);
+  margin-left: 16px;
+
+  @media (max-width: 900px) {
+    display: none;
+  }
+}
+.review-chart-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.review-chart-title {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
+.review-chart-el {
+  flex: 1;
+  min-height: 100px;
+}
+
+
+:deep(.el-progress-bar__outer) {
+  background: var(--el-fill-color);
+}
+:deep(.el-empty__description p) {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+
+[data-theme='dark'] {
+
+  --home-notice-bg: rgba(99, 102, 241, 0.12);
+  --home-notice-border: rgba(99, 102, 241, 0.25);
+
+
+  --home-hero-bg: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(79,70,229,0.12) 50%, rgba(59,130,246,0.1) 100%);
+  --home-hero-border: rgba(99, 102, 241, 0.2);
+
+  .home-page {
+    background: var(--el-bg-color-page);
+  }
+
+
+  .notice-text { color: #6ee7b7; }
+  .notice-icon { color: #6ee7b7; }
+
+
+  .hero-sub { color: #6ee7b7; }
+  .hero-date, .hero-time { color: #818cf8; }
+  .hero-avatar { border-color: rgba(165, 180, 252, 0.5); }
+  .hero-avatar-ring { border-color: rgba(165, 180, 252, 0.3); }
+
+
+  .stat-card {
+    box-shadow: none;
+    &:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); }
+    &.no-click:hover { box-shadow: none; }
+  }
+
+
+  .panel { box-shadow: none; }
+
+
+  .recent-tab {
+    color: var(--el-text-color-secondary);
+    &.active {
+      background: var(--el-bg-color);
+      color: #818cf8;
+    }
+    &:not(.active):hover { color: var(--el-text-color-primary); }
+  }
+
+  
+  .recent-item:hover,
+  .project-item:hover,
+  .todo-item:hover { background: var(--el-fill-color-light); }
+
+
+  .quick-item:hover {
+    background: var(--el-fill-color-light);
+    .quick-item-name { color: #818cf8; }
+  }
+
+
+  .review-num-card {
+    &:hover {
+      border-color: #6366f1;
+      background: rgba(99, 102, 241, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+  }
+  .review-num-val { color: var(--el-text-color-primary); }
+
+
+  .df-total-block { background: rgba(99, 102, 241, 0.12); }
+  .df-recent-icon { background: rgba(99, 102, 241, 0.15); }
+  .df-recent-item:hover { background: rgba(99, 102, 241, 0.08); }
+
+
+  .project-rank {
+    background: var(--el-fill-color);
+    color: var(--el-text-color-secondary);
+  }
+}
 </style>

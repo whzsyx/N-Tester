@@ -1,6 +1,6 @@
-"""
-测试用例管理Schema
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional, List
 from datetime import datetime

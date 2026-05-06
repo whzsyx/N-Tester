@@ -1,6 +1,6 @@
-"""
-UI自动化模块 - 数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from sqlalchemy import Column, BigInteger, String, Text, Integer, DateTime, Boolean, JSON
 from sqlalchemy.sql import func
 from app.models.base import Base

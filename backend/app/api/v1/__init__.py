@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
 API v1版本
 """
@@ -19,12 +22,13 @@ from app.api.v1.reviews.controller import router as reviews_router
 from app.api.v1.assistant.controller import router as assistant_router
 from app.api.v1.notifications.controller import router as notifications_router
 from app.api.v1.dashboard.controller import router as dashboard_router
-from app.api.v1.cloud_device.controller import router as cloud_device_router
 from app.api.v1.api_automation.controller import router as api_automation_router
 from app.api.v1.web_management.controller import router as web_management_router
 from app.api.v1.app_management.controller import router as app_management_router
 from app.api.v1.task_scheduler.controller import router as task_scheduler_router
-from app.api.v1.app_mitmproxy.controller import router as app_mitmproxy_router
+from app.api.v1.precision_test.controller import router as precision_test_router
+from app.api.v1.desktop_automation.controller import router as desktop_automation_router
+from app.api.v1.miniprogram_automation.controller import router as miniprogram_automation_router
 
 # 创建v1路由
 router = APIRouter(prefix="/v1")
@@ -46,11 +50,12 @@ router.include_router(reviews_router, tags=["用例评审"])
 router.include_router(assistant_router, tags=["AI助手"])
 router.include_router(notifications_router, tags=["统一通知系统"])
 router.include_router(dashboard_router, tags=["首页看板"])
-router.include_router(cloud_device_router, prefix="/cloud_device", tags=["云真机管理"])
 router.include_router(api_automation_router, prefix="/api_automation", tags=["接口自动化"])
 router.include_router(web_management_router, prefix="/web_management", tags=["Web管理模块"])
 router.include_router(app_management_router, prefix="/app_management", tags=["APP管理"])
 router.include_router(task_scheduler_router, prefix="/task_scheduler", tags=["定时任务调度"])
-router.include_router(app_mitmproxy_router, prefix="/mitmproxy", tags=["APP抓包"])
+router.include_router(precision_test_router, prefix="/precision_test", tags=["精准测试"])
+router.include_router(desktop_automation_router, prefix="/desktop_automation", tags=["客户端UI自动化"])
+router.include_router(miniprogram_automation_router, prefix="/miniprogram_automation", tags=["小程序自动化"])
 
 __all__ = ["router"]

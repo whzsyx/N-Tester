@@ -1,4 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 AI 模块数据模型
 """

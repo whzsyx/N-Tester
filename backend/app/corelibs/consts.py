@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 # 公共
 DEFAULT_PAGE = 1
 DEFAULT_PER_PAGE = 10

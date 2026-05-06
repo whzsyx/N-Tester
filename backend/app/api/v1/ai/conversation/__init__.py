@@ -1,6 +1,7 @@
-"""
-对话管理模块
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 from fastapi import APIRouter
 from .controller import router as http_router
 from .websocket import router as ws_router

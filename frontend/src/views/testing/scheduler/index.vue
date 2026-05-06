@@ -477,13 +477,11 @@ import { Plus, Search, Refresh, Edit, Delete } from '@element-plus/icons-vue';
 import type { FormInstance } from 'element-plus';
 import { useTaskSchedulerApi, type SchedulerTask } from '/@/api/v1/task_scheduler';
 import { useNotificationConfigApi } from '/@/api/v1/notifications';
-import { useCloudDeviceApi } from '/@/api/v1/cloud_device';
 import { useApiAutomationApi } from '/@/api/v1/api_automation';
 import { useWebManagementApi } from '/@/api/v1/web_management';
 
 const taskSchedulerApi = useTaskSchedulerApi();
 const notificationConfigApi = useNotificationConfigApi();
-const { device_list } = useCloudDeviceApi();
 const { get_api_script_list, api_env, params_select, api_service, api_suite_list } = useApiAutomationApi();
 const { web_group_select } = useWebManagementApi();
 import { formatDateTime } from '/@/utils/formatTime';
@@ -602,12 +600,8 @@ const browserList = ref<any[]>([
 ]);
 
 const loadDevices = async () => {
-  try {
-    const res = await device_list({});
-    deviceList.value = (res.data && (res.data.items || res.data)) || [];
-  } catch {
-    deviceList.value = [];
-  }
+  // 云真机模块已移除，设备列表置空
+  deviceList.value = [];
 };
 
 const loadApiScripts = async () => {

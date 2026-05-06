@@ -1,6 +1,6 @@
-"""
-权限数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, String, Integer, Text
 from app.core.base_model import BaseModel

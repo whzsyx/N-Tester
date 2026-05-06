@@ -1,6 +1,6 @@
-"""
-文件管理数据访问层
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional, List, Tuple
 from sqlalchemy import select, and_, or_

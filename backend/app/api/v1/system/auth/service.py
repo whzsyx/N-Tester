@@ -1,6 +1,6 @@
-"""
-认证授权业务逻辑层
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from datetime import datetime, timedelta
 from typing import Optional

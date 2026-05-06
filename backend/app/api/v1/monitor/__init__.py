@@ -1,6 +1,6 @@
-"""
-监控模块
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from fastapi import APIRouter
 from .server import router as server_router

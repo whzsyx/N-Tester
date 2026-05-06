@@ -1,4 +1,6 @@
-# 用例评审模块 - 数据模型层
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from sqlalchemy import Column, BigInteger, String, Text, DateTime, Boolean, Integer, JSON, Index, UniqueConstraint
 from sqlalchemy.sql import func

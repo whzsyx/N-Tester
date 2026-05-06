@@ -1,6 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
-基础CRUD类
-提供通用的数据访问操作
+基础CRUD类提供通用的数据访问操作
 """
 from __future__ import annotations
 

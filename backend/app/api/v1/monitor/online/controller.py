@@ -1,6 +1,6 @@
-"""
-在线用户监控控制器
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from fastapi import APIRouter, Depends, Query
 from app.common.response import success_response

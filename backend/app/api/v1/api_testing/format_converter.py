@@ -1,7 +1,6 @@
-"""
-API测试模块 - 格式转换器
-支持从Swagger/OpenAPI、Apifox等格式转换为内部格式
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from typing import Dict, Any, List, Optional
 
 

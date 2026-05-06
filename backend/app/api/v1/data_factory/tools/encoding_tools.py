@@ -1,7 +1,6 @@
-"""
-编码工具
-提供各种编码转换功能
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 import time
 import base64
 import binascii

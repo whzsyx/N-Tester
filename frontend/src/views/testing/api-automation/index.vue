@@ -1,11 +1,13 @@
 <template>
-	<ApiList v-if="currentService === null" @select-service="onSelectService" />
-	<ApiServiceDetail
-		v-else
-		:serviceId="currentService.id"
-		:serviceName="currentService.name"
-		@back="onBack"
-	/>
+	<div class="api-automation-root">
+		<ApiList v-if="currentService === null" @select-service="onSelectService" />
+		<ApiServiceDetail
+			v-else
+			:serviceId="currentService.id"
+			:serviceName="currentService.name"
+			@back="onBack"
+		/>
+	</div>
 </template>
 
 <script setup lang="ts">
@@ -23,3 +25,13 @@ function onBack() {
 	currentService.value = null;
 }
 </script>
+
+<style scoped>
+.api-automation-root {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+</style>

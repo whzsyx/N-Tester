@@ -1,6 +1,6 @@
-"""
-文件管理业务逻辑层
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 import os
 import uuid

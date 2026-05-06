@@ -1,8 +1,6 @@
-"""
-
-API测试模块 - 控制器
-
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Optional
 

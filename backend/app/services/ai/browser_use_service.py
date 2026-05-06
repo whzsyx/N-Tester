@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 Browser-use AI浏览器服务，基于browser-use框架实现自然语言驱动的浏览器自动化
 """

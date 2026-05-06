@@ -1,6 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
-数据权限过滤器
-实现5种数据权限范围
+数据权限过滤器实现5种数据权限范围
 """
 
 from typing import Any, Optional

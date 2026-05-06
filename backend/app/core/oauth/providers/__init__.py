@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# @author: Rebort
 """
 OAuth 提供商实现
 """

@@ -1,6 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
-基础Schema
-提供通用的数据验证和序列化
+基础Schema提供通用的数据验证和序列化
 """
 
 from datetime import datetime

@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 """
 LLM 服务封装 - 使用 LangChain，支持所有 OpenAI 兼容的 API
 """
@@ -97,18 +100,26 @@ class LLMService:
             # 清理 base_url
             base_url = self.config.get("base_url", "")
             if base_url:
-                # 移除端点路径
-                endpoints_to_remove = ['/chat/completions', '/v1/chat/completions', '/completions']
+                # 移除完整端点路径（用户可能直接粘贴了完整的 completions URL）
+                endpoints_to_remove = ['/chat/completions', '/completions']
                 for endpoint in endpoints_to_remove:
                     if base_url.endswith(endpoint):
                         base_url = base_url[:-len(endpoint)]
                         logger.info(f"Removed endpoint '{endpoint}' from base_url")
                         break
-                
-                # 确保以 /v1 结尾
-                if not base_url.endswith('/v1') and not base_url.endswith('/compatible-mode/v1'):
-                    base_url = base_url.rstrip('/') + '/v1'
+
+                base_url = base_url.rstrip('/')
+
+                # 只有当 base_url 不包含版本路径时才补 /v1
+                # 例如：https://api.openai.com → 补成 https://api.openai.com/v1
+                # 但 https://open.bigmodel.cn/api/paas/v4 已有版本，不再追加
+                import re as _re
+                has_version = bool(_re.search(r'/v\d+(/|$)', base_url) or base_url.endswith('/compatible-mode/v1'))
+                if not has_version:
+                    base_url = base_url + '/v1'
                     logger.info(f"Added /v1 to base_url: {base_url}")
+                else:
+                    logger.info(f"base_url already contains version path, kept as-is: {base_url}")
             
             # 创建 ChatOpenAI 实例（兼容所有 OpenAI 格式的 API）
             self.client = ChatOpenAI(

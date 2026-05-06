@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 """
 接口权限控制器，基于权限标识和角色进行接口访问控制
 """

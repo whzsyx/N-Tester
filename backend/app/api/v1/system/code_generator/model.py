@@ -1,7 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-编码生成器数据模型
-"""
+# @author: Rebort
+
 from sqlalchemy import Column, String, Integer, UniqueConstraint
 from sqlalchemy.orm import mapped_column
 from app.models.base import Base

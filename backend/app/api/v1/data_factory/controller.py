@@ -1,7 +1,6 @@
-"""
-数据工厂Controller层
-提供API接口
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional

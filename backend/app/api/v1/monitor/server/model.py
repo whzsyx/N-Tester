@@ -1,6 +1,6 @@
-"""
-服务器监控数据模型
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 from typing import Dict, Any
 from pydantic import BaseModel

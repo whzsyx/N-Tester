@@ -1,17 +1,10 @@
-"""
-接口自动化模块
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
+
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from datetime import datetime
-
-
-
-
-class ApiProjectRequest(BaseModel):
-    """获取项目列表 - 无必填参数，body 可为空"""
-    page: Optional[int] = Field(None, description="页码")
-    pageSize: Optional[int] = Field(None, description="每页条数")
 
 
 class ApiServiceRequest(BaseModel):
@@ -27,26 +20,6 @@ class ApiServiceRequest(BaseModel):
 class ApiServiceSortRequest(BaseModel):
     """服务排序"""
     ids: List[int] = Field(..., description="按顺序传入服务 ID 列表")
-
-class AddApiProjectRequest(BaseModel):
-    """新增项目"""
-    name: str = Field(..., description="项目名称")
-    img: Optional[str] = Field(None, description="项目图标")
-    description: Optional[str] = Field(None, description="项目描述")
-
-
-class EditApiProjectRequest(BaseModel):
-    """编辑项目"""
-    id: int = Field(..., description="项目ID")
-    name: Optional[str] = Field(None, description="项目名称")
-    img: Optional[str] = Field(None, description="项目图标")
-    description: Optional[str] = Field(None, description="项目描述")
-
-
-class DelApiProjectRequest(BaseModel):
-    """删除项目"""
-    id: int = Field(..., description="项目ID")
-
 
 class AddApiServiceRequest(BaseModel):
     """新增服务"""
@@ -279,18 +252,6 @@ class ApiScriptReportLogRequest(BaseModel):
     menu_id: str = Field(..., description="菜单/用例 UUID")
 
 
-
-
-class ApiProjectResponse(BaseModel):
-    """API 项目"""
-    id: int
-    name: str
-    img: Optional[str] = None
-    description: Optional[str] = None
-    creation_date: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ApiServiceResponse(BaseModel):

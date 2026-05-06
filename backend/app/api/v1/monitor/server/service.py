@@ -1,6 +1,6 @@
-"""
-服务器监控服务
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author: Rebort
 
 import psutil
 import platform

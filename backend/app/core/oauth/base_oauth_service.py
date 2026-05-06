@@ -1,8 +1,7 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-OAuth 基础服务类
-提供通用的 OAuth 认证流程
-"""
+# @author: Rebort
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple
