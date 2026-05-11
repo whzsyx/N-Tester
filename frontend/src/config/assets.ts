@@ -3,7 +3,7 @@
  * 统一管理系统中使用的图片资源路径
  */
 
-// 背景图配置
+// 背景图配置（请将资源放到 frontend/src/assets/bakgrounImage/ 等对应路径）
 export const backgroundImages = {
   // 登录页背景图
   loginBg: new URL('../assets/bakgrounImage/N-Tester.png', import.meta.url).href,
@@ -13,22 +13,17 @@ export const backgroundImages = {
   defaultBg: new URL('../assets/bakgrounImage/bakgrounImage.jpg', import.meta.url).href,
 };
 
-// Logo配置
+// Logo配置（frontend/src/assets/ 根目录）
 export const logos = {
-  // 主Logo
   main: new URL('../assets/logo.png', import.meta.url).href,
-  // 白色Logo（用于深色背景）
   white: new URL('../assets/whiteLogo.png', import.meta.url).href,
-  // 迷你Logo（用于折叠菜单）
   mini: new URL('../assets/logo-mini.png', import.meta.url).href,
 };
 
 // 其他图片资源
 export const images = {
-  // 登录页装饰图
   loginMain: new URL('../assets/login-main.png', import.meta.url).href,
   loginBgSvg: new URL('../assets/login-bg.png', import.meta.url).href,
-  // 微信二维码
   weixin: new URL('../assets/weixin.png', import.meta.url).href,
 };
 

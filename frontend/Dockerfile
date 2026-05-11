@@ -12,6 +12,9 @@ RUN yarn install --registry=https://registry.npmmirror.com
 # 复制项目文件
 COPY . .
 
+# Vite/Rollup 打包
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # 构建生产版本
 RUN yarn run build
 
