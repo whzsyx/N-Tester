@@ -20,6 +20,8 @@ class Configs(BaseSettings):
     BASE_URL: AnyHttpUrl = Field(default="http://127.0.0.1:8100", validation_alias="BASE_URL")  # 开发环境
     # 前端访问地址（用于通知中的“查看报告”链接）。未配置则回退 BASE_URL。
     FRONTEND_BASE_URL: str = Field(default="", validation_alias="FRONTEND_BASE_URL")
+    # 便携目录部署：前端构建产物目录（绝对路径）；非空时由 FastAPI 托管 SPA（见 init_mount）
+    FRONTEND_DIST_PATH: str = Field(default="", validation_alias="FRONTEND_DIST_PATH")
 
     API_PREFIX: str = "/api"  # 接口前缀 - v1版本通过路由器添加
     STATIC_DIR: str = 'static'  # 静态文件目录
@@ -214,4 +216,17 @@ class Configs(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
+def _bootstrap_portable_config() -> None:
+    """在实例化 Configs 之前应用便携目录 config.yaml（若存在）。"""
+    import warnings
+
+    try:
+        from portable_env import load_portable_yaml_into_environ
+
+        load_portable_yaml_into_environ()
+    except Exception as e:
+        warnings.warn(f"便携配置 config.yaml 未应用: {e}", stacklevel=2)
+
+
+_bootstrap_portable_config()
 config = Configs()

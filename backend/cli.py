@@ -67,6 +67,17 @@ def get_alembic_config() -> Config:
     return alembic_cfg
 
 
+def _has_bundled_alembic_revisions() -> bool:
+    """若 versions 下已有迁移脚本，则为发行包/已有仓库：只应 upgrade，勿再 autogenerate。"""
+    versions_dir = os.path.join(os.path.dirname(__file__), "app", "alembic", "versions")
+    if not os.path.isdir(versions_dir):
+        return False
+    for name in os.listdir(versions_dir):
+        if name.endswith(".py") and name != "__init__.py":
+            return True
+    return False
+
+
 @app.command(name="revision", help="生成新的 Alembic 迁移脚本")
 def revision(
     message: Annotated[str, typer.Option("--message", "-m", help="迁移描述信息")] = "auto migration",
@@ -93,7 +104,7 @@ def revision(
     try:
         alembic_cfg = get_alembic_config()
         
-        typer.echo(f"环境: {env.value}")
+        typer.echo(f"环境: {env}")
         typer.echo(f"描述: {message}")
         typer.echo()
         typer.echo("正在生成迁移脚本...")
@@ -141,7 +152,7 @@ def upgrade(
     try:
         alembic_cfg = get_alembic_config()
         
-        typer.echo(f"环境: {env.value}")
+        typer.echo(f"环境: {env}")
         typer.echo(f"目标版本: {revision}")
         typer.echo()
         typer.echo("正在应用迁移...")
@@ -186,7 +197,7 @@ def downgrade(
     try:
         alembic_cfg = get_alembic_config()
         
-        typer.echo(f"环境: {env.value}")
+        typer.echo(f"环境: {env}")
         typer.echo(f"目标版本: {revision}")
         typer.echo()
         
@@ -274,20 +285,22 @@ def history(
         raise typer.Exit(code=1)
 
 
-@app.command(name="init-db", help="初始化数据库（生成并应用迁移）")
+@app.command(name="init-db", help="初始化数据库（生成并应用迁移，可选种子数据）")
 def init_db(
     message: Annotated[str, typer.Option("--message", "-m", help="迁移描述信息")] = "initial migration",
     env: Annotated[str, typer.Option("--env", help="运行环境 (dev, prod)")] = "dev",
-    force: Annotated[bool, typer.Option("--force", "-f", help="强制重新初始化")] = False
+    force: Annotated[bool, typer.Option("--force", "-f", help="强制重新初始化")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="非交互：跳过硬删除确认，并自动导入种子数据")] = False,
 ) -> None:
     """
-    初始化数据库（一键完成：检查/创建 alembic + 生成迁移 + 应用迁移）
+    初始化数据库（一键：检查/创建 alembic、应用迁移；若已有打包迁移则跳过 autogenerate）
     
     示例:
         python cli.py init-db
         python cli.py init-db -m "initial setup"
         python cli.py init-db --force
         python cli.py init-db --env prod
+        python cli.py init-db --yes
     """
     # 验证环境参数
     if env not in ["dev", "prod"]:
@@ -481,13 +494,12 @@ def downgrade() -> None:
             typer.echo()
         
         alembic_cfg = get_alembic_config()
-        
+
         if force:
             typer.echo("强制模式：将清理旧的迁移文件")
-            if not typer.confirm("确定要继续吗？"):
+            if not yes and not typer.confirm("确定要继续吗？"):
                 typer.echo("已取消")
                 raise typer.Exit()
-            
 
             versions_dir = os.path.join(os.path.dirname(__file__), "app", "alembic", "versions")
             if os.path.exists(versions_dir):
@@ -497,18 +509,25 @@ def downgrade() -> None:
                         os.remove(file)
                         typer.echo(f"  删除: {os.path.basename(file)}")
             typer.echo()
-        
-        # 1. 生成迁移脚本
-        typer.echo("[1/2] 生成迁移脚本...")
-        command.revision(alembic_cfg, autogenerate=True, message=message)
-        typer.echo("迁移脚本已生成")
-        typer.echo()
-        
-        # 2. 应用迁移
-        typer.echo("[2/2] 应用迁移...")
-        command.upgrade(alembic_cfg, "head")
-        typer.echo("迁移已应用")
-        typer.echo()
+
+        use_bundled = _has_bundled_alembic_revisions() and not force
+        if use_bundled:
+            typer.echo("已检测到自带迁移脚本，执行 upgrade head（跳过 autogenerate）…")
+            command.upgrade(alembic_cfg, "head")
+            typer.echo("迁移已应用")
+            typer.echo()
+        else:
+            # 1. 生成迁移脚本
+            typer.echo("[1/2] 生成迁移脚本...")
+            command.revision(alembic_cfg, autogenerate=True, message=message)
+            typer.echo("迁移脚本已生成")
+            typer.echo()
+
+            # 2. 应用迁移
+            typer.echo("[2/2] 应用迁移...")
+            command.upgrade(alembic_cfg, "head")
+            typer.echo("迁移已应用")
+            typer.echo()
         
         typer.echo("=" * 50)
         typer.echo("数据库初始化完成！")
@@ -516,7 +535,7 @@ def downgrade() -> None:
         typer.echo()
         
         # 询问是否导入初始数据
-        if typer.confirm("是否导入初始数据（用户、角色、菜单等）？", default=True):
+        if yes or typer.confirm("是否导入初始数据（用户、角色、菜单等）？", default=True):
             typer.echo()
             typer.echo("=" * 50)
             typer.echo("  导入初始数据")

@@ -224,6 +224,7 @@ import {computed, defineAsyncComponent, nextTick, onMounted, reactive, ref} from
 import {formatAxis, formatDateTime} from '/@/utils/formatTime';
 import {useUserStore} from "/@/stores/user";
 import {useUserApi} from "/@/api/v1/system/user";
+import {getBaseApiUrl} from "/@/utils/config";
 import {ElMessage} from "element-plus";
 import {storeToRefs} from "pinia";
 import ResetPassword from "/@/views/system/personal/ResetPassword.vue";
@@ -277,7 +278,7 @@ const getUserInfo = async () => {
   
   // 处理头像URL：如果是相对路径，添加完整的基础URL
   if (data.avatar && data.avatar.startsWith('/static/')) {
-    data.avatar = `${import.meta.env.VITE_API_BASE_URL}${data.avatar}`;
+    data.avatar = `${getBaseApiUrl()}${data.avatar}`;
   }
   
   state.userInfoForm = data

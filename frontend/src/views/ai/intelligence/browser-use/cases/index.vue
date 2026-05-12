@@ -810,7 +810,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download, Upload, VideoPlay, ArrowDown, Delete, UploadFilled } from '@element-plus/icons-vue'
 import { getProjectList } from '/@/api/v1/project'
@@ -818,6 +818,7 @@ import { getModuleList, getModuleTree } from '/@/api/v1/modules'
 import { getTestCaseList } from '/@/api/v1/testcases'
 
 import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
+import { getBaseApiUrl } from '/@/utils/config'
 
 // 数据
 const loading = ref(false)
@@ -1360,7 +1361,9 @@ const excelModuleList = ref([])
 const excelModuleLoading = ref(false)
 
 // Excel模板下载URL
-const excelTemplateUrl = `${import.meta.env.VITE_API_BASE_URL}/static/templates/AI_TestCase_Template.xlsx`
+const excelTemplateUrl = computed(
+	() => `${getBaseApiUrl()}/static/templates/AI_TestCase_Template.xlsx`,
+)
 
 const handleImportExcel = () => {
   // 重置状态

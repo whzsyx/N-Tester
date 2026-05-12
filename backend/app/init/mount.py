@@ -4,6 +4,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.corelibs.logger import logger
 from config import config
 
 
@@ -27,3 +28,13 @@ def init_mount(app: FastAPI):
     uploads_abs = os.path.join(backend_root, "uploads")
     os.makedirs(uploads_abs, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=uploads_abs), name="uploads")
+
+    # 便携目录：托管 Vite 构建的前端（config.yaml 中 frontend.dist_path）
+    dist_path = (getattr(config, "FRONTEND_DIST_PATH", None) or "").strip()
+    if dist_path and os.path.isdir(dist_path):
+        assets_dir = os.path.join(dist_path, "assets")
+        if os.path.isdir(assets_dir):
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="spa_assets")
+        app.mount("/", StaticFiles(directory=dist_path, html=True), name="spa")
+    elif dist_path:
+        logger.warning("FRONTEND_DIST_PATH 已配置但目录不存在，跳过前端托管: %s", dist_path)

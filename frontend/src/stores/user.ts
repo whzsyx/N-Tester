@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 import {Session} from '/@/utils/storage';
 import {useUserApi} from "/@/api/v1/system/user";
+import {getBaseApiUrl} from "/@/utils/config";
 
 /**
  * 用户信息
@@ -32,7 +33,7 @@ export const useUserStore = defineStore('userInfo', {
 				// 处理头像URL：如果是相对路径，添加完整的基础URL
 				let avatarUrl = apiUserInfo.avatar || '';
 				if (avatarUrl && avatarUrl.startsWith('/static/')) {
-					avatarUrl = `${import.meta.env.VITE_API_BASE_URL}${avatarUrl}`;
+					avatarUrl = `${getBaseApiUrl()}${avatarUrl}`;
 				}
 				
 				// 映射后端返回的数据到前端格式
