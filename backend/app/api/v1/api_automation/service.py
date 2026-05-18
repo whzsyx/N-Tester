@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @author: Rebort
 
@@ -48,7 +48,7 @@ from app.api.v1.system.user.crud import UserCRUD
 from app.api.v1.task_scheduler.service import TaskSchedulerService
 from app.api.v1.task_scheduler.model import MsgNoticeModel
 
-
+from .transports.unified_invoke import unified_transport_invoke
 async def _get_username_map(db: AsyncSession, user_ids: List[int]) -> Dict[int, str]:
     if not user_ids:
         return {}
@@ -2224,9 +2224,12 @@ class ApiAutomationService:
         file_paths = api_req.get("file_path") or []
         config = api_req.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
 
-        res = await ApiAutomationService._send_request(
-            method=method,
+        protocol = str(api_req.get("protocol") or "http").strip()
+        res = await unified_transport_invoke(
+            protocol=protocol,
             url=str(url),
+            api_req=api_req,
+            method=method,
             headers=headers,
             params=params,
             body_type=body_type,
@@ -2966,9 +2969,12 @@ class ApiAutomationService:
                 user_id=user_id,
             )
 
-        res = await ApiAutomationService._send_request(
-            method=method,
+        protocol = str(req.get("protocol") or "http").strip()
+        res = await unified_transport_invoke(
+            protocol=protocol,
             url=str(url),
+            api_req=req,
+            method=method,
             headers=headers,
             params=params,
             body_type=body_type,
@@ -3312,9 +3318,12 @@ class ApiAutomationService:
                 if item.get("message"):
                     await ApiAutomationService._write_log_line(menu_uuid, result_id, str(item.get("message")))
 
-            res = await ApiAutomationService._send_request(
-                method=int(api_cfg.get("method") or 2),
+            protocol = str(api_cfg.get("protocol") or "http").strip()
+            res = await unified_transport_invoke(
+                protocol=protocol,
                 url=str(url),
+                api_req=api_cfg,
+                method=int(api_cfg.get("method") or 2),
                 headers=headers,
                 params=params,
                 body_type=int(api_cfg.get("body_type") or 2),

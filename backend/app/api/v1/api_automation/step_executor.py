@@ -16,6 +16,7 @@ from jsonpath_ng import parse as jsonpath_parse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from .model import ApiDatabaseModel, ApiModel, ApiFunctionModel
+from .transports.unified_invoke import unified_transport_invoke
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +293,7 @@ class StepExecutor:
         form_urlencoded = ApiAutomationService.params_header(api_cfg.get("form_urlencoded"))
         file_paths = api_cfg.get("file_path") or []
         config = api_cfg.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
+        protocol = str(api_cfg.get("protocol") or "http").strip()
 
         # 前置操作
         before_ops = api_cfg.get("before") or []
@@ -304,10 +306,12 @@ class StepExecutor:
             if item.get("message"):
                 result.logs.append(str(item["message"]))
 
-        # 发送请求
-        res = await ApiAutomationService._send_request(
-            method=int(api_cfg.get("method") or 2),
+        # 发送请求（多协议统一入口）
+        res = await unified_transport_invoke(
+            protocol=protocol,
             url=str(url),
+            api_req=api_cfg,
+            method=int(api_cfg.get("method") or 2),
             headers=headers,
             params=params,
             body_type=int(api_cfg.get("body_type") or 2),

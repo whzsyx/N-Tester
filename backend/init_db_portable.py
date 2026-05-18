@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Portable deploy: load root config.yaml, then full DB init (cli.py init-db --yes)."""
 import os
 import subprocess
 import sys

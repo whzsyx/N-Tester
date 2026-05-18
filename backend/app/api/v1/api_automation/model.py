@@ -205,6 +205,20 @@ class ApiCaseModel(Base):
     step_rely = Column(Integer, default=1, comment='步骤依赖：1=是（步骤间共享变量），0=否（每步骤独立）')
 
 
+class ApiPerfReportModel(Base):
+    """单接口压测报告（轻量并发 HTTP）"""
+
+    __tablename__ = "api_automation_perf_reports"
+
+    api_id = Column(BigInteger, nullable=False, comment="接口ID")
+    api_service_id = Column(BigInteger, nullable=True, comment="服务ID")
+    env_id = Column(BigInteger, nullable=True, comment="环境ID")
+    title = Column(String(255), nullable=True, comment="报告标题")
+    perf_config = Column(JSON, nullable=True, comment="压测参数：并发、时长、上限等")
+    summary = Column(JSON, nullable=True, comment="汇总：TPS、延迟分位、状态码分布等")
+    detail = Column(JSON, nullable=True, comment="扩展明细")
+
+
 class NtestScriptModel(Base):
     """公共脚本（脚本中心）"""
     __tablename__ = 'api_automation_ntest_scripts'

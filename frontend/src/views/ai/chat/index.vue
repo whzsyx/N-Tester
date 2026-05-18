@@ -1482,13 +1482,31 @@ const openEvidence = (url: string) => {
 const extractEvidenceLinks = (content: string): Array<{ name: string; url: string; isImage: boolean }> => {
   if (!content) return []
   const out: Array<{ name: string; url: string; isImage: boolean }> = []
-  const mdRe = /\[([^\]]+)\]\((\/uploads\/[^)\s]+)\)/g
+  const seen = new Set<string>()
+  const push = (name: string, url: string) => {
+    if (!url || seen.has(url)) return
+    seen.add(url)
+    const isImage = /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
+    out.push({ name: name || 'artifact', url, isImage })
+  }
+  const mdRe = /\[([^\]]+)\]\((\/(?:uploads|v1\/skills)[^)\s]+)\)/g
   let m: RegExpExecArray | null = null
   while ((m = mdRe.exec(content)) !== null) {
-    const name = m[1] || 'artifact'
-    const url = m[2] || ''
-    const isImage = /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
-    out.push({ name, url, isImage })
+    push(m[1] || 'artifact', m[2] || '')
+  }
+  const uploadRe = /(\/uploads\/skills\/runtime\/screenshots\/[^\s"'<>)\]]+\.(?:png|jpg|jpeg|gif|webp|bmp))/gi
+  while ((m = uploadRe.exec(content)) !== null) {
+    const url = m[1] || ''
+    push(url.split('/').pop() || 'screenshot', url)
+  }
+  const savedRe = /saved\s+((?:uploads[\\/])?[\w./\\-]+\.(?:png|jpg|jpeg|gif|webp|bmp))/gi
+  while ((m = savedRe.exec(content)) !== null) {
+    const raw = (m[1] || '').replace(/\\/g, '/')
+    const name = raw.split('/').pop() || 'screenshot'
+    const url = raw.includes('runtime/screenshots/')
+      ? `/uploads/skills/runtime/screenshots/${raw.split('runtime/screenshots/')[1]}`
+      : `/uploads/skills/runtime/screenshots/${raw.replace(/^uploads\/skills\/?/, '')}`
+    push(name, url)
   }
   return out
 }

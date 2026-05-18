@@ -116,12 +116,181 @@ def _scan_skill_pack(repo_dir: Path) -> List[dict]:
     return items
 
 
+ZIP_MAX_UPLOAD_MB = int(os.getenv("SKILL_ZIP_MAX_MB", "200"))
+ZIP_MAX_FILES = int(os.getenv("SKILL_ZIP_MAX_FILES", "8000"))
+ZIP_MAX_RATIO = int(os.getenv("SKILL_ZIP_MAX_RATIO", "250"))
+
+
+def _extract_zip_safely(zip_path: Path, dest: Path) -> None:
+    """解压 zip：防路径穿越、限制体积与文件数。"""
+    dest.mkdir(parents=True, exist_ok=True)
+    dest_resolved = dest.resolve()
+    max_zip = max(1, ZIP_MAX_UPLOAD_MB) * 1024 * 1024
+    if zip_path.stat().st_size > max_zip:
+        raise HTTPException(status_code=400, detail=f"zip 超过上限 {ZIP_MAX_UPLOAD_MB} MB")
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        members = zf.infolist()
+        if len(members) > ZIP_MAX_FILES:
+            raise HTTPException(status_code=400, detail=f"zip 内文件数超过 {ZIP_MAX_FILES}")
+        uncompressed = sum(int(m.file_size or 0) for m in members)
+        zsize = max(zip_path.stat().st_size, 1)
+        if uncompressed > zsize * max(10, ZIP_MAX_RATIO):
+            raise HTTPException(status_code=400, detail="压缩包解压体积异常，已拒绝解压（疑似 zip 炸弹）")
+
+        for m in members:
+            name = (m.filename or "").strip().replace("\\", "/")
+            if not name or name.endswith("/"):
+                continue
+            if name.startswith("/") or ".." in Path(name).parts:
+                raise HTTPException(status_code=400, detail=f"非法路径: {name}")
+            target = (dest / name).resolve()
+            if not str(target).startswith(str(dest_resolved)):
+                raise HTTPException(status_code=400, detail=f"路径穿越: {name}")
+
+        zf.extractall(dest)
+
+
+def _single_skill_root(base: Path) -> Optional[Path]:
+    """单个 Cursor/Antigravity 风格技能包：SKILL.md 在根或唯一子目录内。"""
+    if (base / "SKILL.md").is_file():
+        return base.resolve()
+    subs = [p for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")]
+    if len(subs) == 1 and (subs[0] / "SKILL.md").is_file():
+        return subs[0].resolve()
+    skip = {"node_modules", ".git", "__pycache__", "venv", ".venv", "dist", "build"}
+    best: Optional[Path] = None
+    best_depth = 99
+    for md in base.rglob("SKILL.md"):
+        if any(part in skip for part in md.parts):
+            continue
+        try:
+            depth = len(md.relative_to(base).parts)
+        except ValueError:
+            continue
+        if depth <= best_depth:
+            best_depth = depth
+            best = md.parent.resolve()
+    return best
+
+
+def _infer_entry_command(skill_dir: Path) -> Optional[str]:
+    """根据常见约定推断默认可执行命令（上传后即可点「执行」）。"""
+    pj = skill_dir / "package.json"
+    if pj.is_file():
+        try:
+            pkg = json.loads(pj.read_text(encoding="utf-8", errors="ignore"))
+            scripts = pkg.get("scripts") if isinstance(pkg, dict) else {}
+            if isinstance(scripts, dict):
+                for key in ("skill", "start", "test", "run"):
+                    if key in scripts and str(scripts.get(key) or "").strip():
+                        return f"npm run {key}"
+        except Exception:
+            pass
+    if (skill_dir / "run.js").is_file():
+        return "node run.js"
+    if (skill_dir / "main.py").is_file():
+        return "python main.py"
+    if (skill_dir / "run.sh").is_file():
+        return "bash run.sh"
+    return None
+
+
+def _discover_skill_layout(extract_root: Path) -> tuple[str, List[dict], Optional[Path]]:
+    """
+    返回 (mode, pack_items, single_root)
+    mode: multi | single
+    """
+    pack = _scan_skill_pack(extract_root)
+    if pack:
+        return "multi", pack, None
+    one = _single_skill_root(extract_root)
+    if one:
+        return "single", [], one
+    raise HTTPException(
+        status_code=400,
+        detail="未找到 SKILL.md：请上传包含 skills/*/SKILL.md 的多技能包，或 zip 根目录（及唯一一级子目录）下含 SKILL.md 的单技能包。",
+    )
+
+
+def _skill_root_abs() -> Path:
+    return SKILL_ROOT.resolve()
+
+
 def _build_skill_runtime_dirs(project_id: int, session_key: str) -> tuple[Path, Path]:
-    screenshots_dir = SKILL_ROOT / "runtime" / "screenshots" / str(project_id) / session_key
-    artifacts_dir = SKILL_ROOT / "runtime" / "artifacts" / str(project_id) / session_key
+    """必须使用绝对路径，否则子进程 cwd 在技能包目录时会把截图写到错误位置。"""
+    root = _skill_root_abs()
+    screenshots_dir = root / "runtime" / "screenshots" / str(project_id) / session_key
+    artifacts_dir = root / "runtime" / "artifacts" / str(project_id) / session_key
     screenshots_dir.mkdir(parents=True, exist_ok=True)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
-    return screenshots_dir, artifacts_dir
+    return screenshots_dir.resolve(), artifacts_dir.resolve()
+
+
+def _resolve_output_file(raw: str, cwd: Path) -> Optional[Path]:
+    """解析 stdout/日志中的文件路径（支持相对技能目录、相对 uploads）。"""
+    raw = (raw or "").strip().strip('"').strip("'")
+    if not raw:
+        return None
+    p = Path(raw)
+    if p.is_file():
+        return p.resolve()
+    norm = raw.replace("\\", "/")
+    bases: List[Path] = []
+    for b in (cwd, _skill_root_abs().parent.parent, _skill_root_abs().parent, _skill_root_abs()):
+        try:
+            br = b.resolve()
+        except Exception:
+            continue
+        if br not in bases:
+            bases.append(br)
+    for base in bases:
+        cand = (base / norm).resolve()
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _ingest_saved_outputs(stdout: str, stderr: str, cwd: Path, screenshots_dir: Path) -> None:
+    """
+    将 stdout 中 saved 的图片路径收拢到 screenshots_dir，供 _collect_files 与页面 /uploads 直链使用。
+    """
+    screenshots_dir = screenshots_dir.resolve()
+    image_ext = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+    seen_src: set[str] = set()
+    blobs = f"{stdout or ''}\n{stderr or ''}"
+    candidates: List[str] = []
+    for line in blobs.splitlines():
+        m = re.search(r"\bsaved\s+(.+)", line, flags=re.IGNORECASE)
+        if m:
+            candidates.append(m.group(1).strip())
+        for m2 in re.finditer(
+            r"((?:uploads[\\/])?[\w./\\-]+\.(?:png|jpg|jpeg|gif|webp|bmp))",
+            line,
+            flags=re.IGNORECASE,
+        ):
+            candidates.append(m2.group(1).strip())
+
+    for raw in candidates:
+        src = _resolve_output_file(raw, cwd)
+        if not src or src.suffix.lower() not in image_ext:
+            continue
+        key = str(src.resolve())
+        if key in seen_src:
+            continue
+        seen_src.add(key)
+        try:
+            if src.resolve().is_relative_to(screenshots_dir):
+                continue
+        except ValueError:
+            pass
+        dest = screenshots_dir / src.name
+        try:
+            if dest.exists() and dest.stat().st_size == src.stat().st_size:
+                continue
+            shutil.copy2(src, dest)
+        except Exception:
+            continue
 
 
 def _collect_files(base_dir: Path) -> List[dict]:
@@ -197,9 +366,12 @@ def _resolve_skill_command(
     skill_dir: Path,
     arguments: Optional[dict],
 ) -> str:
-    cmd = (entry_command or "").strip()
-    if cmd:
-        return cmd
+    """
+    解析最终 shell 命令。约定：
+    - arguments.command / __command 优先（智能模式、API 显式传入的执行串）；
+    - 其次 template；
+    - 最后才用库里的 entry_command 作为默认（上传推断的 node run.js 等不应盖住显式命令）。
+    """
     args = arguments or {}
     override_cmd = str(args.get("command") or args.get("__command") or "").strip()
     if override_cmd:
@@ -219,6 +391,10 @@ def _resolve_skill_command(
         if template_path.suffix.lower() == ".sh":
             return f"bash {_quote_cmd_arg(str(template_path))}" + (f" {tail}" if tail else "")
         return _quote_cmd_arg(str(template_path)) + (f" {tail}" if tail else "")
+
+    cmd = (entry_command or "").strip()
+    if cmd:
+        return cmd
 
     return ""
 
@@ -425,9 +601,15 @@ async def import_skill_from_git(project_id: int, user_id: int, db: AsyncSession,
         "is_active": True,
     }
 
-    # If repo is a skill pack (multi-SKILL.md layout), create one record per SKILL.md under /skills
-    pack = _scan_skill_pack(dst)
-    if pack:
+    try:
+        mode, pack, single_root = _discover_skill_layout(dst)
+    except HTTPException:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
+
+    explicit_entry = str(data.get("entry_command") or "").strip() or None
+
+    if mode == "multi" and pack:
         created_ids: List[int] = []
         for item in pack:
             skill_name = _safe_skill_name(item["name"])
@@ -446,33 +628,47 @@ async def import_skill_from_git(project_id: int, user_id: int, db: AsyncSession,
                     "source_type": payload["source_type"],
                     "repo_url": repo_url,
                     "skill_path": str(item["skill_dir"]),
-                    # entry_command left empty: prefer SKILL.md allowed-tools / templates
-                    "entry_command": str(data.get("entry_command") or "").strip() or None,
+                    "entry_command": explicit_entry or _infer_entry_command(Path(item["skill_dir"])) or None,
                     "is_active": True,
                     "extra_config": extra,
                 },
             )
             created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
-        return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
+        return success_response(
+            data={"created": created_ids, "count": len(created_ids), "layout": "multi"},
+            message="导入成功",
+        )
 
-    # Fallback: treat repo root as a single skill
+    assert single_root is not None
+    inferred = _infer_entry_command(single_root)
+    entry_c = explicit_entry or inferred
+    extra_base = data.get("extra_config") if isinstance(data.get("extra_config"), dict) else {}
+    extra_single = {**extra_base, "layout": "single", "inferred_entry": bool(inferred and not explicit_entry)}
     res = await create_skill(
         project_id,
         user_id,
         db,
         {
-            "name": name,
-            "description": str(data.get("description") or _parse_skill_description(dst)),
-            "scenario_category": payload.get("scenario_category"),
+            "name": _safe_skill_name(single_root.name or name),
+            "description": str(data.get("description") or _parse_skill_description(single_root)),
+            "scenario_category": payload.get("scenario_category") or _safe_skill_name(single_root.name or name),
             "source_type": payload["source_type"],
             "repo_url": repo_url,
-            "skill_path": str(dst),
-            "entry_command": str(data.get("entry_command") or "").strip() or None,
+            "skill_path": str(single_root),
+            "entry_command": entry_c,
             "is_active": True,
-            "extra_config": data.get("extra_config") if isinstance(data.get("extra_config"), dict) else {},
+            "extra_config": extra_single,
         },
     )
-    return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+    return success_response(
+        data={
+            "created": [((res or {}).get("data") or {}).get("id")],
+            "count": 1,
+            "layout": "single",
+            "inferred_entry": bool(inferred and not explicit_entry),
+        },
+        message="导入成功",
+    )
 
 
 async def import_skill_from_upload(
@@ -497,8 +693,10 @@ async def import_skill_from_upload(
         tf.write(raw)
         zip_path = Path(tf.name)
     try:
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(dst)
+        _extract_zip_safely(zip_path, dst)
+    except HTTPException:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
     except Exception as e:
         shutil.rmtree(dst, ignore_errors=True)
         raise HTTPException(status_code=400, detail=f"解压失败: {e}")
@@ -507,20 +705,18 @@ async def import_skill_from_upload(
             zip_path.unlink(missing_ok=True)
         except Exception:
             pass
-    payload = {
-        "name": name,
-        "description": _parse_skill_description(dst),
-        "scenario_category": scenario_category,
-        "source_type": "upload",
-        "repo_url": None,
-        "skill_path": str(dst),
-        "entry_command": (entry_command or "").strip() or None,
-        "is_active": True,
-        "extra_config": {},
-    }
 
-    pack = _scan_skill_pack(dst)
-    if pack:
+    try:
+        mode, pack, single_root = _discover_skill_layout(dst)
+    except HTTPException:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
+
+    inferred = _infer_entry_command(single_root) if mode == "single" and single_root else None
+    explicit_entry = (entry_command or "").strip() or None
+    default_entry = explicit_entry or inferred
+
+    if mode == "multi" and pack:
         created_ids: List[int] = []
         for item in pack:
             skill_name = _safe_skill_name(item["name"])
@@ -539,16 +735,50 @@ async def import_skill_from_upload(
                     "source_type": "upload",
                     "repo_url": None,
                     "skill_path": str(item["skill_dir"]),
-                    "entry_command": (entry_command or "").strip() or None,
+                    "entry_command": explicit_entry or _infer_entry_command(Path(item["skill_dir"])) or None,
                     "is_active": True,
                     "extra_config": extra,
                 },
             )
             created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
-        return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
+        return success_response(
+            data={
+                "created": created_ids,
+                "count": len(created_ids),
+                "layout": "multi",
+                "hint": "已从 skills/ 下解析多个 SKILL；未配命令的技能可稍后在编辑里补充 entry_command。",
+            },
+            message="导入成功",
+        )
 
-    res = await create_skill(project_id, user_id, db, payload)
-    return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+    assert single_root is not None
+    skill_display_name = _safe_skill_name(single_root.name or name)
+    res = await create_skill(
+        project_id,
+        user_id,
+        db,
+        {
+            "name": skill_display_name,
+            "description": _parse_skill_description(single_root),
+            "scenario_category": scenario_category or skill_display_name,
+            "source_type": "upload",
+            "repo_url": None,
+            "skill_path": str(single_root),
+            "entry_command": default_entry,
+            "is_active": True,
+            "extra_config": {
+                "layout": "single",
+                "inferred_entry": bool(inferred and not explicit_entry),
+                "upload_stem": name,
+            },
+        },
+    )
+    sid = int(((res or {}).get("data") or {}).get("id") or 0)
+    hint = "导入成功，可在列表中直接「执行」。" if default_entry else "导入成功；未识别到默认可执行命令，请在编辑中填写 entry_command 或通过模板/arguments 执行。"
+    return success_response(
+        data={"created": [sid], "count": 1, "layout": "single", "inferred_entry": bool(inferred and not explicit_entry), "hint": hint},
+        message="导入成功",
+    )
 
 
 async def get_skill_content(project_id: int, user_id: int, skill_id: int, db: AsyncSession) -> dict:
@@ -664,6 +894,7 @@ async def run_skill_tool(
 
     out_text = _smart_decode(cp.stdout)
     err_text = _smart_decode(cp.stderr)
+    _ingest_saved_outputs(out_text, err_text, cwd, screenshots_dir)
     return {
         "ok": cp.returncode == 0,
         "skill_id": m.id,
@@ -761,8 +992,12 @@ async def create_skill_job(
     await db.refresh(job)
 
     # Seed first event
-    db.add(SkillExecutionEventModel(job_id=job.id, seq=1, level="info", message=f"queued runner={rt}"))
+    db.add(SkillExecutionEventModel(job_id=job.id, seq=1, level="info", message=f"queued runner={rt}", created_by=user_id, updated_by=user_id))
     await db.commit()
+
+    from app.api.v1.skills.skill_job_runner import schedule_skill_job
+
+    schedule_skill_job(int(job.id))
 
     return success_response(
         data={

@@ -114,6 +114,7 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
       },
     },
     build: {
+      sourcemap: false,
       outDir: 'dist',
       chunkSizeWarningLimit: 1500,
       rollupOptions: {

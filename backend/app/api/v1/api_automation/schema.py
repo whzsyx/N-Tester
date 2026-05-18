@@ -91,7 +91,10 @@ class SaveApiRequest(BaseModel):
     """保存接口（编辑） - 与 service save_api 入参一致"""
     id: int = Field(..., description="接口ID")
     url: Optional[str] = Field(None, description="请求 URL")
-    req: Optional[Dict[str, Any]] = Field(None, description="完整请求配置(header/params/body/before/after/assert 等)")
+    req: Optional[Dict[str, Any]] = Field(
+        None,
+        description="请求配置：header/params/body/before/after/assert；企业多协议时增加 protocol 与 protocol_config",
+    )
 
 
 class ApiSendRequest(BaseModel):
@@ -99,7 +102,10 @@ class ApiSendRequest(BaseModel):
     id: Optional[int] = Field(None, description="接口ID，可选")
     env_id: Optional[int] = Field(None, description="环境ID")
     url: Optional[str] = Field(None, description="请求 URL（可含变量）")
-    req: Optional[Dict[str, Any]] = Field(None, description="请求配置(header/params/body/before/after/assert 等)")
+    req: Optional[Dict[str, Any]] = Field(
+        None,
+        description="请求配置：header/params/body/before/after/assert；多协议时增加 protocol 与 protocol_config",
+    )
 
 
 class ReqHistoryRequest(BaseModel):

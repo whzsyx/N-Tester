@@ -31,6 +31,10 @@ Authlib==1.6.6
 requests==2.32.5
 httpx==0.28.1
 aiohttp==3.13.3
+websockets>=12.0
+grpcio>=1.60.0,<2.0.0
+grpcio-reflection>=1.60.0,<2.0.0
+paho-mqtt>=2.1.0,<3.0.0
 
 # 文件处理
 aiofiles==25.1.0

@@ -9,6 +9,7 @@ from app.core.dependencies import get_current_user_id
 from app.common.response import success_response, error_response
 from app.utils.common import body_to_json
 from .service import ApiAutomationService
+from .perf_service import ApiPerfService
 
 router = APIRouter()
 
@@ -264,6 +265,69 @@ async def api_send(
         return success_response(res, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
+@router.post("/api_perf_run")
+async def api_perf_run(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """单接口轻量压测（HTTP/HTTPS），生成压测报告记录。"""
+    try:
+        body = await body_to_json(request)
+        data = await ApiPerfService.run_and_save_report(db, body or {}, current_user_id)
+        return success_response(data, message="压测完成")
+    except Exception as e:
+        return error_response(f"压测失败：{str(e)}")
+
+
+@router.post("/api_perf_report_list")
+async def api_perf_report_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """压测报告分页列表。"""
+    try:
+        body = await body_to_json(request)
+        data = await ApiPerfService.list_reports(db, current_user_id, body or {})
+        return success_response(data, message="ok")
+    except Exception as e:
+        return error_response(f"查询失败：{str(e)}")
+
+
+@router.post("/api_perf_report_detail")
+async def api_perf_report_detail(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """压测报告详情。"""
+    try:
+        body = await body_to_json(request)
+        rid = int((body or {}).get("id") or 0)
+        if not rid:
+            return error_response("缺少报告 id")
+        data = await ApiPerfService.get_report(db, rid, current_user_id)
+        if not data:
+            return error_response("报告不存在或无权访问")
+        return success_response(data, message="ok")
+    except Exception as e:
+        return error_response(f"查询失败：{str(e)}")
+
+
+@router.post("/transport_protocols")
+async def transport_protocols(
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """企业级多协议：返回支持的传输类型与 protocol_config 说明（供前端渲染表单）。"""
+    try:
+        from .transports import list_transport_catalog
+
+        return success_response(list_transport_catalog(), message="ok")
+    except Exception as e:
+        return error_response(f"获取协议列表失败：{str(e)}")
 
 
 @router.post("/req_history")
