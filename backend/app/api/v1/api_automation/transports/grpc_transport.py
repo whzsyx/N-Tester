@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # @author: Rebort
 from __future__ import annotations
-
 import asyncio
 import base64
 import time

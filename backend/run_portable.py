@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+"""启动入口：先加载 config.yaml，再按其中 server 段启动 uvicorn。"""
 import os
 import sys
 
-
+# 确保可导入同目录下的 main、portable_env
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)

@@ -2396,21 +2396,6 @@ class ApiAutomationService:
 
     @staticmethod
     async def _res_assert(rule: Dict[str, Any], res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Dict[str, Any]:
-        """
-        res_assert：支持新版 AssertEditor 格式（rules 数组）和旧版格式。
-
-        新版格式（AssertEditor）：
-          rule = {
-            "rules": [
-              {"target": "response_json", "path": "$.code", "comparator": "eq", "expect": "200"},
-              ...
-            ]
-          }
-
-        旧版格式：
-          rule = {"name": "$.code", "res_type": 1, "value": "200"}
-        """
-        # ---- 新版格式：rules 数组 ----
         rules = rule.get("rules")
         if isinstance(rules, list):
             results = []
@@ -2426,7 +2411,7 @@ class ApiAutomationService:
                 "details": results,
             }
 
-        # ---- 旧版格式：单条 eq 断言 ----
+        
         try:
             ok, actual = ApiAutomationService._jsonpath_value_advanced(rule, res, header, body)
             expect = str(rule.get("value", ""))
@@ -2453,10 +2438,6 @@ class ApiAutomationService:
 
     @staticmethod
     def _extract_assert_target(target: str, path: str, res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Tuple[bool, Any]:
-        """
-        根据 target 和 path 提取断言目标值。
-        返回 (success, value)
-        """
         import re as _re
         try:
             if target == "response_json":
@@ -2515,8 +2496,7 @@ class ApiAutomationService:
                 return True, res.get("res_time") or res.get("response_time") or 0
 
             elif target in ("env_var", "global_var"):
-                # Variables are resolved before execution; here we just return the path as-is
-                # In practice the variable should already be substituted
+
                 return True, path
 
             else:
@@ -2590,16 +2570,12 @@ class ApiAutomationService:
 
     @staticmethod
     async def _eval_assert_rule(rule: Dict[str, Any], res: Dict[str, Any], header: Dict[str, Any], body: Any) -> Dict[str, Any]:
-        """
-        执行单条 AssertEditor 规则。
-        rule = {"target": str, "path": str, "comparator": str, "expect": str}
-        """
         target = rule.get("target", "response_json")
         path = rule.get("path", "")
         comparator = rule.get("comparator", "eq")
         expect = str(rule.get("expect", ""))
 
-        # For exists/not_exists, check if extraction succeeds
+
         if comparator == "not_exists":
             ok, _ = ApiAutomationService._extract_assert_target(target, path, res, header, body)
             passed = not ok
@@ -2642,7 +2618,7 @@ class ApiAutomationService:
 
     @staticmethod
     async def _local_db_execute(db_model: ApiDatabaseModel, table: str, where: str) -> Any:
-        """直连数据库查询，local_db_execute。"""
+        """直连数据库查询"""
         try:
             cfg = db_model.config or {}
             host = cfg.get("host") or db_model.host
@@ -2662,10 +2638,6 @@ class ApiAutomationService:
 
     @staticmethod
     async def test_db_connection(db: AsyncSession, db_id: int, user_id: int) -> Dict[str, Any]:
-        """
-        测试直连数据库连接是否可用。
-        逻辑与 _local_db_execute 获取连接配置的方式一致，只做一次简单连接 + ping。
-        """
         row = (
             await db.execute(
                 select(ApiDatabaseModel).where(
@@ -2695,11 +2667,6 @@ class ApiAutomationService:
 
     @staticmethod
     async def _db_result_assert(rule: Dict[str, Any], actual: str) -> Dict[str, Any]:
-        """
-        db_result_assert：
-        - rule['assert_value'] 为数据库字段值（字符串）
-        - actual 为被测值（从响应/请求/常量提取）
-        """
         expect = str(rule.get("assert_value", ""))
         name = str(rule.get("name", ""))
         value_expr = str(rule.get("value", ""))
@@ -2712,7 +2679,6 @@ class ApiAutomationService:
 
     @staticmethod
     async def _db_assert(rule: Dict[str, Any], res: Dict[str, Any], header: Dict[str, Any], body: Any, row: Dict[str, Any]) -> Dict[str, Any]:
-        """db_assert：从响应/请求中取值，与数据库结果字段比较。"""
         try:
             t = int(rule.get("type") or 1)
             if t == 5:
@@ -2745,13 +2711,6 @@ class ApiAutomationService:
         body: Any,
         user_id: int,
     ) -> List[Dict[str, Any]]:
-        """
-        直连数据库断言，local_db_assert：
-        rule 中包含:
-        - local_db: 数据库配置ID
-        - local_db_table/local_db_where
-        - local_db_assert: 断言列表
-        """
         try:
             db_id = int(rule.get("local_db") or 0)
             row_model = (
@@ -2787,12 +2746,6 @@ class ApiAutomationService:
         body: Any,
         user_id: int,
     ) -> List[Dict[str, Any]]:
-        """
-        handle_assert：
-        - type=1: 响应结果断言（支持新版 rules 数组格式 和 旧版格式）
-        - type=4: 直连数据库断言
-        - type=5: 自定义断言（Python 脚本）
-        """
         results: List[Dict[str, Any]] = []
         for op in ops or []:
             try:
@@ -2817,7 +2770,6 @@ class ApiAutomationService:
                             break
                     results.append(r)
                 elif t == 5:
-                    # 自定义断言脚本
                     script = op.get("custom_script") or ""
                     if not script.strip():
                         results.append({"status": 1, "message": "自定义断言：脚本为空，跳过", "type": t})
@@ -2854,7 +2806,7 @@ class ApiAutomationService:
                 r = requests.get(url, headers=headers, params=params, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
             elif method == 2:
                 if body_type in (1, 2):
-                    r = requests.post(url, headers=headers, json=(body if body_type == 2 else {}), timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, data=(body if body_type == 2 else {}), timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
                 elif body_type == 3:
                     r = requests.post(url, headers=headers, data=form_data, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
                 elif body_type == 4:
@@ -2865,9 +2817,9 @@ class ApiAutomationService:
                         files.append(("file", (p.split("/")[-1], open(p, "rb"), "application/octet-stream")))
                     r = requests.request("POST", url=url, files=files, data={}, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
                 else:
-                    r = requests.post(url, headers=headers, json=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, data=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
             elif method == 3:
-                r = requests.put(url, headers=headers, params=params, json=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                r = requests.put(url, headers=headers, params=params, data=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
             elif method == 4:
                 r = requests.delete(url, headers=headers, params=params, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
             else:
@@ -2878,7 +2830,7 @@ class ApiAutomationService:
             except Exception:
                 body_json = {"raw": r.text}
 
-            # cookies
+
             cookies_list = [
                 {
                     "name": c.name,
@@ -2892,7 +2844,7 @@ class ApiAutomationService:
                 for c in r.cookies
             ]
 
-            # raw_request — actual request sent by requests
+
             prep = r.request
             raw_req_headers = dict(prep.headers) if prep and prep.headers else {}
             raw_req_body = ""
@@ -3013,7 +2965,7 @@ class ApiAutomationService:
         res["assert"] = assert_list
         res["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # console: collect log lines from before/after/assert results
+ 
         console_logs: List[Dict[str, Any]] = []
         for item in before_list:
             level = "info" if item.get("status") == 1 else "error"
@@ -3060,35 +3012,16 @@ class ApiAutomationService:
         await db.commit()
         return res
 
-    # -------------------- 场景执行与结果 --------------------
+
     @staticmethod
     async def _new_uuid() -> str:
         return str(uuid.uuid4())
 
     @staticmethod
     async def run_api_script(db: AsyncSession, data: Dict[str, Any], user_id: int) -> None:
-        """
-
-        请求体关键字段：
-        - result_id: 执行批次ID
-        - name: 任务名称
-        - config: {"env_id": int, ...}
-        - run_list: [
-            {
-              "name": "...",
-              "config": {"params_id": ..., ...},
-              "script": [
-                {"name": "...", "api_id": int, ...},
-                ...
-              ]
-            },
-            ...
-          ]
-        """
         result_id = str(data["result_id"])
         env_id = int(data["config"]["env_id"])
         try:
-            # 创建汇总记录
             summary = ApiScriptResultListModel(
                 result_id=int(result_id),
                 name=data["name"],
@@ -3132,12 +3065,11 @@ class ApiAutomationService:
                         case_uuid, result_id, f"开始执行步骤-{step.get('name')}"
                     )
 
-                    # 使用 StepExecutor 支持多步骤类型
+
                     from .step_executor import StepExecutor, VariableContext
                     if not hasattr(ApiAutomationService, '_step_ctx_cache'):
                         ApiAutomationService._step_ctx_cache = {}
                     ctx_key = f"{result_id}_{case_uuid}"
-                    # step_rely 从 case 配置中读取，默认为 True（步骤间共享变量）
                     step_rely = bool(int(case.get("config", {}).get("step_rely", 1)))
                     if ctx_key not in ApiAutomationService._step_ctx_cache:
                         env_vars = await ApiAutomationService._load_env_vars(db, env_id)
@@ -3238,7 +3170,6 @@ class ApiAutomationService:
         params_id: Optional[int],
         user_id: int,
     ) -> Tuple[bool, Dict[str, Any], Dict[str, Any]]:
-        """单步执行逻辑，对handle_api_request（before -> request -> after -> assert）。"""
         req: Dict[str, Any] = {}
         try:
             api_id = int(step["api_id"])
@@ -3449,7 +3380,7 @@ class ApiAutomationService:
             await db.flush()
             return False, req, error_res
 
-    # 结果查询 & 日志
+ 
     @staticmethod
     async def get_script_result(db: AsyncSession, result_id: int, user_id: int) -> List[Dict[str, Any]]:
         own = (
@@ -3854,7 +3785,7 @@ class ApiAutomationService:
                             api_id = api_value.id
                             imported_count += 1
 
-                        # 菜单叶子节点（type=2）
+                       
                         leaf_name = k.get("name") or url
                         leaf_row = (
                             await db.execute(
@@ -3888,18 +3819,17 @@ class ApiAutomationService:
 
     @staticmethod
     async def service_api_update(db: AsyncSession, body: Dict[str, Any]) -> None:
-        """对service_api_update（开放给文档平台）"""
         if body.get("token") != "1fefb62cdd834925983f72c2bc9b9c55":
             raise ValueError("检验token失败，请联系-管理员")
 
-        # author -> sys_user.username
+    
         author = str(body.get("author") or "")
         u = await UserCRUD(db).get_by_username_crud(author)
         if not u:
             raise ValueError("author 对应用户不存在")
         user_id = int(u.id)
 
-        # upsert commonErrorCodes
+      
         for i in body.get("commonErrorCodes") or []:
             code = str(i.get("code") or "")
             msg = str(i.get("msg") or "")
@@ -3919,7 +3849,7 @@ class ApiAutomationService:
 
     
         is_overseas = "overseas" in server_name
-        project_name = "海外项目" if is_overseas else "国内项目"
+        project_name = "海项目" if is_overseas else "国项目"
         proj = (
             await db.execute(
                 select(ApiProjectModel).where(ApiProjectModel.enabled_flag == 1, ApiProjectModel.name == project_name)
@@ -3953,12 +3883,6 @@ class ApiAutomationService:
     
     @staticmethod
     async def gitlab_ci_notice(db: AsyncSession, body: Dict[str, Any]) -> Dict[str, Any]:
-        """
-         gitlab_ci_notice：
-        - 根据 api_project_id 找到脚本列表
-        - 过滤 cn_service 包含 api_service
-        - 创建 type=3 的定时任务（10 秒后执行一次）
-        """
         api_project_id = int(body.get("api_project_id") or 0)
         api_service = str(body.get("api_service") or "")
         env_id = int(body.get("env_id") or 0)
@@ -4103,7 +4027,7 @@ class ApiAutomationService:
                     wechat["content"] = str(data)
                     payload["script"]["wechat"] = wechat
 
-            # ：type==1 企业微信；type==2 钉钉；type==3 邮件
+      
             if int(payload.get("type") or 0) == 1 and int(payload.get("status") or 0) == 1:
                 ApiAutomationService._send_wechat_notice(payload)
         except Exception:
@@ -4149,11 +4073,10 @@ class ApiAutomationService:
             return False
 
 
-    # ── 代码生成辅助 ──────────────────────────────────────────────────
+
 
     @staticmethod
     async def get_apis_by_ids(db: AsyncSession, api_ids: list) -> list:
-        """根据接口 ID 列表批量获取接口数据（用于代码生成）"""
         if not api_ids:
             return []
         result = await db.execute(
@@ -4172,9 +4095,7 @@ class ApiAutomationService:
 
     @staticmethod
     async def get_service_base_url(db: AsyncSession, service_id: int) -> str:
-        """尝试从服务关联的环境配置中获取 base_url"""
         try:
-            # 查找该服务下第一个环境的 host 配置
             result = await db.execute(
                 select(ApiEnvironmentModel).where(ApiEnvironmentModel.enabled_flag == 1).limit(1)
             )
@@ -4189,11 +4110,10 @@ class ApiAutomationService:
         return ""
 
 
-    # ── 服务排序 ──────────────────────────────────────────────────────
+
 
     @staticmethod
     async def sort_services(db: AsyncSession, ids: List[int], user_id: int) -> None:
-        """按传入 ID 列表顺序更新服务的 sort 字段"""
         for idx, service_id in enumerate(ids):
             await db.execute(
                 update(ApiServiceModel)
@@ -4202,7 +4122,7 @@ class ApiAutomationService:
             )
         await db.commit()
 
-    # ── 用例集（Suite）CRUD ───────────────────────────────────────────
+
 
     @staticmethod
     def _build_suite_tree(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -4269,7 +4189,6 @@ class ApiAutomationService:
     async def delete_suite(db: AsyncSession, suite_id: int, user_id: int) -> None:
         """级联删除用例集及其所有子用例集和用例"""
         from .model import ApiSuiteModel, ApiCaseModel
-        # 递归收集所有子用例集 ID
         all_ids: List[int] = [int(suite_id)]
         queue = [int(suite_id)]
         while queue:
@@ -4284,13 +4203,11 @@ class ApiAutomationService:
             for cid in children:
                 all_ids.append(cid)
                 queue.append(cid)
-        # 删除所有用例
         await db.execute(
             update(ApiCaseModel)
             .where(ApiCaseModel.suite_id.in_(all_ids), ApiCaseModel.enabled_flag == 1)
             .values(enabled_flag=0, updated_by=user_id)
         )
-        # 删除所有用例集
         await db.execute(
             update(ApiSuiteModel)
             .where(ApiSuiteModel.id.in_(all_ids), ApiSuiteModel.enabled_flag == 1)
@@ -4309,7 +4226,7 @@ class ApiAutomationService:
             )
         await db.commit()
 
-    # ── 用例（Case）CRUD ──────────────────────────────────────────────
+  
 
     @staticmethod
     async def get_case_list(db: AsyncSession, suite_id: int, user_id: int) -> List[Dict[str, Any]]:
@@ -4374,33 +4291,32 @@ class ApiAutomationService:
 
     @staticmethod
     async def run_api_case(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """执行用例：复用现有 run_api_script 逻辑，写入结果并关联 api_service_id"""
         from .model import ApiCaseModel, ApiSuiteModel
         case_ids = [int(i) for i in (body.get("case_ids") or [])]
         env_id = body.get("env_id")
         params_id = body.get("params_id")
         task_name = body.get("name") or f"用例执行_{uuid.uuid4().hex[:8]}"
 
-        # 查询用例，获取 script 和所属服务 ID
+
         cases = (await db.execute(
             select(ApiCaseModel).where(ApiCaseModel.id.in_(case_ids), ApiCaseModel.enabled_flag == 1)
         )).scalars().all()
         if not cases:
             raise ValueError("未找到有效用例")
 
-        # 通过第一个用例的 suite_id 获取 api_service_id
+
         suite = (await db.execute(
             select(ApiSuiteModel).where(ApiSuiteModel.id == cases[0].suite_id, ApiSuiteModel.enabled_flag == 1)
         )).scalar_one_or_none()
         api_service_id = suite.api_service_id if suite else None
 
-        # 构建 run_list（复用现有场景执行格式）
+
         run_list = []
-        case_id_map = {}  # name -> case_id 映射
+        case_id_map = {}  
         for case in cases:
-            case_name = f"{case.name}_{case.id}"  # 确保唯一性
+            case_name = f"{case.name}_{case.id}"  
             run_list.append({
-                "name": case.name,  # 显示原始名称
+                "name": case.name,  
                 "script": case.script or [],
                 "config": {"env_id": env_id, "params_id": params_id, "case_id": case.id, "step_rely": getattr(case, 'step_rely', 1)},
             })
@@ -4416,12 +4332,11 @@ class ApiAutomationService:
         }
         await ApiAutomationService.run_api_script(db, run_body, user_id)
 
-        # 执行完成后按用例单独更新状态
+
         pass_count = 0
         fail_count = 0
         try:
             from .model import ApiScriptResultModel
-            # 查询该批次所有步骤结果，按 menu_id 分组
             result_rows = (await db.execute(
                 select(ApiScriptResultModel).where(
                     ApiScriptResultModel.result_id == result_id,
@@ -4430,7 +4345,7 @@ class ApiAutomationService:
                 ).order_by(ApiScriptResultModel.id.asc())
             )).scalars().all()
 
-            # 按 menu_id 分组，判断每组是否全部通过
+    
             from collections import defaultdict, OrderedDict
             menu_pass: Dict[str, bool] = OrderedDict()
             for row in result_rows:
@@ -4440,13 +4355,13 @@ class ApiAutomationService:
                 if row.status == 0:
                     menu_pass[mid] = False
 
-            # 按 run_list 顺序（即 cases 顺序）对应 menu_id
+    
             menu_ids = list(menu_pass.keys())
             for i, case in enumerate(cases):
                 if i < len(menu_ids):
                     is_pass = menu_pass[menu_ids[i]]
                 else:
-                    is_pass = True  # 无结果时默认通过
+                    is_pass = True  
                 new_status = 1 if is_pass else 2
                 if is_pass:
                     pass_count += 1
@@ -4464,7 +4379,7 @@ class ApiAutomationService:
         total_count = len(cases)
         return {"result_id": str(result_id), "total": total_count, "pass": pass_count, "fail": fail_count}
 
-    # ─── 脚本中心（NtestScript）CRUD ──────────────────────────────────────────
+    # ─── 脚本中心（NtestScript）
 
     @staticmethod
     async def get_ntest_scripts(db: AsyncSession, api_service_id: int, user_id: int) -> List[Dict]:

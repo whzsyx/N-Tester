@@ -1,7 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+供 Windows 企业安装器在安装末尾调用：根据安装向导生成的 INI 写出解压根目录 config.yaml。
 
+用法:
+  python write_installer_config.py <params.ini> <config.yaml 输出路径>
+
+INI 分段（UTF-8）:
+  [server]   host, port
+  [mysql]    host, port, user, password, name
+  [redis]    uri
+  [celery]   broker_url, result_backend, beat_db_url  （可选；缺省时由 mysql 推导）
+  [security] secret_key
+  [frontend] dist_path, public_base_url
+"""
 from __future__ import annotations
+
 import configparser
 import sys
 from pathlib import Path
@@ -29,7 +43,7 @@ def main() -> int:
         print(f"INI not found: {ini_path}", file=sys.stderr)
         return 1
 
-   
+    # 禁用插值，且行内注释仅认「;」——否则密码里的「#」会把后面截断，导致读不到 name=，进而误用旧默认值
     cp = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
     read_ok = cp.read(ini_path, encoding="utf-8-sig")
     if not read_ok:
@@ -52,7 +66,8 @@ def main() -> int:
     name = (db.get("name") or "").strip()
     if not name:
         print(
-     
+            "INI 中 [mysql] 缺少有效的 name（数据库名），或解析失败（常见原因：MySQL 密码含「#」，"
+            "旧版脚本把「#」当成注释导致未读到 name）。请检查向导生成的 INI 或改用不含 # 的密码分段转义策略。",
             file=sys.stderr,
         )
         print(f"当前解析到的 [mysql] 键: {sorted(db.keys())}", file=sys.stderr)

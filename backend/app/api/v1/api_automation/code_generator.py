@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 # ── 工具函数 ──────────────────────────────────────────────────────────
 
-# method 字段存的是数字（与前端 method_list 对应）
+
 _METHOD_MAP = {1: "GET", 2: "POST", 3: "PUT", 4: "DELETE", 5: "PATCH", 6: "OPTIONS"}
 
 
