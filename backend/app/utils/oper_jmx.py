@@ -967,6 +967,35 @@ class JMXParser:
             ]):
                 props[j].text = str(val)
 
+    # ──────────────── 调试组件写入 ────────────────
+
+    def close_debug_components(self) -> list[str]:
+        """
+        关闭 JMX 中所有仍处于启用状态的调试组件（调试监听器 + 调试取样器），
+        用于正式压测启动前自动清理联调阶段遗留、忘记关闭的调试组件。
+
+        Args:
+            无（在当前解析树 self._root 上原地修改）
+        Returns:
+            list[str]: 被关闭的调试组件 testname 列表（可能含空字符串，
+            即 JMX 中未配置 testname 的组件），用于调用方日志记录/提示，
+            不影响修改是否生效
+        """
+        closed: list[str] = []
+        # 调试监听器：JMeter 内置用 ResultCollector 标签，jp@gc 插件用
+        # CorrectedResultCollector 标签，均按 guiclass 属性判断是否为调试类
+        for tag in ("ResultCollector", "kg.apc.jmeter.vizualizers.CorrectedResultCollector"):
+            for el in self._root.iter(tag):
+                if el.get("guiclass", "") in JMETER_DEBUG_GUI_LABEL and el.get("enabled", "true") == "true":
+                    el.set("enabled", "false")
+                    closed.append(el.get("testname", ""))
+        # 调试取样器：独立标签，非 ResultCollector，无需判断 guiclass
+        for el in self._root.iter("DebugSampler"):
+            if el.get("enabled", "true") == "true":
+                el.set("enabled", "false")
+                closed.append(el.get("testname", ""))
+        return closed
+
     # ──────────────── 序列化 ────────────────
 
     def to_bytes(self, encoding: str = "utf-8") -> bytes:
@@ -1160,6 +1189,27 @@ def apply_jmx_by_type(
         parser.apply_thread_group(tg.index, **fields)
 
     return parser.to_bytes()
+
+
+def close_debug_components(jmx_bytes: bytes) -> tuple[bytes, list[str]]:
+    """
+    关闭 JMX 中所有仍启用的调试组件，返回修改后的 bytes。
+
+    使用场景：正式压测启动（execute）Stage1 写完线程组参数后调用一次，
+    自动关闭联调阶段遗留、忘记手动关闭的调试组件；联调（inspect）预览
+    阶段不调用，保留调试组件供用户观察调试输出。
+
+    Args:
+        jmx_bytes: 原始 JMX bytes（通常是已完成线程组参数写入后的 bytes）
+    Returns:
+        tuple[bytes, list[str]]:
+          - 关闭调试组件后的 JMX bytes
+          - 被关闭的调试组件 testname 列表，供调用方记录日志/提示；
+            为空列表表示当前 JMX 中没有需要关闭的调试组件
+    """
+    parser = JMXParser(jmx_bytes)
+    closed = parser.close_debug_components()
+    return parser.to_bytes(), closed
 
 
 def parse_jmx_summary(jmx_content: bytes) -> dict:

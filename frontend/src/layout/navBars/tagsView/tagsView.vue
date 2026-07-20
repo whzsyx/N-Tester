@@ -645,7 +645,7 @@ watch(
     display: flex;
     align-items: center;
     color: var(--el-text-color-regular);
-    font-size: 12px;
+    font-size: 14px;
     white-space: nowrap;
     padding: 0 15px;
 

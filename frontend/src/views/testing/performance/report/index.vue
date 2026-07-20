@@ -1,6 +1,7 @@
 <template>
 	<div class="perf-report-container">
 		<el-card shadow="never">
+			<div class="page-content-layout">
 			<!-- 查询区 -->
 			<div class="toolbar">
 				<div class="toolbar-left">
@@ -58,12 +59,14 @@
 			</div>
 
 			<!-- 数据表格 -->
+			<div ref="tableWrapRef" class="table-wrap">
 			<el-table
 				:data="tableData"
 				v-loading="loading"
 				stripe
 				border
 				style="width: 100%"
+				:height="tableHeight"
 			>
 				<el-table-column label="编号" prop="id" width="75" align="center" />
 				<el-table-column prop="report_code" width="195" align="center" show-overflow-tooltip>
@@ -145,38 +148,43 @@
 								<el-button type="success" size="small" text @click="handlePreview(row)">
 									<el-icon><ele-Monitor /></el-icon>在线报告
 								</el-button>
-								<el-popover
-									trigger="hover"
-									placement="bottom-start"
-									:width="200"
-									:show-after="80"
-									:hide-after="200"
-									@show="loadLogFiles(row)"
+								<!-- 单文件（单机）：直接打开 -->
+								<el-button
+									v-if="logFilesCache[row.id] && logFilesCache[row.id].length <= 1"
+									type="info" size="small" text
+									@click="handleDirectLog(row)"
 								>
-									<template #reference>
-										<el-button type="info" size="small" text>
-											<el-icon><ele-Document /></el-icon>在线日志
-										</el-button>
+									<el-icon><ele-Document /></el-icon>在线日志
+								</el-button>
+
+								<!-- 多文件（分布式）：下拉选择 -->
+								<el-dropdown
+									v-else-if="logFilesCache[row.id] && logFilesCache[row.id].length > 1"
+									trigger="click"
+									@command="(f: string) => openLogByFile(row, f)"
+								>
+									<el-button type="info" size="small" text>
+										<el-icon><ele-Document /></el-icon>在线日志<el-icon style="margin-left:2px;font-size:10px"><ele-ArrowDown /></el-icon>
+									</el-button>
+									<template #dropdown>
+										<el-dropdown-menu>
+											<el-dropdown-item v-for="f in logFilesCache[row.id]" :key="f" :command="f">
+												{{ f }}
+											</el-dropdown-item>
+										</el-dropdown-menu>
 									</template>
-									<div v-if="logFilesLoading[row.id]" class="log-popover-loading">
-										<el-icon class="is-loading"><ele-Loading /></el-icon>
-										<span>加载中…</span>
-									</div>
-									<div v-else class="log-popover-list">
-										<div
-											v-for="f in (logFilesCache[row.id] ?? [])"
-											:key="f"
-											class="log-popover-item"
-											@click="openLogByFile(row, f)"
-										>
-											<el-icon><ele-Document /></el-icon>
-											<span>{{ f }}</span>
-										</div>
-										<div v-if="!logFilesCache[row.id]?.length && !logFilesLoading[row.id]" class="log-popover-empty">
-											暂无日志文件
-										</div>
-									</div>
-								</el-popover>
+								</el-dropdown>
+
+								<!-- 未加载：hover 预取，click 加载后自动判断 -->
+								<el-button
+									v-else
+									type="info" size="small" text
+									:loading="logFilesLoading[row.id]"
+									@mouseenter="loadLogFiles(row)"
+									@click="handleDirectLog(row)"
+								>
+									<el-icon v-if="!logFilesLoading[row.id]"><ele-Document /></el-icon>在线日志
+								</el-button>
 							</template>
 							<!-- 中断/失败：查看进度 + 恢复收集 -->
 							<template v-else-if="row.report_status === 3 || row.report_status === 4">
@@ -194,6 +202,7 @@
 					</template>
 				</el-table-column>
 			</el-table>
+			</div><!-- /table-wrap -->
 
 			<!-- 分页 -->
 			<el-pagination
@@ -206,6 +215,7 @@
 				@size-change="handleQuery"
 				@current-change="handleQuery"
 			/>
+			</div><!-- /page-content-layout -->
 		</el-card>
 
 		<!-- 在线日志抽屉（右侧，宽度自适应屏幕 1/2） -->
@@ -234,7 +244,7 @@
 			destroy-on-close
 			class="download-drawer"
 		>
-			<el-form label-width="90px" class="download-form">
+			<el-form label-width="100px" size="default" class="download-form">
 				<el-form-item label="报告 ID" required>
 					<el-select
 						v-model="downloadForm.reportId"
@@ -247,26 +257,29 @@
 							:key="r.id"
 							:value="r.id"
 							:label="r.report_code"
-						/>
+						>
+							<span class="dl-opt-code">{{ r.report_code }}</span>
+							<span class="dl-opt-name" :title="r.report_name">（{{ r.report_name }}）</span>
+						</el-option>
 					</el-select>
 				</el-form-item>
 				<el-form-item label="下载内容" required>
-					<el-checkbox-group v-model="downloadForm.types" class="download-checks">
-						<el-checkbox label="report">HTML 报告</el-checkbox>
-						<el-checkbox label="log">JMeter 运行日志</el-checkbox>
-						<el-checkbox label="jtl">JTL 结果文件</el-checkbox>
-					</el-checkbox-group>
+					<div style="display:flex;flex-direction:column;gap:12px;padding-top:2px;width:100%">
+						<el-checkbox v-model="downloadForm.typeMap.report">HTML 报告</el-checkbox>
+						<el-checkbox v-model="downloadForm.typeMap.log">JMeter 运行日志</el-checkbox>
+						<el-checkbox v-model="downloadForm.typeMap.jtl">JTL 结果文件</el-checkbox>
+					</div>
 				</el-form-item>
 				<div class="download-hint">
 					<el-icon><ele-InfoFilled /></el-icon>
-					每个文件将在新标签页中独立下载
+					多个文件将打包为一个 zip 下载
 				</div>
 			</el-form>
 			<template #footer>
 				<el-button @click="downloadDrawer.visible = false">取消</el-button>
 				<el-button
 					type="primary"
-					:disabled="!downloadForm.reportId || !downloadForm.types.length"
+					:disabled="!downloadForm.reportId || !Object.values(downloadForm.typeMap).some(Boolean)"
 					:loading="downloadDrawer.loading"
 					@click="confirmDownload"
 				>
@@ -281,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onActivated } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute } from 'vue-router';
 import { usePerformanceApi } from '/@/api/v1/performance';
@@ -290,6 +303,28 @@ import CollectProgressDrawer from './CollectProgress.vue';
 
 const perfApi = usePerformanceApi();
 const route = useRoute();
+
+// 表格包裹层 ref，ResizeObserver 动态更新 height
+const tableWrapRef = ref<HTMLElement | null>(null);
+const tableHeight = ref(500);
+
+// 检测系统滚动条高度（Windows ~17px，Mac overlay 为 0），修正横向滚动条遮挡末行问题
+const SCROLLBAR_SIZE: number = (() => {
+	const div = document.createElement('div');
+	div.style.cssText = 'width:100px;height:100px;overflow:scroll;position:absolute;top:-9999px;visibility:hidden';
+	document.body.appendChild(div);
+	const size = div.offsetHeight - div.clientHeight;
+	document.body.removeChild(div);
+	return size;
+})();
+
+let _resizeObserver: ResizeObserver | null = null;
+// 更新表格高度：取包裹层高度并扣除横向滚动条占用
+const updateTableHeight = () => {
+	if (tableWrapRef.value) {
+		tableHeight.value = tableWrapRef.value.clientHeight - SCROLLBAR_SIZE;
+	}
+};
 
 // ======================== 已关闭弹窗的报告 ID（sessionStorage 持久化） ========================
 const DISMISSED_KEY = 'perf_report_dismissed_ids';
@@ -353,6 +388,7 @@ async function fetchList(autoOpenProgress = false) {
 					progressDrawerRef.value?.open(collecting);
 				}
 			}
+			startPollingIfNeeded();
 		}
 	} finally {
 		loading.value = false;
@@ -407,8 +443,20 @@ const downloadDrawerSize = computed(() => {
 	return Math.max(420, Math.floor(window.innerWidth / 3)) + 'px';
 });
 
-async function openLogByFile(row: any, filename: string) {
-	logDrawer.title   = `${row.report_code} - ${filename}`;
+async function handleDirectLog(row: any) {
+	if (logFilesCache[row.id] === undefined && !logFilesLoading[row.id]) {
+		await loadLogFiles(row);
+	}
+	const files = logFilesCache[row.id] ?? [];
+	if (files.length === 0) {
+		ElMessage.warning('暂无日志文件');
+	} else if (files.length === 1) {
+		openLogByFile(row, files[0]);
+	}
+	// files.length > 1：模板重渲染为 dropdown，用户再次点击即可选择
+}
+
+async function openLogByFile(row: any, filename: string) {	logDrawer.title   = `${row.report_code} - ${filename}`;
 	logDrawer.content = '';
 	logDrawer.visible = true;
 	logDrawer.loading = true;
@@ -427,7 +475,7 @@ const downloadDrawer = reactive({ visible: false, loading: false });
 
 const downloadForm = reactive({
 	reportId: null as number | null,
-	types:    ['report', 'log', 'jtl'] as string[],
+	typeMap:  { report: true, log: true, jtl: true } as Record<string, boolean>,
 });
 
 // 从已加载的表格数据中取已完成报告，避免额外请求
@@ -437,7 +485,7 @@ const completedReports = computed(() =>
 
 function openDownloadDrawer() {
 	downloadForm.reportId = null;
-	downloadForm.types    = ['report', 'log', 'jtl'];
+	downloadForm.typeMap  = { report: true, log: true, jtl: true };
 	downloadDrawer.visible = true;
 }
 
@@ -448,31 +496,78 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 async function confirmDownload() {
-	if (!downloadForm.reportId || !downloadForm.types.length) return;
+	const selectedTypes = Object.entries(downloadForm.typeMap)
+		.filter(([, v]) => v)
+		.map(([k]) => k);
+	if (!downloadForm.reportId || !selectedTypes.length) return;
 	downloadDrawer.loading = true;
 	try {
-		const res: any = await perfApi.getReportDownloadUrl(downloadForm.reportId, downloadForm.types);
-		if (res?.code === 200) {
-			const urls = res.data ?? {};
-			let opened = 0;
-			for (const t of downloadForm.types) {
-				if (urls[t]) {
-					window.open(urls[t], '_blank');
-					opened++;
-				} else {
-					ElMessage.warning(`${TYPE_LABELS[t] ?? t} 文件不存在，已跳过`);
-				}
-			}
-			if (opened > 0) downloadDrawer.visible = false;
-		}
+		const blob: any = await perfApi.getReportDownloadUrl(downloadForm.reportId, selectedTypes);
+		const url = URL.createObjectURL(blob);
+		const selectedReport = tableData.value.find((r: any) => r.id === downloadForm.reportId);
+		const filename = selectedReport
+			? selectedTypes.length === 1
+				? `${selectedReport.report_name}-${TYPE_LABELS[selectedTypes[0]] ?? selectedTypes[0]}.zip`
+				: `${selectedReport.report_name}.zip`
+			: `report_${downloadForm.reportId}.zip`;
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+		downloadDrawer.visible = false;
 	} catch {
-		ElMessage.error('获取下载链接失败');
+		ElMessage.error('下载失败，请重试');
 	} finally {
 		downloadDrawer.loading = false;
 	}
 }
 
-// ======================== 操作按钮 ========================
+// ======================== 收集中轮询 ========================
+// 有 status=1 报告时每 5s 刷新；初次列表为空时最多补重试 3 次，
+// 兜底压测完成→记录写入之间的极短时序窗口。
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+let emptyRetries = 0;
+const MAX_EMPTY_RETRIES = 3;
+
+function startPollingIfNeeded() {
+	const hasCollecting = tableData.value.some((r: any) => r.report_status === 1);
+	if (hasCollecting) {
+		emptyRetries = 0;
+		if (!pollingTimer) {
+			pollingTimer = setInterval(async () => {
+				await fetchList();
+				if (!tableData.value.some((r: any) => r.report_status === 1)) {
+					stopPolling();
+				}
+			}, 5000);
+		}
+	} else if (!pollingTimer && emptyRetries < MAX_EMPTY_RETRIES) {
+		// 初次为空：短暂重试以捕获刚刚写入 DB 的收集记录
+		pollingTimer = setInterval(async () => {
+			emptyRetries++;
+			await fetchList(true);
+			if (tableData.value.some((r: any) => r.report_status === 1) || emptyRetries >= MAX_EMPTY_RETRIES) {
+				stopPolling();
+			}
+		}, 5000);
+	} else if (!hasCollecting && pollingTimer) {
+		stopPolling();
+	}
+}
+
+function stopPolling() {
+	if (pollingTimer) {
+		clearInterval(pollingTimer);
+		pollingTimer = null;
+	}
+}
+
+onUnmounted(() => { stopPolling(); emptyRetries = 0; _resizeObserver?.disconnect(); });
+
+
 const progressDrawerRef = ref<InstanceType<typeof CollectProgressDrawer>>();
 
 function handleViewProgress(row: any) {
@@ -589,19 +684,63 @@ onMounted(() => {
 	}
 	const navType = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type;
 	fetchList(navType !== 'reload');
+	// 初始化高度，并注册 ResizeObserver 响应容器尺寸变化
+	updateTableHeight();
+	if (tableWrapRef.value) {
+		_resizeObserver = new ResizeObserver(updateTableHeight);
+		_resizeObserver.observe(tableWrapRef.value);
+	}
 });
 
 onActivated(() => {
+	// keep-alive 组件重激活时同步路由参数，防止场景编号过滤条件停留在上次的值
+	if (route.query.scene_no) {
+		query.scenario_code = route.query.scene_no as string;
+	}
+	emptyRetries = 0;
 	fetchList(true);
 });
 </script>
 
 <style scoped lang="scss">
 .perf-report-container {
+	height: 100%;
+	box-sizing: border-box;
 	padding: 10px 10px 20px 10px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+
+	:deep(.el-card) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
 
 	:deep(.el-card__body) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		padding: 10px 10px 20px 10px;
+	}
+
+	// 内容布局容器：查询栏 + 表格包裹 + 分页 纵向排列
+	.page-content-layout {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	// 表格包裹层：吸收剩余高度，el-table 的 max-height 由此计算
+	.table-wrap {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	:deep(.el-button > span) {
@@ -627,7 +766,6 @@ onActivated(() => {
 
 	:deep(.el-table) {
 		font-size: 13.5px;
-		margin-top: 12px;
 
 		.el-table__header th {
 			font-size: 13.5px;
@@ -736,16 +874,6 @@ onActivated(() => {
 }
 
 // ── 下载表单 ───────────────────────────────────────────────────────────────────
-.download-form {
-	padding: 8px 0;
-
-	.download-checks {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-}
-
 .download-opt {
 	display: flex;
 	flex-direction: column;
@@ -838,14 +966,75 @@ onActivated(() => {
 	}
 }
 
-// 下载抽屉：footer 右对齐
+// 下载抽屉：对齐场景管理新增页面字体 & 间距规范
+// el-drawer 用 teleport 挂到 <body>，scoped 样式无法穿透，必须在全局块写
 .download-drawer {
+	.el-drawer__body {
+		padding: 24px 20px 0 20px !important;
+	}
+
+	// 表单 label
+	.el-form-item__label {
+		font-size: 13.5px !important;
+	}
+
+	// 表单项间距
+	.el-form-item {
+		margin-bottom: 18px !important;
+	}
+
+	// 输入框 & 下拉字体
+	.el-input__inner,
+	.el-select__selected-item,
+	.el-select__placeholder,
+	.el-input__inner::placeholder {
+		font-size: 13.5px !important;
+	}
+
+	// checkbox 标签字体
+	.el-checkbox__label {
+		font-size: 13.5px !important;
+	}
+
+	// checkbox 纵向排列
+	.el-checkbox-group {
+		display: flex !important;
+		flex-direction: column !important;
+		gap: 10px;
+		width: 100%;
+	}
+
 	.el-drawer__footer {
 		display: flex;
 		justify-content: flex-end;
-		gap: 8px;
-		padding: 12px 20px !important;
+		gap: 12px;
+		padding: 16px 24px !important;
 		border-top: 1px solid var(--el-border-color-lighter);
 	}
+}
+
+// el-select 下拉选项：报告ID正常色 + 文件名灰色括号
+// el-select 下拉面板单独 teleport 到 body，必须写在全局顶层，不能嵌套在 .download-drawer 内
+.dl-opt-code {
+	font-size: 13px;
+	color: var(--el-text-color-primary);
+	flex-shrink: 0;
+}
+
+.dl-opt-name {
+	font-size: 12px;
+	color: var(--el-text-color-placeholder);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+// el-option 默认 display:flex，让内容撑满整行才能触发 text-overflow
+.el-select-dropdown__item:has(.dl-opt-code) {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	overflow: hidden;
 }
 </style>

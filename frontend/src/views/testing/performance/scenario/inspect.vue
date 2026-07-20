@@ -365,7 +365,7 @@
 							<el-icon v-else-if="isPanelPassed('debug_components')" class="panel-icon icon-done"><ele-CircleCheckFilled /></el-icon>
 							<el-icon v-else class="panel-icon icon-warn"><ele-WarningFilled /></el-icon>
 							<span class="panel-num">6</span>
-							<span class="panel-title">调试组件</span>
+							<span class="panel-title">Jmeter调试组件</span>
 						</div>
 						<div class="panel-right">
 							<span v-if="!panelData.debug_components" class="panel-wait">等待中…</span>

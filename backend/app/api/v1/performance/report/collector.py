@@ -14,7 +14,7 @@
   3. MinIO 对象命名：
        report/{report_code}/jmeter-reports.zip  ← HTML 报告（range-request 预览）
        report/{report_code}/jmeter-logs.zip    ← JMeter 日志
-       report/{report_code}/results.zip        ← JTL 结果文件
+       report/{report_code}/jmeter-results.zip        ← JTL 结果文件
        report/{report_code}/collector_process.log ← 收集流程日志
   4. SSH 连接全程复用（self._exec_ssh），仅在 finally 中关闭
   5. 分布式始终使用方案B（平台中转）；单机视 MinIO 可达性决定方案A或B
@@ -245,7 +245,7 @@ class ReportCollector:
 
     def _cleanup_plan_a_zips(self, report_code: str) -> None:
         """清理方案A在执行机工作目录生成的3个临时zip（须在 SSH 关闭前调用）。"""
-        for zip_name in ('jmeter-reports.zip', 'jmeter-logs.zip', 'results.zip'):
+        for zip_name in ('jmeter-reports.zip', 'jmeter-logs.zip', 'jmeter-results.zip'):
             self._remote_rm(f'{self.remote_dir}/{zip_name}')
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ class ReportCollector:
 
     @staticmethod
     def _build_jtl_zip(jtl_files: dict[str, bytes]) -> bytes:
-        """将 JTL 结果文件打成 results.zip，内部路径格式：results/{filename}.jtl。"""
+        """将 JTL 结果文件打成 jmeter-results.zip，内部路径格式：results/{filename}.jtl。"""
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             for rel, data in jtl_files.items():
@@ -451,7 +451,7 @@ class ReportCollector:
 
             report_zip_key = f'report/{report_code}/jmeter-reports.zip'
             log_zip_key    = f'report/{report_code}/jmeter-logs.zip'
-            jtl_zip_key    = f'report/{report_code}/results.zip'
+            jtl_zip_key    = f'report/{report_code}/jmeter-results.zip'
 
             self._log('INFO', f'开始收集压测报告 {report_name}  report_id={self.report_id}')
 
@@ -770,6 +770,9 @@ class ReportCollector:
                     put_url = MinioClient.presign_put(bucket, minio_key, expires_minutes=60)
                     cmd = MINIO_PUT_ZIP.format(remote_dir=self.remote_dir, zip_name=zip_name, url=put_url)
                     _, out, _ = await asyncio.to_thread(self._exec_cmd, cmd)
+                    # 从命令输出中解析上传前取得的本地文件大小（FILE_SIZE:xxx），无需调用 MinIO stat
+                    size_m = re.search(r'FILE_SIZE:(\d+)', out)
+                    file_size = int(size_m.group(1)) if size_m else 0
                     # 同时校验 curl 退出码和 HTTP 状态码（需均为成功才算上传完成）
                     exit_ok = 'PUT_EXIT:0' in out
                     http_ok = bool(re.search(r'HTTP:2\d\d', out))
@@ -779,13 +782,7 @@ class ReportCollector:
                         http_info = f'HTTP {http_m.group(1)}' if http_m else ''
                         body_info = (body_m.group(1) or '').strip()[:300] if body_m else out[:200]
                         raise RuntimeError(f'curl PUT失败（{zip_name}）：{http_info} {body_info}'.strip())
-                    try:
-                        def _stat():
-                            return MinioClient.get_client().stat_object(bucket, minio_key)
-                        stat = await asyncio.to_thread(_stat)
-                        return stat.size
-                    except Exception:
-                        return 0
+                    return file_size
 
                 rpt_size = 0
                 if self.include_report:
@@ -805,7 +802,7 @@ class ReportCollector:
 
                 jtl_size = 0
                 if self.include_jtl:
-                    jtl_size = await _put_plan_a('results.zip', jtl_zip_key)
+                    jtl_size = await _put_plan_a('jmeter-results.zip', jtl_zip_key)
                 js = 'done' if self.include_jtl else 'skip'
                 jd = f'{jtl_size / 1024 / 1024:.2f}MB' if jtl_size else ''
                 file_size = rpt_size + log_size + jtl_size

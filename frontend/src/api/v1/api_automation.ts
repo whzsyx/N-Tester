@@ -35,13 +35,6 @@ export function useApiAutomationApi() {
     save_api_case: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/save_api_case', data),
     api_send: (data: { id?: number; env_id?: number; url?: string; req?: Record<string, any> }) =>
       postApiAutomation('/v1/api_automation/api_send', data),
-    api_perf_run: (data: Record<string, any>) => postApiAutomation('/v1/api_automation/api_perf_run', data),
-    api_perf_report_list: (data: Record<string, any> = {}) =>
-      postApiAutomation('/v1/api_automation/api_perf_report_list', data),
-    api_perf_report_detail: (data: { id: number }) =>
-      postApiAutomation('/v1/api_automation/api_perf_report_detail', data),
-    transport_protocols: (data: Record<string, any> = {}) =>
-      postApiAutomation('/v1/api_automation/transport_protocols', data),
     req_history: (data: Record<string, any> = {}) => postApiAutomation('/v1/api_automation/req_history', data),
     edit_history: (data: { api_id: number }) => postApiAutomation('/v1/api_automation/edit_history', data),
 
@@ -209,9 +202,6 @@ export const {
   save_api,
   save_api_case,
   api_send,
-  api_perf_run,
-  api_perf_report_list,
-  api_perf_report_detail,
   req_history,
   edit_history,
   api_env,

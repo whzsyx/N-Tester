@@ -392,20 +392,15 @@ class AppManagementService:
         device_store: List[Dict[str, Any]] = []
         for d in device_list:
             deviceid = str(d.get("deviceid") or "")
-            pkg = str(d.get("package") or script_config.get("package") or "")
-            app_act = str(d.get("app_activity") or script_config.get("app_activity") or "")
             ntest_ctx = None
-            need_session = AppManagementService._use_appium_executor() or (
-                d.get("server_id") is not None and d.get("phone_id") is not None
-            )
-            if need_session:
+            if AppManagementService._use_appium_executor():
                 ntest_ctx = await AppManagementService._resolve_ntest_appium_session(
                     db,
                     user_id,
                     d.get("server_id") or script_config.get("server_id"),
                     d.get("phone_id") or script_config.get("phone_id"),
-                    pkg,
-                    app_act,
+                    str(d.get("package") or script_config.get("package") or ""),
+                    str(d.get("app_activity") or script_config.get("app_activity") or ""),
                 )
             exec_id = (ntest_ctx or {}).get("udid") or deviceid
             if not exec_id:
@@ -480,12 +475,6 @@ class AppManagementService:
             AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": exec_id}
             AppManagementService._proc_index[int(p.pid)] = p
 
-        if not pid_list:
-            raise ValueError(
-                "未启动任何执行进程：请确认设备列表中已选择设备中心的服务器与手机并填写包名；"
-                "若使用 Appium/Android 步骤执行，请在环境变量或配置中启用 USE_APPIUM_APP_EXECUTOR=1。"
-            )
-
         # 写入汇总记录
         db.add(
             AppResultListModel(
@@ -543,25 +532,21 @@ class AppManagementService:
 
         for d in (device_list or []):
             deviceid = str(d.get("deviceid") or "")
-            device_package = str(d.get("package") or ro.get("package") or "")
-            app_act = str(d.get("app_activity") or ro.get("app_activity") or "")
             ntest_ctx = None
-            need_session = AppManagementService._use_appium_executor() or (
-                d.get("server_id") is not None and d.get("phone_id") is not None
-            )
-            if need_session:
+            if AppManagementService._use_appium_executor():
                 ntest_ctx = await AppManagementService._resolve_ntest_appium_session(
                     db,
                     user_id,
                     d.get("server_id") or ro.get("server_id"),
                     d.get("phone_id") or ro.get("phone_id"),
-                    device_package,
-                    app_act,
+                    str(d.get("package") or ro.get("package") or ""),
+                    str(d.get("app_activity") or ro.get("app_activity") or ""),
                 )
             exec_id = (ntest_ctx or {}).get("udid") or deviceid
             if not exec_id:
                 continue
             device_name = str(d.get("name") or d.get("device_name") or "")
+            device_package = str(d.get("package") or "")
             os_type = str(d.get("os_type") or "android")
             install_path = str(d.get("path") or "")
 
@@ -636,12 +621,6 @@ class AppManagementService:
             )
             AppManagementService._pid_index[int(p.pid)] = {"result_id": result_id, "deviceid": exec_id}
             AppManagementService._proc_index[int(p.pid)] = p
-
-        if not pid_list:
-            raise ValueError(
-                "未启动任何执行进程：请检查设备列表（设备 ID 或设备中心服务器/手机）与包名配置；"
-                "Appium 模式需启用 USE_APPIUM_APP_EXECUTOR=1。"
-            )
 
         script_list_payload: List[Dict[str, Any]] = []
         if script_items:
@@ -1185,7 +1164,7 @@ class AppManagementService:
     @staticmethod
     async def send_app_warn(db: AsyncSession, result_id: str, user_id: int) -> None:
         """有失败步骤时按频次发通知 27（app_error_report）"""
-        from app.api.v1.api_automation.service import ApiAutomationService
+        from app.api.v1.automation_api.service import ApiAutomationService
 
         row = (
             await db.execute(
@@ -1246,7 +1225,7 @@ class AppManagementService:
         deviceid: Optional[str] = None,
     ) -> bool:
         """停止APP执行进程；传 pid+deviceid 时对齐 stop_process（写结束日志、追加 script_status、通知）"""
-        from app.api.v1.api_automation.service import ApiAutomationService
+        from app.api.v1.automation_api.service import ApiAutomationService
         from .airtest_common import get_performance
 
         if pid:

@@ -5,15 +5,14 @@
 		:width="width"
 		:center="center"
 		:close-on-click-modal="false"
-		append-to-body
+		:append-to-body="false"
 		draggable
 		:destroy-on-close="destroyOnClose"
 		:before-close="koiClose"
 		:fullscreen="fullscreen"
 	>
 		<slot name="header"></slot>
-		<!-- 关闭时不挂载插槽内容，避免首屏挂载 Upload/Form 与外层 KeepAlive 卸载叠在同一帧触发 Vue patch 告警 -->
-		<div v-if="visible" class="container" :style="{ height: height + 'px' }">
+		<div class="container" :style="{ height: height + 'px' }">
 			<slot name="content"></slot>
 		</div>
 		<template #footer v-if="!footerHidden">

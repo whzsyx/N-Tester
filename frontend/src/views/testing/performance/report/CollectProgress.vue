@@ -55,7 +55,9 @@
 						</div>
 						<div class="step-name">
 							{{ s.name }}
-							<span v-if="s.step === 1 && plan" class="step-plan-label">{{ plan === 'a' ? '执行机直传' : '平台中转' }}</span>
+							<!-- running 时在步骤名后显示当前小步骤描述 -->
+							<span v-if="isRunningStep(s.step) && currentState.step_name" class="step-running-detail">· {{ currentState.step_name }}</span>
+							<span v-else-if="s.step === 1 && plan" class="step-plan-label">{{ plan === 'a' ? '执行机直传' : '平台中转' }}</span>
 							<span v-else-if="s.step === 2 && plan" class="step-plan-label">{{ plan === 'a' ? '方案A' : '方案B' }}</span>
 							<span v-else-if="s.step === 4 && plan" class="step-plan-label">{{ plan === 'a' ? '执行机直传 MinIO' : '平台中转上传' }}</span>
 							<span v-else-if="s.planLabel && plan" class="step-plan-label">（{{ s.planLabel }}）</span>
@@ -103,8 +105,8 @@
 									</div>
 								</div>
 
-								<!-- Step 2 done：打包子步骤（快照） -->
-								<div v-if="s.step === 2 && plan === 'a' && stepSnapshots[2]?.sub_items?.report_zip" class="zip-list">
+								<!-- Step 2 done：打包子步骤（快照；有 report_zip 字段则显示，不依赖 plan） -->
+								<div v-if="s.step === 2 && stepSnapshots[2]?.sub_items?.report_zip" class="zip-list">
 									<div
 										v-for="key in (['report_zip','log_zip','jtl_zip'] as Array<'report_zip'|'log_zip'|'jtl_zip'>)"
 										:key="key"
@@ -194,8 +196,8 @@
 									</div>
 								</div>
 
-								<!-- Step 2：打包子步骤（方案A显示3个zip，方案B只有detail） -->
-								<div v-if="s.step === 2 && plan === 'a' && currentState.sub_items?.report_zip" class="zip-list">
+								<!-- Step 2：打包子步骤（有 report_zip 字段则显示3个zip，否则只展示 detail） -->
+								<div v-if="s.step === 2 && currentState.sub_items?.report_zip" class="zip-list">
 									<div
 										v-for="item in step2ZipItems"
 										:key="item.key"
@@ -314,14 +316,25 @@ const stepSnapshots = ref<Record<number, { detail: string; sub_items?: any }>>({
 
 // sessionStorage 持久化：按报告 ID 缓存快照，关闭/重开抽屉后仍可查看过程详情
 const SNAPSHOT_KEY = (id: number) => `perf_snapshots_${id}`;
+const PLAN_KEY     = (id: number) => `perf_plan_${id}`;
+
 function saveSnapshots(id: number) {
-	try { sessionStorage.setItem(SNAPSHOT_KEY(id), JSON.stringify(stepSnapshots.value)); } catch { /* ignore */ }
+	try {
+		sessionStorage.setItem(SNAPSHOT_KEY(id), JSON.stringify(stepSnapshots.value));
+		if (plan.value) sessionStorage.setItem(PLAN_KEY(id), plan.value);
+	} catch { /* ignore */ }
 }
 function loadSnapshots(id: number): Record<number, { detail: string; sub_items?: any }> {
 	try {
 		const raw = sessionStorage.getItem(SNAPSHOT_KEY(id));
 		return raw ? JSON.parse(raw) : {};
 	} catch { return {}; }
+}
+function loadPlan(id: number): 'a' | 'b' | null {
+	try {
+		const v = sessionStorage.getItem(PLAN_KEY(id));
+		return (v === 'a' || v === 'b') ? v : null;
+	} catch { return null; }
 }
 
 const currentState = ref<{
@@ -353,7 +366,7 @@ let abortCtrl: AbortController | null = null;
 function open(report: any) {
 	currentReport.value = report;
 	currentState.value  = { step: 0, pct: 0, step_name: '', detail: '等待收集开始...', status: 'running' };
-	plan.value          = null;
+	plan.value          = loadPlan(report.id);
 	expandedDone.value  = new Set();
 	stepSnapshots.value = loadSnapshots(report.id);
 	visible.value       = true;
@@ -665,6 +678,13 @@ function getStepPanelClass(step: number): string {
 	font-weight: 400;
 	color: var(--el-text-color-placeholder);
 	margin-left: 3px;
+}
+
+.step-running-detail {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--el-color-primary);
+	margin-left: 4px;
 }
 
 .step-toggle-icon {

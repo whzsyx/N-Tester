@@ -196,7 +196,7 @@ class PerfReportService:
         type_map = {
             'report': (report.object_key,                                          f'{report.report_name}.zip'),
             'log':    (f'report/{report.report_code}/jmeter-logs.zip',             f'{report.report_name}-日志.zip'),
-            'jtl':    (f'report/{report.report_code}/results.zip',                 f'{report.report_name}-结果.zip'),
+            'jtl':    (f'report/{report.report_code}/jmeter-results.zip',                 f'{report.report_name}-结果.zip'),
         }
         urls: dict[str, str | None] = {}
         for t in types:
@@ -211,12 +211,11 @@ class PerfReportService:
 
 
     async def download_batch(self, report_id: int, types: list[str] | None = None):
-        """将勾选的报告文件打包进以 report_name 命名的目录后供整体下载。
+        """下载勾选的报告文件。
 
-        外层 zip 使用 ZIP_STORED（无重新压缩），内部路径：
-          {report_name}/{report_code}-报告.zip
-          {report_name}/{report_code}-日志.zip
-          {report_name}/{report_code}-结果.zip
+        - 单文件：直接返回该 zip 文件
+        - 多文件：打包进以 report_name 命名的目录后返回（ZIP_STORED，无重新压缩）
+            内部路径：{report_name}/{report_code}-报告.zip 等
         """
         import io, zipfile
         from urllib.parse import quote
@@ -230,33 +229,51 @@ class PerfReportService:
         safe_name = report.report_name.replace('/', '-').replace('\\', '-')
 
         type_map = {
-            'report': (report.object_key,                              f'{safe_name}/{report.report_code}-报告.zip'),
-            'log':    (f'report/{report.report_code}/jmeter-logs.zip', f'{safe_name}/{report.report_code}-日志.zip'),
-            'jtl':    (f'report/{report.report_code}/results.zip',     f'{safe_name}/{report.report_code}-结果.zip'),
+            'report': report.object_key,
+            'log':    f'report/{report.report_code}/jmeter-logs.zip',
+            'jtl':    f'report/{report.report_code}/jmeter-results.zip',
         }
 
+        valid_types = [t for t in types if t in type_map]
+
+        # 单文件：直接从 MinIO 取原文件返回
+        if len(valid_types) == 1:
+            obj_key = type_map[valid_types[0]]
+            data = await MinioClient.get_object_bytes(config.MINIO_BUCKET, obj_key)
+            encoded_name = quote(f'{safe_name}.zip', safe='')
+            return Response(
+                content=data,
+                media_type='application/zip',
+                headers={
+                    'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_name}",
+                    'Content-Length': str(len(data)),
+                },
+            )
+
+        # 多文件：打包进以 safe_name 命名的目录，内层文件用报告ID（report_code）作前缀
+        rcode = report.report_code
+        inner_name_map = {
+            'report': f'{rcode}-reports.zip',
+            'log':    f'{rcode}-logs.zip',
+            'jtl':    f'{rcode}-results.zip',
+        }
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_STORED) as zf:
-            for t in types:
-                if t not in type_map:
-                    continue
-                obj_key, inner_path = type_map[t]
+            for t in valid_types:
+                obj_key = type_map[t]
                 try:
                     data = await MinioClient.get_object_bytes(config.MINIO_BUCKET, obj_key)
-                    zf.writestr(inner_path, data)
+                    zf.writestr(f'{safe_name}/{inner_name_map[t]}', data)
                 except Exception:
                     pass
 
         zip_bytes = buf.getvalue()
-        encoded_name = quote(safe_name, safe='')
+        encoded_name = quote(f'{safe_name}.zip', safe='')
         return Response(
             content=zip_bytes,
             media_type='application/zip',
             headers={
-                'Content-Disposition': (
-                    f"attachment; filename=\"{safe_name}.zip\"; "
-                    f"filename*=UTF-8''{encoded_name}.zip"
-                ),
+                'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_name}",
                 'Content-Length': str(len(zip_bytes)),
             },
         )

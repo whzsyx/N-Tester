@@ -5,6 +5,7 @@
 
 				<!-- Tab 1: 压测场景列表 -->
 				<el-tab-pane label="压测场景列表" name="list">
+					<div class="list-tab-layout">
 					<!-- 工具栏 -->
 					<div class="toolbar">
 						<!-- 搜索框区（仅输入控件） -->
@@ -83,10 +84,12 @@
 					</div>
 
 					<!-- 列表 -->
+					<div ref="tableWrapRef" class="table-wrap">
 					<el-table
 						ref="tableRef"
 						v-loading="loading"
 						:data="sceneList"
+						:height="tableHeight"
 						border
 						stripe
 						style="width: 100%"
@@ -470,13 +473,15 @@
 								</el-tooltip>
 							</template>
 							<template #default="{ row }">
-								<span v-if="row.has_unknown_times" style="cursor:default;display:inline-flex;align-items:center;gap:4px">
-									<el-icon :size="15" color="var(--el-color-danger)"><ele-WarningFilled /></el-icon>
-									<span style="color:var(--el-color-danger)">
-										<template v-if="row.known_times != null && row.known_times > 0">{{ formatDuration(row.known_times) }}</template>
-										<template v-else>?</template>
+								<el-tooltip v-if="row.has_unknown_times" content="子配置中循环次数耗时无法自动解析，请手动填写预估耗时" placement="top">
+									<span style="cursor:help;display:inline-flex;align-items:center;gap:4px">
+										<el-icon :size="15" color="var(--el-color-danger)"><ele-WarningFilled /></el-icon>
+										<span style="color:var(--el-color-danger)">
+											<template v-if="row.known_times != null && row.known_times > 0">{{ formatDuration(row.known_times) }}</template>
+											<template v-else>?</template>
+										</span>
 									</span>
-								</span>
+								</el-tooltip>
 								<span v-else>{{ formatDuration(row.known_times ?? row.estimated_duration) || '--' }}</span>
 							</template>
 						</el-table-column>
@@ -512,8 +517,11 @@
 						<el-table-column label="操作" width="260" fixed="right" align="center" class-name="operation-col">
 							<template #default="{ row }">
 								<div class="action-btns">
-									<!-- 进行中：立即停止 + 复制 -->
+									<!-- 进行中：实时监控 + 立即停止 + 复制 -->
 									<template v-if="row.status === 'running'">
+										<el-button type="primary" size="small" text @click="handleOpenMonitor(row)">
+											<el-icon><ele-Monitor /></el-icon>实时监控
+										</el-button>
 										<el-button type="danger" size="small" text @click="handleStopTask(row)">
 											<el-icon><ele-VideoPause /></el-icon>立即停止
 										</el-button>
@@ -564,6 +572,7 @@
 							</template>
 						</el-table-column>
 					</el-table>
+					</div><!-- /table-wrap -->
 
 					<!-- 分页 -->
 					<el-pagination
@@ -577,6 +586,7 @@
 						@size-change="handleQuery"
 						@current-change="handleQuery"
 					/>
+					</div><!-- /list-tab-layout -->
 				</el-tab-pane>
 
 				<!-- Tab 2: 压测实时监控 -->
@@ -585,7 +595,7 @@
 						ref="monitorRef"
 						:scene="monitorScene"
 						:exec-state="execState"
-						@exec-done="execState = null"
+						@exec-done="onExecDone"
 						@force-stop="handleForceStop"
 					/>
 				</el-tab-pane>
@@ -606,18 +616,21 @@
 </template>
 
 <script setup lang="ts" name="PerformanceScenario">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import SceneDebug from './inspect.vue';
 import SceneMonitor from './monitor.vue';
 import AddUpdate from './addUpdate.vue';
 import { normalizeConfig } from './utils';
+import { applyStageEvent } from '/@/utils/perfExecState';
 import { usePerformanceApi } from '/@/api/v1/performance';
 import { useDictCache } from '/@/utils/dictCache';
+import { usePerfSchedulerWatcher } from '/@/stores/perfSchedulerWatcher';
 
 const perfApi = usePerformanceApi();
 const { getDictOptions } = useDictCache();
+const schedWatcher = usePerfSchedulerWatcher();
 const router = useRouter();
 const route = useRoute();
 const addUpdateRef = ref<InstanceType<typeof AddUpdate>>();
@@ -721,6 +734,147 @@ const progressColor = (status: string) => {
 const nowMs = ref(Date.now());
 let _nowTimer: ReturnType<typeof setInterval> | null = null;
 
+// 检测系统原生滚动条宽度（Windows ~17px，Mac overlay scrollbar 为 0）
+// 横向滚动条实际占用表格 body 底部高度，需从 tableHeight 中扣除以避免最后一行被遮
+const SCROLLBAR_SIZE: number = (() => {
+	const div = document.createElement('div');
+	div.style.cssText = 'width:100px;height:100px;overflow:scroll;position:absolute;top:-9999px;visibility:hidden';
+	document.body.appendChild(div);
+	const size = div.offsetHeight - div.clientHeight;
+	document.body.removeChild(div);
+	return size;
+})();
+
+// 表格高度自适应：ResizeObserver 监听 tableWrapRef 容器尺寸变化
+let _resizeObserver: ResizeObserver | null = null;
+const updateTableHeight = () => {
+	if (tableWrapRef.value) {
+		// 减去横向滚动条占用高度，确保末行不被滚动条遮挡
+		tableHeight.value = tableWrapRef.value.clientHeight - SCROLLBAR_SIZE;
+	}
+};
+
+// ======================== 场景列表按需轮询（定时任务感知）========================
+// 策略：
+//   - 场景进行中（hasRunningTask）：5s 轮询，结束后通知调度页更新
+//   - 定时任务待触发（task_status=0）：在各自 plan_time 精准 setTimeout 唤醒
+//   - plan_time 到达后若场景尚未 running（后端尚在处理中），启动等待轮询（最长5分钟），
+//     一旦检测到 running 立即切换为正常轮询并自动开启实时监控
+let _scenePollTimer: ReturnType<typeof setInterval> | null = null;
+let _waitForRunningTimer: ReturnType<typeof setInterval> | null = null;
+const _planTimeouts: ReturnType<typeof setTimeout>[] = [];
+
+function _stopScenePoll() {
+	if (_scenePollTimer) { clearInterval(_scenePollTimer); _scenePollTimer = null; }
+}
+
+function _stopWaitForRunning() {
+	if (_waitForRunningTimer) { clearInterval(_waitForRunningTimer); _waitForRunningTimer = null; }
+}
+
+function _clearPlanTimeouts() {
+	_planTimeouts.forEach(t => clearTimeout(t));
+	_planTimeouts.length = 0;
+}
+
+// plan_time 到了但场景尚未 running：每5s轮询一次，最长等5分钟
+// 后端 APScheduler 触发到 scenario.status=2 写入 DB 可能需要几秒到几十秒
+function _startWaitForRunning() {
+	if (_waitForRunningTimer || _scenePollTimer) return;
+	const deadline = Date.now() + 5 * 60 * 1000;
+	_waitForRunningTimer = setInterval(async () => {
+		await handleQuery(true);
+		_checkAndAutoMonitor();
+		if (hasRunningTask.value) {
+			_stopWaitForRunning();
+			_startScenePollIfNeeded();
+		} else if (Date.now() > deadline) {
+			_stopWaitForRunning();
+		}
+	}, 5000);
+}
+
+// 对 store 中每条待触发+已启用的定时任务，在其 plan_time 时刻安排唤醒
+function _schedulePlanTimeouts() {
+	_clearPlanTimeouts();
+	const now = Date.now();
+	for (const task of schedWatcher.tasks) {
+		if ((task as any).task_status !== 0 || !(task as any).is_active || !(task as any).plan_time) continue;
+		const planMs = new Date((task as any).plan_time).getTime();
+		const delay = Math.max(0, planMs - now);
+		_planTimeouts.push(setTimeout(async () => {
+			await handleQuery(true);
+			_checkAndAutoMonitor();
+			if (hasRunningTask.value) {
+				_startScenePollIfNeeded();
+			} else {
+				// 场景尚未进入 running（后端还在处理 Stage1/2/3），进入等待轮询
+				_startWaitForRunning();
+			}
+		}, delay));
+	}
+}
+
+function _startScenePollIfNeeded() {
+	if (hasRunningTask.value && !_scenePollTimer) {
+		_stopWaitForRunning();
+		_scenePollTimer = setInterval(async () => {
+			const prevRunning = hasRunningTask.value;
+			await handleQuery(true);
+			_checkAndAutoMonitor();
+			// 压测刚结束：通知调度页刷新任务状态，并停止本轮询
+			if (prevRunning && !hasRunningTask.value) {
+				schedWatcher.notifySchedulerRefresh();
+				_stopScenePoll();
+				_schedulePlanTimeouts();
+			}
+		}, 5000);
+	} else if (!hasRunningTask.value) {
+		_stopScenePoll();
+	}
+}
+
+// store 任务列表更新时（调度页同步 或 refresh() 拉取），重新安排精准唤醒
+watch(() => schedWatcher.tasks, _schedulePlanTimeouts);
+
+// 检测列表中新进入 running 状态的场景，若当前无活跃 SSE 监控则静默建立连接。
+// 不切换 Tab，不干扰用户当前浏览位置；Tab 切换仅由用户主动点击"实时监控"触发。
+function _checkAndAutoMonitor() {
+	// 无论 SSE 是否活跃，先同步 component 侧最新偏移，防止 SSE 刚关闭时偏移丢失
+	// 注意：logOffset/isMonitoring 是 monitor.vue 通过 defineExpose 暴露的 ref，
+	// Vue 的 exposeProxy 内部用 proxyRefs 做了自动解包，这里拿到的已经是原始值，
+	// 不能再多接一层 .value（否则在 number/boolean 上取 .value 恒为 undefined）
+	const compOffset = monitorRef.value?.logOffset ?? 0;
+	if (compOffset > _autoMonitorOffset) _autoMonitorOffset = compOffset;
+
+	if (monitorRef.value?.isMonitoring) return;
+
+	const runningRow = sceneList.value.find((r: any) => r.status === 'running');
+	if (!runningRow) return;
+	const isSameScene = monitorScene.value?.id === runningRow.id;
+	// SSE 断线且场景仍在 running：断线重连，保留已有 offset 和日志，避免历史重放
+	// 若 monitorScene.value.status 不是 running（上一轮已结束）或场景 id 变了：新一轮/新场景，清零
+	const isResume = isSameScene && monitorScene.value?.status === 'running';
+	if (!isResume) {
+		// 新场景或同场景新一轮：清空日志并重置偏移
+		runningRow.progress = 0;
+		monitorRef.value?.clearLogs();
+		_autoMonitorOffset = 0;
+	}
+	if (!isResume || !execState.value) {
+		// 定时任务触发的运行（无 execute_sse 前端流程）：冷启动初始化 execState，
+		// 使监控页也能显示与手动启动一致的三阶段进度条（由 monitor.vue 接收
+		// 到的 stage_start/stage_done 结构化事件驱动，见 monitor.vue _handleMonitorEvent）
+		execState.value = {
+			stages: EXECUTE_STAGE_LABELS.map((label, i) => ({ label, done: false, active: i === 0 })),
+			progress: 0,
+		};
+	}
+	// 断线重连：_autoMonitorOffset 已在函数开头从 logOffset 更新（同一场景继续）
+	monitorScene.value = runningRow;
+	monitorRef.value?.startMonitor(runningRow.id, _autoMonitorOffset);
+}
+
 // running 时：当前监控场景直接用 SSE 已写入的 row.progress（与监控界面完全同步）；
 // 其他 running 行（理论上不存在，兜底）才用客户端时钟估算
 const liveProgress = (row: any): number => {
@@ -791,6 +945,8 @@ const queryScriptOptions = computed<{ id: number; name: string }[]>(() => {
 const activeTab = ref('list');
 const loading = ref(false);
 const tableRef = ref();
+const tableWrapRef = ref<HTMLElement | null>(null);
+const tableHeight = ref(500);
 const sceneList = ref<any[]>([]);
 const total = ref(0);
 const selectedRows = ref<any[]>([]);
@@ -808,8 +964,8 @@ const query = reactive({
 
 const hasRunningTask = computed(() => sceneList.value.some(r => r.status === 'running'));
 
-const handleQuery = async () => {
-	loading.value = true;
+const handleQuery = async (silent = false) => {
+	if (!silent) loading.value = true;
 	try {
 		const params: any = { page: query.page, page_size: query.page_size };
 		if (query.name)        params.name        = query.name;
@@ -822,25 +978,46 @@ const handleQuery = async () => {
 		const res: any = await perfApi.getScenarioList(params);
 		if (res.code === 200) {
 			total.value = res.data.total;
-			sceneList.value = (res.data.items ?? []).map(normalizeScenario);
-			// 重新绑定 monitorScene 引用，防止列表刷新后引用断裂导致进度条不同步
-			if (monitorScene.value) {
-				const fresh = sceneList.value.find((r: any) => r.id === monitorScene.value.id);
-				if (fresh) {
-					// DB 仍在进行中：保留 SSE 实时进度，防止列表刷新覆盖
-					// DB 已是终态（完成/取消/失败）：以 DB 值为准，不用旧 SSE 状态覆盖
-					if (fresh.status === 'running') {
-						fresh.progress = monitorScene.value.progress;
-						fresh.status   = monitorScene.value.status;
+			const newItems = (res.data.items ?? []).map(normalizeScenario);
+			if (silent && sceneList.value.length > 0) {
+				// 轮询时原地 patch 更新，避免完整替换数组导致进度条 transition 闪跳
+				const newMap = new Map<number, any>(newItems.map((r: any) => [r.id, r]));
+				for (const row of sceneList.value) {
+					const fresh = newMap.get(row.id);
+					if (!fresh) continue;
+					const wasRunning = row.status === 'running'; // 覆写前保留旧状态，用于检测 pending→running 转换
+					row.status     = fresh.status;
+					row.error_msg  = fresh.error_msg;
+					row.started_at = fresh.started_at;
+					// 非 running → running（新一轮开始）：立即清零进度条
+					// 注意：监控状态的 offset/日志清零交由 _checkAndAutoMonitor 统一处理（isResume 判断），
+					// 此处不操作 _autoMonitorOffset，避免 handleQuery 轮询时序干扰已活跃的 SSE 连接
+					if (!wasRunning && fresh.status === 'running') {
+						row.progress = 0;
+					} else if (!(fresh.status === 'running' && monitorScene.value?.id === row.id)) {
+						// running 状态下 SSE 监控中的场景保留实时进度，不用 DB 值覆盖
+						row.progress = fresh.progress;
 					}
-					monitorScene.value = fresh;
+				}
+				// 原地更新对象引用不变，monitorScene 无需重绑
+			} else {
+				sceneList.value = newItems;
+				// 完整替换后重新绑定 monitorScene 引用，防止引用断裂导致进度不同步
+				if (monitorScene.value) {
+					const fresh = sceneList.value.find((r: any) => r.id === monitorScene.value.id);
+					if (fresh) {
+						if (fresh.status === 'running' && monitorScene.value.status === 'running') {
+							fresh.progress = monitorScene.value.progress;
+						}
+						monitorScene.value = fresh;
+					}
 				}
 			}
 		}
 	} catch (_) {
 		ElMessage.error('获取场景列表失败');
 	} finally {
-		loading.value = false;
+		if (!silent) loading.value = false;
 	}
 };
 
@@ -972,7 +1149,7 @@ const handleStartRow = (row: any) => {
 // 通用 SSE 执行流程：联调（action=inspect）和正式执行（action=execute）均在监控 Tab 内显示进度
 const INSPECT_STAGE_LABELS = ['注入参数', '上传脚本', '执行联调'];
 const EXECUTE_STAGE_LABELS = ['注入参数', '上传脚本', '启动进程'];
-const RECOVER_STAGE_LABELS = ['恢复启动进程'];
+const RECOVER_STAGE_LABELS = ['恢复启动压测'];
 
 const _runExecSSE = async (row: any, action: 'inspect' | 'execute' | 'recover') => {
 	// execute/recover 点击即时更新状态为运行中，让列表 badge 立即响应，出错时回滚
@@ -982,16 +1159,16 @@ const _runExecSSE = async (row: any, action: 'inspect' | 'execute' | 'recover') 
 	}
 
 	const stageLabels = action === 'inspect' ? INSPECT_STAGE_LABELS
-	                  : action === 'recover'  ? RECOVER_STAGE_LABELS
-	                  : EXECUTE_STAGE_LABELS;
+		: action === 'recover' ? RECOVER_STAGE_LABELS
+		: EXECUTE_STAGE_LABELS;
 	execState.value = {
 		stages: stageLabels.map((label, i) => ({ label, done: false, active: i === 0 })),
 		progress: 0,
 	};
+	row.progress = 0;
 	monitorScene.value = row;
 	// 切换到监控 Tab 前清空历史日志，避免新旧日志混合
 	monitorRef.value?.clearLogs();
-	activeTab.value = 'console';
 
 	let actionDone = false;
 	let actionError = '';
@@ -1019,33 +1196,13 @@ const _runExecSSE = async (row: any, action: 'inspect' | 'execute' | 'recover') 
 				try {
 					const evt = JSON.parse(line.slice(6));
 					if (evt.type === 'stage_start') {
-						// 后端 stage 字段为 1-indexed，转换为 0-indexed 数组下标
-						const stageIdx = (evt.stage ?? 1) - 1;
-						const stages = execState.value!.stages;
-						stages.forEach((s, i) => {
-							s.done   = i < stageIdx;
-							s.active = i === stageIdx;
-						});
-						// 前置阶段（非最后）各占 3%；最后阶段由 Monitor SSE 填充，此处保持在 preWeight
-						const preWeight = Math.max(0, (stages.length - 1) * 3);
-						execState.value!.progress = Math.min(stageIdx * 3, preWeight);
+						applyStageEvent(execState.value!, evt, action === 'execute' || action === 'recover');
 						if (evt.message) monitorRef.value?.addExternalLog(evt.message);
 					} else if (evt.type === 'stage_done') {
-						const stageIdx = (evt.stage ?? 1) - 1;
-						const stages = execState.value!.stages;
-						const isLastStage = stageIdx === stages.length - 1;
-						if (isLastStage && (action === 'execute' || action === 'recover')) {
-							// JMeter 已后台启动：标记当前阶段 active，进度由 Monitor SSE 持续更新
-							stages.forEach((s, i) => { s.done = i < stageIdx; s.active = i === stageIdx; });
+						const lastStageStarted = applyStageEvent(execState.value!, evt, action === 'execute' || action === 'recover');
+						if (lastStageStarted) {
 							// 进程启动完成，立即开放强制停止按钮
 							row.status = 'running';
-						} else {
-							stages.forEach((s, i) => {
-								s.done   = i <= stageIdx;
-								s.active = i === stageIdx + 1 && stageIdx + 1 < stages.length;
-							});
-							// 非最后阶段：3% 递增；inspect 最后阶段：100%
-							execState.value!.progress = isLastStage ? 100 : (stageIdx + 1) * 3;
 						}
 						if (evt.message) monitorRef.value?.addExternalLog(evt.message);
 					} else if (evt.type === 'log') {
@@ -1083,6 +1240,8 @@ const _runExecSSE = async (row: any, action: 'inspect' | 'execute' | 'recover') 
 			row.status = 'running';
 			monitorScene.value = row;
 			monitorRef.value?.startMonitor(row.id, 0);
+			// 刷新列表以同步 executed_at；handleQuery 内部会重新绑定 monitorScene 引用
+			handleQuery();
 			// execState 保持显示（Stage 最后阶段 active），由 monitor @exec-done 清除
 		}
 	} else if (actionError) {
@@ -1171,12 +1330,44 @@ const handleDelete = (row: any) => {
 // ======================== 监控 Tab ========================
 const monitorScene = ref<any>(null);
 const monitorRef = ref<any>(null);
+// 父组件侧追踪已读 Redis 日志偏移量：组件 ref 变化时（tab 切换/重建）不丢失偏移
+// 仅在新一轮运行（handleQuery 检测到非 running→running 跳变）时归零
+let _autoMonitorOffset = 0;
+
+// 定时任务触发的压测（无 execute_sse 流程）：直接打开监控 Tab 并连接 SSE
+const handleOpenMonitor = (row: any) => {
+	// 同一个仍在 running 的场景重复点击"实时监控"：视为断线重连，保留已有 offset 和日志，
+	// 避免重复清零导致 Redis 历史日志从头重放（与 _checkAndAutoMonitor 的 isResume 判断保持一致）
+	const isResume = monitorScene.value?.id === row.id && monitorScene.value?.status === 'running';
+	row.status = 'running';
+	if (!isResume) {
+		row.progress = 0;  // 新一轮监控会话重置进度，防止旧值残留
+		monitorRef.value?.clearLogs();
+		_autoMonitorOffset = 0;
+	}
+	if (!isResume || !execState.value) {
+		// 冷启动初始化 execState，使监控页展示与手动启动一致的三阶段进度条，
+		// 由 monitor.vue 接收到的 stage_start/stage_done 结构化事件驱动
+		execState.value = {
+			stages: EXECUTE_STAGE_LABELS.map((label, i) => ({ label, done: false, active: i === 0 })),
+			progress: 0,
+		};
+	}
+	monitorScene.value = row;
+	activeTab.value = 'console';
+	monitorRef.value?.startMonitor(row.id, _autoMonitorOffset);
+};
 
 // 联调阶段进度条状态（inspect action 使用，替代弹窗）
 const execState = ref<{
 	stages: { label: string; done: boolean; active: boolean }[];
 	progress: number;
 } | null>(null);
+
+function onExecDone() {
+	execState.value = null;
+	handleQuery();
+}
 
 // 新增/修改/复制场景或子配置成功后的回调：full 模式刷新父列表，config 模式局部刷新对应行
 const handleAddUpdateSuccess = async ({ mode, row }: any) => {
@@ -1353,29 +1544,106 @@ onMounted(async () => {
 	// 线程组类型：用于 panel 标题标签动态显示
 	THREAD_TYPE_OPTIONS.value = (tgTypeOpts as any[]).map((o) => ({ value: String(o.value), label: o.label }));
 
-	handleQuery();
+	await handleQuery();
 	_nowTimer = setInterval(() => { nowMs.value = Date.now(); }, 1000);
+
+	// 初始化表格高度自适应
+	await nextTick();
+	updateTableHeight();
+	if (tableWrapRef.value) {
+		_resizeObserver = new ResizeObserver(updateTableHeight);
+		_resizeObserver.observe(tableWrapRef.value);
+	}
+
+	// store 无数据时主动拉取一次定时任务状态（用户从非 scheduler 页直接进入时）
+	if (!schedWatcher.lastChecked) await schedWatcher.refresh();
+	// 页面加载后检测是否有运行中场景，静默建立 SSE 连接（不切换 Tab）
+	_checkAndAutoMonitor();
+	// 若场景已在运行，启动 5s 轮询；对待触发任务安排精准 setTimeout
+	_startScenePollIfNeeded();
+	_schedulePlanTimeouts();
 });
 
 onUnmounted(() => {
 	if (_nowTimer) clearInterval(_nowTimer);
+	_resizeObserver?.disconnect();
+	_stopScenePoll();
+	_stopWaitForRunning();
+	_clearPlanTimeouts();
 });
 </script>
 
 <style scoped lang="scss">
 .perf-scene-container {
+	// 填满父容器可用高度，禁止自身产生滚动条
+	height: 100%;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+
 	// 外间距：上/左/右缩减一半，下保留
 	padding: 10px 10px 20px 10px;
 
+	// el-card 撑满 flex 剩余高度
+	:deep(.el-card) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	// 卡片内间距：上/左/右缩减一半，下保留
 	:deep(.el-card__body) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		padding: 10px 10px 20px 10px;
 	}
 
 	.scene-tabs {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+
 		:deep(.el-tabs__header) {
 			margin-top: -8px;
+			flex-shrink: 0;
 		}
+
+		// tabs 内容区撑满剩余高度，禁止内容区本身出现滚动条
+		:deep(.el-tabs__content) {
+			flex: 1;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		// 每个 tab-pane 占满内容区高度，并支持独立纵向滚动
+		// - 列表 Tab：内部 flex 布局恰好填满，不会触发滚动
+		// - 监控 Tab：内容超出时此处滚动，确保指标/错误表完整可见
+		:deep(.el-tab-pane) {
+			height: 100%;
+			overflow-y: auto;
+		}
+	}
+
+	// 列表 Tab 内容区：flex 列布局，精确填满 tab-pane 高度，禁止自身滚动
+	// （表格 body 通过 el-table :height prop 独立滚动，分页固定在底部）
+	.list-tab-layout {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	// 表格区域：撑满 flex 剩余空间，高度由 ResizeObserver 实时回写到 :height prop
+	.table-wrap {
+		flex: 1;
+		min-height: 0;
 	}
 
 	// 隐藏列表表头的全选复选框，不支持多选

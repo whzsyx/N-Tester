@@ -22,8 +22,8 @@ from app.core.base_crud import BaseCRUD
 from app.core.minio_client import MinioClient
 from app.corelibs.logger import logger
 from app.common.constants import JMETER_DEBUG_GUI_LABEL
-from app.utils.common import get_next_code, format_sse_event, get_temp_file_path, fmt_cloudflare_html_resp
-from app.utils.oper_jmx import apply_jmx_by_type, parse_jmx_summary
+from app.utils.common import get_next_code, format_sse_event, fmt_cloudflare_html_resp
+from app.utils.oper_jmx import apply_jmx_by_type, parse_jmx_summary, close_debug_components
 from app.utils.oper_shell import ShellOperationUtils
 from .crud import PerfScenarioConfigCRUD, _calc_config_duration
 from .model import PerfScenarioModel, PerfScenarioConfigModel
@@ -1259,8 +1259,8 @@ class ScenarioExecuteService:
             from config import config as app_config
             jmx_bytes = await MinioClient.get_object_bytes(app_config.MINIO_BUCKET, file_obj.object_key)
         except Exception as e:
-            logger.error(f'下载 JMX 脚本失败 scenario_id={scenario_id}：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
-            yield format_sse_event({'type': 'error', 'message': f'下载 JMX 脚本失败：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}'})
+            logger.error(f'平台机连接 MinIO 下载 JMX 脚本失败 scenario_id={scenario_id}：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
+            yield format_sse_event({'type': 'error', 'message': f'平台机连接 MinIO 下载 JMX 脚本失败：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}'})
             return
 
         # ── 4. 解析 JMX 摘要 ──
@@ -1429,13 +1429,13 @@ class ScenarioExecuteService:
             async for chunk in self._recover_sse(scenario):
                 yield chunk
         else: # 启动压测逻辑
-            if scenario.status != 1:
-                if scenario.status == 0:
-                    yield format_sse_event({'type': 'error', 'message': '场景当前状态：待联调，请先场景联调通过。'})
-                elif scenario.status == 2:
-                    yield format_sse_event({'type': 'error', 'message': '场景正在压测中，请勿重复启动'})
-                else:
-                    yield format_sse_event({'type': 'error', 'message': f'当前场景状态（{scenario.status}）不支持启动压测'})
+            # 仅拦截：待联调(0) 不可执行；运行中(2) 不可重复启动
+            # 待开始(1)/已完成(3)/已取消(4)/失败(5) 均允许通过调度器或手动重新启动
+            if scenario.status == 0:
+                yield format_sse_event({'type': 'error', 'message': '场景当前状态：待联调，请先完成场景联调。'})
+                return
+            if scenario.status == 2:
+                yield format_sse_event({'type': 'error', 'message': '场景正在压测中，请勿重复启动'})
                 return
             # 前置条件②：预计耗时统计正确（循环次数线程组需手动填写 estimated_duration）
             known_secs = 0
@@ -1535,6 +1535,7 @@ class ScenarioExecuteService:
                                         'message': upload_result[len('skipped:'):]})
             yield format_sse_event({'type': 'stage_done', 'stage': 2,
                                     'stage_name': '上传JMX到压力机',
+                                    'skipped': upload_skipped,
                                     'message': '已跳过（MD5一致，文件未变）' if upload_skipped else '上传完成',
                                     'detail': {'target': f'{machine.ip}', 'remote_path': remote_jmx}})
 
@@ -1581,6 +1582,7 @@ class ScenarioExecuteService:
             await self.scenario_crud.update_crud(scenario.id, {
                 'status': 1,        # 待开始（联调通过）
                 'error_info': None,
+                'progress': 0,       # 清空上一次运行（如已取消/失败）遗留的进度条
             })
             yield format_sse_event({'type': 'stage_done', 'stage': 3,
                                     'stage_name': '执行联调',
@@ -1619,23 +1621,47 @@ class ScenarioExecuteService:
             SSE 事件：stage_start / stage_done / done / error
         """
         from datetime import datetime
+        from app.db import get_redis_pool
+        from app.common.rediskeys import (
+            _pid_key, _log_key, _offset_key, _evicted_key, _stage_key,
+            _metric_series_key, _jtl_offset_key, _label_samples_key,
+            _label_errors_key, _label_error_detail_key, _top5_key,
+        )
+
+        # 先清理 Redis 历史状态，再变更场景状态为进行中：
+        # 确保 monitor_sse 连入时 Redis 已干净，current_offset 从 0 正确起步
+        redis = get_redis_pool().get_redis()
+        await redis.delete(
+            _log_key(scenario.id), _offset_key(scenario.id),
+            _evicted_key(scenario.id), _pid_key(scenario.id), _stage_key(scenario.id),
+            _metric_series_key(scenario.id), _jtl_offset_key(scenario.id),
+            _label_samples_key(scenario.id), _label_errors_key(scenario.id),
+            _label_error_detail_key(scenario.id), _top5_key(scenario.id),
+        )
 
         # ── 立即将状态变更为"进行中"，防止并发重复启动，让监控页面即时感知 ─────────
+        # 同时清除上一次运行的 executed_at，避免 monitor_sse 用旧时间戳计算进度导致直接跳到 99%
         # executed_at 将在 PID 验证通过后更新，确保 monitor_sse 以 JMeter 实际启动时刻为基准
         await self.scenario_crud.update_crud(scenario.id, {
             'status':      2,
             'progress':    0,
             'error_info':  None,
+            'executed_at': None,
         })
 
         async def _fail(stage: int, msg: str) -> None:
-            """将场景标记为失败（status=5）并写入 error_info。"""
+            """将场景标记为失败（status=5）并写入 error_info。
+            独立 session：避免 self.db 因前序异常处于 rollback-needed 状态而静默丢弃更新。
+            """
             try:
-                await self.scenario_crud.update_crud(scenario.id, {
-                    'status': 5, 'error_info': msg[:2000]
-                })
+                from app.db.sqlalchemy import async_session_factory
+                from app.core.base_crud import BaseCRUD as _BaseCRUD
+                async with async_session_factory() as _fail_db:
+                    await _BaseCRUD(PerfScenarioModel, _fail_db).update_crud(
+                        scenario.id, {'status': 5, 'error_info': msg[:2000]}
+                    )
             except Exception:
-                pass
+                logger.exception(f'[_execute_sse] _fail 更新场景状态失败 scenario_id={scenario.id}')
 
         # ── Stage 1：注入正式参数 ────────────────────────────────────────
         yield format_sse_event({'type': 'stage_start', 'stage': 1,
@@ -1687,9 +1713,10 @@ class ScenarioExecuteService:
         nohup_err    = ''     # PID dead 时读取的 nohup.out 内容，写入 error_info
         try:
             remote_jmx = f'{remote_dir}/{scenario.script_name}'
+            # 是否上传取决于 MD5 比对结果（可能跳过），此处不预判结果，避免与 stage_done 的结论矛盾
             yield format_sse_event({'type': 'stage_start', 'stage': 2,
                                     'stage_name': '上传JMX到压力机',
-                                    'message': f'正在SFTP上传到 {machine.ip}:{remote_dir}...'})
+                                    'message': f'正在校验JMX与压力机现状（{machine.ip}:{remote_dir}）...'})
             try:
                 upload_result = await self._upload_jmx_to_machine(str(local_path), machine, remote_dir, scenario.script_name,
                                                                    reuse_ssh=ssh_conn)
@@ -1699,12 +1726,12 @@ class ScenarioExecuteService:
                 yield format_sse_event({'type': 'error', 'stage': 2, 'message': msg})
                 return
             upload_skipped = isinstance(upload_result, str) and upload_result.startswith('skipped:')
-            if upload_skipped:
-                yield format_sse_event({'type': 'log', 'stage': 2,
-                                        'message': upload_result[len('skipped:'):]})
+            # 上传/跳过二者互斥，唯一结论统一由 stage_done 的 message 给出
+            done_message = upload_result[len('skipped:'):] if upload_skipped else '上传完成'
             yield format_sse_event({'type': 'stage_done', 'stage': 2,
                                     'stage_name': '上传JMX到压力机',
-                                    'message': '' if upload_skipped else '上传完成',
+                                    'skipped': upload_skipped,
+                                    'message': done_message,
                                     'detail': {'target': machine.ip, 'remote_path': remote_jmx}})
 
             # 上传成功后更新文件分发状态（共享分发，worker=1）
@@ -1876,15 +1903,9 @@ class ScenarioExecuteService:
         # monitor_sse 以此时间为进度基准，确保进度条与日志出现时间高度同步
         await self.scenario_crud.update_crud(scenario.id, {'executed_at': datetime.now()})
 
-        from app.db import get_redis_pool
-        from app.utils.perf_log_collector import _pid_key, _log_key, _offset_key, _evicted_key
-        redis = get_redis_pool().get_redis()
-        # 清理上一次压测遗留的 Redis 状态，避免日志行偏移错位、监控页面显示旧日志
-        await redis.delete(_log_key(scenario.id), _offset_key(scenario.id), _evicted_key(scenario.id))
+        # 写入 PID（redis 变量在函数顶部已初始化）
         if pid_str.isdigit():
             await redis.set(_pid_key(scenario.id), pid_str, ex=86400)
-        else:
-            await redis.delete(_pid_key(scenario.id))
 
         # ── 启动 APScheduler 日志收集任务 ────────────────────────────────
         poll_interval = int(await self.param_crud.get_param_value('JMETER_LOG_POLL_INTERVAL', '5'))
@@ -2079,6 +2100,22 @@ class ScenarioExecuteService:
                                     'message': f'JMeter进程恢复启动后立即退出（PID={pid_str}），请检查压力机日志'})
             return
 
+        from app.db import get_redis_pool
+        from app.common.rediskeys import (
+            _pid_key, _log_key, _offset_key, _evicted_key,
+            _metric_series_key, _jtl_offset_key, _label_samples_key,
+            _label_errors_key, _label_error_detail_key, _top5_key,
+        )
+        redis = get_redis_pool().get_redis()
+        # 先清理 Redis，再变更状态，确保 monitor_sse 连入时 Redis 已干净
+        await redis.delete(
+            _log_key(scenario.id), _offset_key(scenario.id),
+            _evicted_key(scenario.id), _pid_key(scenario.id),
+            _metric_series_key(scenario.id), _jtl_offset_key(scenario.id),
+            _label_samples_key(scenario.id), _label_errors_key(scenario.id),
+            _label_error_detail_key(scenario.id), _top5_key(scenario.id),
+        )
+
         now = datetime.now()
         await self.scenario_crud.update_crud(scenario.id, {
             'status':      2,
@@ -2087,15 +2124,8 @@ class ScenarioExecuteService:
             'error_info':  None,
         })
 
-        from app.db import get_redis_pool
-        from app.utils.perf_log_collector import _pid_key, _log_key, _offset_key, _evicted_key
-        redis = get_redis_pool().get_redis()
-        # 清理上一次压测遗留的 Redis 状态，避免日志行偏移错位、监控页面显示旧日志
-        await redis.delete(_log_key(scenario.id), _offset_key(scenario.id), _evicted_key(scenario.id))
         if pid_str.isdigit():
             await redis.set(_pid_key(scenario.id), pid_str, ex=86400)
-        else:
-            await redis.delete(_pid_key(scenario.id))
 
         poll_interval = int(await self.param_crud.get_param_value('JMETER_LOG_POLL_INTERVAL', '5'))
         cred = _build_credential(machine)
@@ -2141,20 +2171,29 @@ class ScenarioExecuteService:
             offset:      客户端已接收到的 Redis List 行索引（断线重连时携带）
         Yields:
             SSE 事件类型：
-              connected — 连接建立确认（含 offset）
-              log       — 一行 JMeter 控制台日志
-              progress  — 当前进度（value/elapsed/estimated）
-              ping      — 心跳保活（含服务端时间戳）
-              done      — 压测结束（含最终 status）
-              error     — 场景异常
+              connected   — 连接建立确认（含 offset、stage_state 供中途加入时补跳阶段）
+              log         — 一行 JMeter 控制台日志
+              progress    — 当前进度（value/elapsed/estimated）
+              stage_start — 定时任务 Stage1-3 开始（结构化，驱动前端 execState）
+              stage_done  — 定时任务 Stage1-3 完成（结构化，驱动前端 execState）
+              metric      — 实时指标快照（time/qps/avg_rt/threads/err_rate），驱动 4 个指标图表
+              top_errors  — Top5 Errors by Sampler 最新快照（items: [{sampler,samples,errors,top}]）
+              ping        — 心跳保活（含服务端时间戳）
+              done        — 压测结束（含最终 status）
+              error       — 场景异常
         """
         import time as _time
         from app.db import get_redis_pool
-        from app.utils.perf_log_collector import _log_key, _evicted_key
+        from app.common.rediskeys import (
+            _log_key, _evicted_key, _stage_key, _metric_series_key, _top5_key,
+        )
 
         redis = get_redis_pool().get_redis()
         log_key     = _log_key(scenario_id)
         evicted_key = _evicted_key(scenario_id)
+        stage_key   = _stage_key(scenario_id)
+        metric_key  = _metric_series_key(scenario_id)
+        top5_key    = _top5_key(scenario_id)
 
         poll_interval        = int(await self.param_crud.get_param_value('JMETER_LOG_POLL_INTERVAL', '5'))
         heartbeat_secs       = int(await self.param_crud.get_param_value('JMETER_MONITOR_HEARTBEAT', '20'))
@@ -2172,9 +2211,29 @@ class ScenarioExecuteService:
         current_offset = list_offset              # 本次连接从此处开始读
         last_log_time  = _time.monotonic()
 
+        # 读取当前阶段状态（定时任务 Stage1-3 结构化进度），供中途加入的监控连接"补跳"到正确阶段，
+        # 而不是从 Stage1 重新显示；last_stage_marker 记录已经推送给本连接的阶段标记，避免重复推送
+        raw_stage_state = await redis.get(stage_key)
+        last_stage_marker: Optional[str] = None
+        stage_state_payload = None
+        if raw_stage_state:
+            try:
+                text = raw_stage_state.decode('utf-8') if isinstance(raw_stage_state, bytes) else raw_stage_state
+                stage_state_payload = json.loads(text)
+                last_stage_marker = text
+            except Exception:
+                stage_state_payload = None
+
+        # 指标 List 从当前末尾开始读（不回放历史指标点，实时图表从连接时刻开始滚动展示即可）；
+        # Top5 快照按内容 diff 推送，避免未变化时重复刷新前端表格
+        metric_offset    = await redis.llen(metric_key)
+        last_top5_marker: Optional[str] = None
+
         yield format_sse_event({
             'type': 'connected', 'offset': offset,
             'evicted': evicted,
+            'start_offset': evicted + list_offset,  # 本次连接实际从此绝对行号开始推送，供前端校准 logOffset
+            'stage_state': stage_state_payload,
             'message': (
                 f'已连接实时监控，等待日志数据...'
                 if evicted == 0 else
@@ -2183,74 +2242,141 @@ class ScenarioExecuteService:
         })
 
         while True:
-            # ── 检查场景状态 ──────────────────────────────────────────────
-            # 【根本修复】MySQL REPEATABLE READ 隔离级别：同一事务内的 SELECT 始终读取
-            # 事务开始时的快照，导致 collect_jmeter_log 提交的 status=3 对本 Session 不可见。
-            # 每轮循环前 rollback 结束当前事务，下一次 SELECT 重新开启事务读取最新已提交数据。
             try:
-                await self.db.rollback()
-            except Exception:
-                pass
-            from sqlalchemy import select as _sa_select
-            _stmt = (_sa_select(PerfScenarioModel)
-                     .where(PerfScenarioModel.id == scenario_id)
-                     .execution_options(populate_existing=True))
-            scenario = (await self.db.execute(_stmt)).scalar_one_or_none()
-            if not scenario:
-                yield format_sse_event({'type': 'error', 'message': '场景不存在'})
-                return
+                # ── 检查场景状态 ──────────────────────────────────────────────
+                # 【根本修复】MySQL REPEATABLE READ 隔离级别：同一事务内的 SELECT 始终读取
+                # 事务开始时的快照，导致 collect_jmeter_log 提交的 status=3 对本 Session 不可见。
+                # 每轮循环前 rollback 结束当前事务，下一次 SELECT 重新开启事务读取最新已提交数据。
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    pass
+                from sqlalchemy import select as _sa_select
+                _stmt = (_sa_select(PerfScenarioModel)
+                         .where(PerfScenarioModel.id == scenario_id)
+                         .execution_options(populate_existing=True))
+                scenario = (await self.db.execute(_stmt)).scalar_one_or_none()
+                if not scenario:
+                    yield format_sse_event({'type': 'error', 'message': '场景不存在', 'terminal': True})
+                    return
 
-            # ── 推送新日志行（按 Redis List 下标增量读取）────────────────
-            # 每轮同步最新裁剪量，防止本次连接期间再次发生 LTRIM 导致 offset 偏移
-            new_evicted = int(await redis.get(evicted_key) or 0)
-            if new_evicted > evicted:
-                # 本轮期间又发生了裁剪，将 current_offset 向前收缩对应行数
-                current_offset = max(0, current_offset - (new_evicted - evicted))
-                evicted = new_evicted
+                # ── 推送新日志行（按 Redis List 下标增量读取）────────────────
+                # 每轮同步最新裁剪量，防止本次连接期间再次发生 LTRIM 导致 offset 偏移
+                new_evicted = int(await redis.get(evicted_key) or 0)
+                if new_evicted > evicted:
+                    # 本轮期间又发生了裁剪，将 current_offset 向前收缩对应行数
+                    current_offset = max(0, current_offset - (new_evicted - evicted))
+                    evicted = new_evicted
 
-            total = await redis.llen(log_key)
-            if total > current_offset:
-                raw_lines = await redis.lrange(log_key, current_offset, total - 1)
-                for raw in raw_lines:
-                    line = raw.decode('utf-8', errors='replace') if isinstance(raw, bytes) else raw
-                    yield format_sse_event({'type': 'log', 'message': line})
-                current_offset = total
-                last_log_time  = _time.monotonic()
-                _last_log_at   = datetime.now()
+                total = await redis.llen(log_key)
+                if total > current_offset:
+                    raw_lines = await redis.lrange(log_key, current_offset, total - 1)
+                    for raw in raw_lines:
+                        line = raw.decode('utf-8', errors='replace') if isinstance(raw, bytes) else raw
+                        yield format_sse_event({'type': 'log', 'message': line})
+                    current_offset = total
+                    last_log_time  = _time.monotonic()
+                    _last_log_at   = datetime.now()
 
-            # ── 推送进度（日志活跃时推进，卡住/失败无输出时冻结）──────────────
-            if scenario.estimated_duration and scenario.executed_at:
-                elapsed_secs = (datetime.now() - scenario.executed_at).total_seconds()
-                in_startup   = elapsed_secs <= _startup_grace
-                log_fresh    = (_last_log_at is not None and
-                                (datetime.now() - _last_log_at).total_seconds() <= _log_freeze_secs)
-                if in_startup or log_fresh:
-                    _frozen_progress = min(99, int(elapsed_secs / scenario.estimated_duration * 100))
-                yield format_sse_event({
-                    'type': 'progress', 'value': _frozen_progress,
-                    'elapsed': int(elapsed_secs), 'estimated': scenario.estimated_duration,
-                })
-            else:
-                yield format_sse_event({'type': 'progress', 'value': 0})
+                # ── 补发定时任务 Stage1-3 结构化阶段事件（驱动前端 execState 富进度条）────
+                # 事件形状与 /execute 原始流一致（type/stage/stage_name/message），
+                # 前端可复用同一套 applyStageEvent 处理逻辑，无需为定时任务再写一份映射。
+                raw_stage_now = await redis.get(stage_key)
+                if raw_stage_now:
+                    stage_text = raw_stage_now.decode('utf-8') if isinstance(raw_stage_now, bytes) else raw_stage_now
+                    if stage_text != last_stage_marker:
+                        last_stage_marker = stage_text
+                        try:
+                            stage_evt = json.loads(stage_text)
+                            evt_type = 'stage_done' if stage_evt.get('kind') == 'done' else 'stage_start'
+                            yield format_sse_event({
+                                'type': evt_type,
+                                'stage': stage_evt.get('stage'),
+                                'stage_name': stage_evt.get('stage_name'),
+                                'message': stage_evt.get('message'),
+                            })
+                        except Exception:
+                            pass
 
-            # ── 场景结束判断 ──────────────────────────────────────────────
-            if scenario.status != 2:
-                if scenario.status == 3:
-                    yield format_sse_event({'type': 'progress', 'value': 100})
-                final_msg = {3: '压测已完成', 4: '压测已取消', 5: '压测失败',}.get(scenario.status, '压测已结束')
-                yield format_sse_event({'type': 'done', 'status': scenario.status, 'message': final_msg})
-                return
+                # ── 推送实时监控指标（QPS/平均RT/并发线程数/错误率）───────────────
+                metric_total = await redis.llen(metric_key)
+                if metric_total > metric_offset:
+                    raw_metrics = await redis.lrange(metric_key, metric_offset, metric_total - 1)
+                    for raw_m in raw_metrics:
+                        try:
+                            m_text = raw_m.decode('utf-8') if isinstance(raw_m, bytes) else raw_m
+                            yield format_sse_event({'type': 'metric', **json.loads(m_text)})
+                        except Exception:
+                            pass
+                    metric_offset = metric_total
 
-            # ── 心跳（无新日志超过 heartbeat_secs 时发送）────────────────
-            if _time.monotonic() - last_log_time >= heartbeat_secs:
-                yield format_sse_event({'type': 'ping', 'ts': int(_time.time())})
-                last_log_time = _time.monotonic()
+                # ── 推送 Top5 Errors by Sampler 快照（内容变化时才推送）──────────
+                raw_top5 = await redis.get(top5_key)
+                if raw_top5:
+                    top5_text = raw_top5.decode('utf-8') if isinstance(raw_top5, bytes) else raw_top5
+                    if top5_text != last_top5_marker:
+                        last_top5_marker = top5_text
+                        try:
+                            yield format_sse_event({'type': 'top_errors', 'items': json.loads(top5_text)})
+                        except Exception:
+                            pass
 
-            try:
-                await asyncio.sleep(poll_interval)
+                # ── 推送进度（日志活跃时推进，卡住/失败无输出时冻结）──────────────
+                if scenario.estimated_duration and scenario.executed_at:
+                    elapsed_secs = (datetime.now() - scenario.executed_at).total_seconds()
+                    in_startup   = elapsed_secs <= _startup_grace
+                    log_fresh    = (_last_log_at is not None and
+                                    (datetime.now() - _last_log_at).total_seconds() <= _log_freeze_secs)
+                    if in_startup or log_fresh:
+                        _frozen_progress = min(99, int(elapsed_secs / scenario.estimated_duration * 100))
+                    yield format_sse_event({
+                        'type': 'progress', 'value': _frozen_progress,
+                        'elapsed': int(elapsed_secs), 'estimated': scenario.estimated_duration,
+                    })
+                else:
+                    yield format_sse_event({'type': 'progress', 'value': 0})
+
+                # ── 场景结束判断 ──────────────────────────────────────────────
+                # status=1（待开始）：定时任务 Stage1/2/3 执行期间场景尚未进入 running，
+                # 继续轮询等待，不关闭连接；否则每次连接都因 status≠2 提前关闭，
+                # 导致前端用 offset=0 反复重连并重播全量历史日志。
+                if scenario.status in (3, 4, 5):
+                    if scenario.status == 3:
+                        yield format_sse_event({'type': 'progress', 'value': 100})
+                    final_msg = {3: '压测已完成', 4: '压测已取消', 5: '压测失败'}.get(scenario.status, '压测已结束')
+                    yield format_sse_event({'type': 'done', 'status': scenario.status, 'message': final_msg})
+                    return
+                elif scenario.status == 0:
+                    yield format_sse_event({'type': 'error', 'message': '场景尚未完成联调，无法监控', 'terminal': True})
+                    return
+                # status=1（待开始/定时启动中）或 status=2（进行中）：继续轮询
+
+                # ── 心跳（无新日志超过 heartbeat_secs 时发送）────────────────
+                if _time.monotonic() - last_log_time >= heartbeat_secs:
+                    yield format_sse_event({'type': 'ping', 'ts': int(_time.time())})
+                    last_log_time = _time.monotonic()
+
+                try:
+                    await asyncio.sleep(poll_interval)
+                except asyncio.CancelledError:
+                    # 服务器关闭或客户端断连导致任务取消，静默退出避免日志噪音
+                    return
+
             except asyncio.CancelledError:
-                # 服务器关闭或客户端断连导致任务取消，静默退出避免日志噪音
                 return
+            except GeneratorExit:
+                return
+            except Exception as _loop_err:
+                # 轮询期间发生瞬时 DB/Redis 异常：记录日志后继续下一轮，不关闭 SSE 流。
+                # 关键：不向前端推送 error 事件，避免触发前端 offset 清零后以 offset=0 重连
+                # 导致历史日志被重复展示（Stage1/2/3 日志重放问题的根本原因之一）。
+                logger.warning(
+                    f'[monitor_sse] 轮询异常（将重试）scenario_id={scenario_id}: {_loop_err}'
+                )
+                try:
+                    await asyncio.sleep(poll_interval)
+                except asyncio.CancelledError:
+                    return
 
     # ──────────────────── 内部实现 ────────────────────
 
@@ -2343,16 +2469,18 @@ class ScenarioExecuteService:
         active_configs: List[PerfScenarioConfigModel],
         jmx_bytes: bytes,
     ) -> bytes:
-        """将正式子配置参数注入 JMX bytes，返回修改后的 bytes。
+        """将正式子配置参数注入 JMX bytes，并关闭遗留的调试组件，返回修改后的 bytes。
 
         单配置类型广播写入；多配置类型按 ID 升序与 JMX 解析顺序位置配对精确注入。
+        线程组参数写完后统一关闭一次调试组件，避免联调阶段忘记手动关闭的
+        调试监听器/取样器带入正式压测，产生额外 IO/内存开销影响压测结果。
 
         Args:
             scenario:       压测场景对象
             active_configs: 启用的子配置列表
             jmx_bytes:      原始 JMX 文件内容
         Returns:
-            注入正式参数后的 JMX bytes
+            注入正式参数、关闭调试组件后的 JMX bytes
         """
         from collections import defaultdict
         type_groups: dict = defaultdict(list)
@@ -2375,6 +2503,12 @@ class ScenarioExecuteService:
                     db_params = self._config_to_db_params(cfg)
                     modified  = apply_jmx_by_type(modified, jmx_type, db_params,
                                                    tg_index=tg['index'])
+
+        # 线程组参数全部写完后，统一关闭一次仍启用的调试组件（联调页面排查到的
+        # "未关闭"项即在此处被关闭），只做一次即可覆盖所有类型的子配置
+        modified, closed_names = close_debug_components(modified)
+        if closed_names:
+            logger.info(f'场景 {scenario.id} 正式启动：已自动关闭 {len(closed_names)} 个未关闭调试组件：{closed_names}')
         return modified
 
     @staticmethod
@@ -2608,9 +2742,9 @@ class ScenarioExecuteService:
             from config import config as app_config
             return await MinioClient.get_object_bytes(app_config.MINIO_BUCKET, file_obj.object_key)
         except Exception as e:
-            logger.error(f'MinIO 下载 JMX 失败 scenario_id={scenario.id}：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
+            logger.error(f'平台机连接 MinIO 下载 JMX 失败 scenario_id={scenario.id}：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                                detail=f'下载 JMX 脚本失败：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
+                                detail=f'平台机连接 MinIO 下载 JMX 脚本失败：{fmt_cloudflare_html_resp(e, "请检查 MinIO 地址或网络配置")}')
 
     async def _get_data_file_statuses(self, csv_file_names: list) -> dict:
         """批量查询 JMX 引用的 CSV 数据文件在 DB 中的状态。
@@ -2635,7 +2769,7 @@ class ScenarioExecuteService:
                 return filename, s
             # 写死路径：含 / 或 \
             if '/' in s or '\\' in s:
-                import posixpath, ntpath
+                import posixpath
                 filename = posixpath.basename(s.replace('\\', '/'))
                 return filename, s
             return s, None
@@ -2866,6 +3000,7 @@ async def stop_running_scenario(scenario_id: int, user_id: int, db: AsyncSession
     步骤：
       1. 加载场景，校验 status=2（进行中），非进行中则跳过
       2. 立即更新 scenario.status=4（已取消），缩小与日志收集任务的竞争窗口
+      2.5. 同步关联的进行中定时任务为已取消，避免定时任务状态卡住
       3. 从 Redis 读取 JMeter PID，SSH 到执行机执行 kill
       4. 移除 perf_log_collector APScheduler 轮询任务
       5. 清理 Redis 中该场景的所有日志/PID/偏移键
@@ -2876,9 +3011,12 @@ async def stop_running_scenario(scenario_id: int, user_id: int, db: AsyncSession
         db:          当前异步数据库会话
     """
     from app.db import get_redis_pool
-    from app.utils.perf_log_collector import (
-        _pid_key, _log_key, _offset_key, _evicted_key, _remove_job,
+    from app.common.rediskeys import (
+        _pid_key, _log_key, _offset_key, _evicted_key, _stage_key,
+        _metric_series_key, _jtl_offset_key, _label_samples_key,
+        _label_errors_key, _label_error_detail_key, _top5_key,
     )
+    from app.utils.perf_log_collector import _remove_job
 
     scenario_crud = BaseCRUD(PerfScenarioModel, db)
     scenario = await scenario_crud.get_by_id_crud(scenario_id)
@@ -2896,6 +3034,35 @@ async def stop_running_scenario(scenario_id: int, user_id: int, db: AsyncSession
         elapsed = (datetime.now() - scenario.executed_at).total_seconds()
         cancel_payload['progress'] = min(99, int(elapsed / scenario.estimated_duration * 100))
     await scenario_crud.update_crud(scenario_id, cancel_payload)
+
+    # ── 1.5. 同步关联定时任务状态为已取消 ──────────────────────────────────
+    # 场景列表页强制停止时，perf_log_collector.py 里"JMeter自然结束"的同步
+    # 逻辑不会被触发（下面第4步会先移除日志收集轮询任务），因此这里比照该
+    # 处的查询+更新写法，主动把关联的进行中(task_status=1)定时任务同步为
+    # 已取消(3)，避免定时任务列表状态卡在"进行中"。
+    try:
+        from sqlalchemy import select, and_
+        from app.api.v1.performance.scheduler.model import PerfSchedulerModel
+        sched_crud = BaseCRUD(PerfSchedulerModel, db)
+        stmt = (
+            select(PerfSchedulerModel)
+            .where(and_(
+                PerfSchedulerModel.scenario_id == scenario_id,
+                PerfSchedulerModel.task_status == 1,
+                PerfSchedulerModel.enabled_flag == 1,
+            ))
+            .limit(1)
+        )
+        sched_obj = (await db.execute(stmt)).scalars().first()
+        if sched_obj:
+            await sched_crud.update_crud(sched_obj.id, {
+                'task_status': 3,
+                'is_active':   0,
+                'end_time':    datetime.now(),
+            })
+            logger.info(f"[StopScenario] 关联定时任务已同步为已取消 scheduler_id={sched_obj.id}")
+    except Exception as e:
+        logger.warning(f"[StopScenario] 同步定时任务状态失败 scenario_id={scenario_id}: {e}")
 
     # ── 2. SSH kill JMeter 进程 ────────────────────────────────────────────
     pid_raw = await redis.get(_pid_key(scenario_id))
@@ -2956,7 +3123,9 @@ async def stop_running_scenario(scenario_id: int, user_id: int, db: AsyncSession
     _remove_job(scenario_id)
 
     # ── 4. 清理 Redis 键 ──────────────────────────────────────────────────
-    for key_fn in [_pid_key, _log_key, _offset_key, _evicted_key]:
+    for key_fn in [_pid_key, _log_key, _offset_key, _evicted_key, _stage_key,
+                   _metric_series_key, _jtl_offset_key, _label_samples_key,
+                   _label_errors_key, _label_error_detail_key, _top5_key]:
         try:
             await redis.delete(key_fn(scenario_id))
         except Exception:

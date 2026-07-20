@@ -71,9 +71,10 @@ watch(
 	overflow: hidden;
 
 	&__toolbar {
+		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: center;
 		padding: 8px 14px;
 		background: #1a1a2e;
 		color: #7ec8e3;
@@ -88,6 +89,10 @@ watch(
 	}
 
 	&__actions {
+		position: absolute;
+		right: 14px;
+		top: 50%;
+		transform: translateY(-50%);
 		display: flex;
 		align-items: center;
 		gap: 8px;

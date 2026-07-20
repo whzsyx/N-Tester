@@ -177,7 +177,7 @@
 			<!-- 高级设置备注 -->
 			<div v-if="drawerMode === 'config' || (form.advanced && _openMode !== 'edit')" class="advanced-remark">
 				<el-icon class="advanced-remark__icon"><ele-WarningFilled /></el-icon>
-				<span>高级设置：默认解析 JMX 脚本中的配置。修改线程参数配置后会覆盖 JMX 脚本原有参数配置。</span>
+				<span>高级设置：默认解析 JMX 脚本中的配置。修改线程参数配置，正式启动压测后会覆盖 JMX 脚本原有参数配置。</span>
 			</div>
 
 			<template v-if="drawerMode === 'config' || (form.advanced && _openMode !== 'edit')">
@@ -466,6 +466,15 @@
 										</div>
 									</template>
 
+									<!-- 梯度折线图：复刻 JMeter 编辑 Stepping/Ultimate 线程组时的实时预览图 -->
+									<div v-if="tab.thread_type === '2' || tab.thread_type === '3'" class="tg-preview-chart-wrap">
+										<div class="tg-preview-chart-title"><span>线程数变化预览</span></div>
+										<GroupPreviewChart
+											:points="buildGroupPreviewPoints(tab)"
+											:legend-name="tab.thread_type === '2' ? '预期活跃线程数（Expected Active users Count）' : 'Expected parallel users count（预计并发用户数）'"
+										/>
+									</div>
+
 								</div>
 							</el-collapse-transition>
 						</div>
@@ -595,7 +604,8 @@ import { ref, reactive, computed, watchEffect, onMounted, onUnmounted } from 'vu
 import { ElMessage, FormInstance } from 'element-plus';
 import { usePerformanceApi } from '/@/api/v1/performance';
 import { useDictCache } from '/@/utils/dictCache';
-import { THREAD_TYPE_LABELS, normalizeConfig, normalizeUltimateRows, buildConfigPayload } from './utils';
+import { THREAD_TYPE_LABELS, normalizeConfig, normalizeUltimateRows, buildConfigPayload, buildGroupPreviewPoints } from './utils';
+import GroupPreviewChart from '../components/GroupPreviewChart.vue';
 
 type OpenMode = 'add' | 'edit' | 'copy' | 'config-edit' | 'config-copy' | 'config-add';
 
@@ -1443,6 +1453,32 @@ onUnmounted(() => {
 		display: flex;
 		justify-content: center;
 		margin-top: 10px;
+	}
+
+	.tg-preview-chart-wrap {
+		margin: 18px 16px 4px;
+	}
+
+	.tg-preview-chart-title {
+		display: flex;
+		align-items: center;
+		margin-bottom: 10px;
+		font-size: 12.5px;
+		font-weight: 500;
+		color: var(--el-text-color-secondary);
+
+		&::before,
+		&::after {
+			content: '';
+			flex: 1;
+			height: 1px;
+			background: var(--el-border-color-lighter);
+		}
+
+		span {
+			padding: 0 12px;
+			white-space: nowrap;
+		}
 	}
 }
 

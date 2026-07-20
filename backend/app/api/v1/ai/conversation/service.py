@@ -7,7 +7,6 @@ import json
 import time
 import re
 import asyncio
-from pathlib import Path
 from urllib.parse import urlparse
 from typing import List, Optional, Dict, Any, Union
 from sqlalchemy import select, func, desc
@@ -26,7 +25,6 @@ from app.api.v1.projects.project_platform_service import (
 from app.api.v1.skills.service import run_skill_tool, create_skill_job
 from app.api.v1.skills.model import ProjectSkillModel
 from app.api.v1.skills.execution_model import SkillExecutionJobModel, SkillExecutionEventModel, SkillExecutionArtifactModel
-from app.db.sqlalchemy import async_session_factory
 from .schema import (
     ConversationCreateRequest,
     ConversationUpdateRequest,
@@ -348,62 +346,11 @@ class MessageService:
         return title, expect
 
     @staticmethod
-    def _screenshot_public_url(project_id: int, session_key: str, relative_path: str) -> str:
-        rel = str(relative_path or "").replace("\\", "/").lstrip("/")
-        return f"/uploads/skills/runtime/screenshots/{project_id}/{session_key}/{rel}"
-
-    @staticmethod
-    def _build_execution_event_timeline(logs: List[str]) -> str:
-        if not logs:
-            return ""
-        lines: List[str] = ["#### 执行事件时间线", ""]
-        for i, msg in enumerate(logs, start=1):
-            one = str(msg or "").replace("\r", "").strip()
-            if not one:
-                continue
-            preview = one if len(one) <= 600 else one[:600] + "..."
-            lines.append(f"{i}. {preview}")
-        lines.append("")
-        return "\n".join(lines)
-
-    @staticmethod
-    def _extract_stdout_summary_from_logs(logs: List[str]) -> str:
-        for msg in logs or []:
-            s = str(msg or "")
-            if "[stdout 摘要]" in s:
-                return s.split("[stdout 摘要]", 1)[-1].strip()
-        return ""
-
-    @staticmethod
-    def _screenshot_links_from_stdout(stdout: str, project_id: int, session_key: str) -> List[dict]:
-        """stdout 中出现 saved path 但尚未入库时的直链兜底。"""
-        items: List[dict] = []
-        seen: set[str] = set()
-        for line in (stdout or "").splitlines():
-            m = re.search(r"\bsaved\s+(.+)", line, flags=re.IGNORECASE)
-            if not m:
-                continue
-            raw = m.group(1).strip().strip('"').strip("'")
-            norm = raw.replace("\\", "/")
-            name = Path(norm).name
-            if not name or name in seen:
-                continue
-            seen.add(name)
-            if "runtime/screenshots/" in norm:
-                tail = norm.split("runtime/screenshots/", 1)[-1].lstrip("/")
-                url = f"/uploads/skills/runtime/screenshots/{tail}"
-            else:
-                url = MessageService._screenshot_public_url(project_id, session_key, name)
-            items.append({"name": name, "url": url})
-        return items
-
-    @staticmethod
     def _build_detailed_test_steps_report(
         command: str,
         logs: List[str],
         job_return_code: Optional[int] = None,
         stderr_blob: str = "",
-        stdout_excerpt: str = "",
     ) -> str:
         """
         将命令链（&&）与 runner 事件中的「[测试步骤 i/n] 结束 returncode=…」对齐，输出可审计的测试步骤表。
@@ -438,12 +385,7 @@ class MessageService:
                     actual = "未执行（前序步骤非零退出，`&&` 短路，后续子命令未运行）。"
                     verdict = "跳过"
                 elif len(steps) == 1 and job_return_code is not None:
-                    actual = f"整 job returncode={job_return_code}。"
-                    if stdout_excerpt:
-                        excerpt = stdout_excerpt if len(stdout_excerpt) <= 3500 else stdout_excerpt[:3500] + "\n...(截断)"
-                        actual += f"\n   **执行输出摘要**:\n```\n{excerpt}\n```"
-                    else:
-                        actual += " stdout/stderr 见下文汇总。"
+                    actual = f"整 job returncode={job_return_code}；stdout/stderr 见下文汇总。"
                     verdict = "通过" if int(job_return_code) == 0 else "失败"
                 else:
                     actual = "未从事件流解析到该步的「结束 returncode」行（可能为旧版 runner 单次执行）。"
@@ -489,12 +431,9 @@ class MessageService:
             if not skill:
                 return None, "Skill不可用"
 
-            # 轮询中会 rollback，ORM 实例会过期；此处缓存标量，避免后续访问 skill.name 触发 MissingGreenlet
-            resolved_skill_name = str(skill.name or "").strip() or "Skill"
-
             extra = skill.extra_config or {}
             allowed_tools = str(extra.get("allowed_tools") or "")
-            skill_name = resolved_skill_name.lower()
+            skill_name = str(skill.name or "").lower()
             test_guard = (
                 "测试执行规范：1) 浏览器场景优先先导航再获取页面结构（snapshot）。"
                 "2) 页面变化后需要再次获取结构。3) 关键步骤保留截图。"
@@ -603,9 +542,6 @@ class MessageService:
                 await stream_emit(f"[SkillJob] 已入队: #{job_id}\n")
 
             # Poll job/events to completion
-            # 轮询前结束本会话上可能残留的事务，避免 REPEATABLE READ 下沿用旧快照，
-            # 导致永远看不到 worker 在另一连接上写入的事件与 job 状态（界面卡在首条 queued）。
-            await db.rollback()
             start = time.time()
             last_seq = 0
             logs: List[str] = []
@@ -643,10 +579,8 @@ class MessageService:
                     return None, "Skill任务不存在"
                 status = str(job.status or "")
                 if status in ("succeeded", "failed", "cancelled"):
-                    await db.rollback()
                     break
                 await asyncio.sleep(1.2)
-                await db.rollback()
 
             job = (
                 await db.execute(
@@ -682,7 +616,7 @@ class MessageService:
             ]
             result = {
                 "ok": status == "succeeded",
-                "skill_name": resolved_skill_name,
+                "skill_name": skill.name,
                 "session_id": smart_session_id,
                 "return_code": job.return_code,
                 "stdout": job.stdout or ("\n".join(logs[-80:]) if logs else ""),
@@ -715,29 +649,16 @@ class MessageService:
                 cmd_preview = cmd_preview[:220] + "..."
             project_id = int(data.project_id)
             sess_key = str(result.get("session_id") or "")
-            ss_lines: List[str] = []
-            ss_seen: set[str] = set()
-            for x in screenshots[:12]:
+            ss_lines = []
+            for x in screenshots[:8]:
                 rel = str(x.get("relative_path") or "").replace("\\", "/")
-                name = str(x.get("name") or rel or "screenshot")
-                if name in ss_seen:
-                    continue
-                ss_seen.add(name)
-                link = MessageService._screenshot_public_url(project_id, sess_key, rel) if rel else ""
+                link = f"/uploads/skills/runtime/screenshots/{project_id}/{sess_key}/{rel}" if rel else ""
                 if link:
-                    ss_lines.append(f"- [{name}]({link})")
+                    ss_lines.append(f"- [{x.get('name')}]({link})")
                 else:
-                    ss_lines.append(f"- {name}")
-            for x in MessageService._screenshot_links_from_stdout(
-                str(result.get("stdout") or ""), project_id, sess_key
-            ):
-                name = str(x.get("name") or "")
-                if not name or name in ss_seen:
-                    continue
-                ss_seen.add(name)
-                ss_lines.append(f"- [{name}]({x.get('url')})")
+                    ss_lines.append(f"- {x.get('name')} ({rel})")
             af_lines = []
-            for x in artifacts[:12]:
+            for x in artifacts[:8]:
                 rel = str(x.get("relative_path") or "").replace("\\", "/")
                 link = f"/uploads/skills/runtime/artifacts/{project_id}/{sess_key}/{rel}" if rel else ""
                 if link:
@@ -745,35 +666,27 @@ class MessageService:
                 else:
                     af_lines.append(f"- {x.get('name')} ({rel})")
             full_cmd = str(args.get("command") or args.get("template") or "").strip()
-            stdout_excerpt = MessageService._extract_stdout_summary_from_logs(logs) or str(
-                result.get("stdout") or ""
-            )[:4000]
             steps_report = MessageService._build_detailed_test_steps_report(
                 full_cmd,
                 logs,
                 job_return_code=int(result.get("return_code") or 0),
                 stderr_blob=str(result.get("stderr") or ""),
-                stdout_excerpt=stdout_excerpt,
             )
-            timeline = MessageService._build_execution_event_timeline(logs)
             text = (
                 f"智能模式已调用 Skill `{result.get('skill_name')}`（{status}）。\n"
-                f"执行会话: `{result.get('session_id') or '-'}`，任务: `#{job_id}`，返回码: `{result.get('return_code')}`。\n"
+                f"执行会话: `{result.get('session_id') or '-'}`，返回码: `{result.get('return_code')}`。\n"
                 f"执行命令/动作: `{cmd_preview or '-'}`\n\n"
                 + (steps_report + "\n" if steps_report else "")
-                + (timeline if timeline else "")
-                + f"截图数量: {len(ss_lines)}\n"
+                + f"截图数量: {len(screenshots)}\n"
                 + ("\n".join(ss_lines) + "\n\n" if ss_lines else "\n")
                 + f"产物数量: {len(artifacts)}\n"
                 + ("\n".join(af_lines) + "\n\n" if af_lines else "\n")
-                + "#### 完整 stdout\n```\n"
-                + f"{result.get('stdout') or '-'}\n"
-                + "```\n\n"
-                + "#### 完整 stderr\n```\n"
-                + f"{result.get('stderr') or '-'}\n"
-                + "```\n"
+                + "stdout:\n"
+                + f"{result.get('stdout') or '-'}\n\n"
+                + "stderr:\n"
+                + f"{result.get('stderr') or '-'}"
             )
-            return text, f"Skill已调用: {resolved_skill_name}"
+            return text, f"Skill已调用: {skill.name}"
         except Exception as e:
             return None, f"Skill链路异常: {e}"
 
@@ -1469,18 +1382,15 @@ class MessageService:
                 }
             )
 
-        # Skill 链在独立 Task 中运行，必须使用独立 AsyncSession；与 WebSocket 请求的 db 并发会违反会话安全并可能死锁/无响应。
-        async def _run_skill_chain_isolated():
-            async with async_session_factory() as skill_db:
-                return await MessageService._run_skill_chain(
-                    skill_db,
-                    user_id,
-                    data,
-                    llm_messages.copy(),
-                    stream_emit=_emit_skill_stream,
-                )
-
-        skill_task = asyncio.create_task(_run_skill_chain_isolated())
+        skill_task = asyncio.create_task(
+            MessageService._run_skill_chain(
+                db,
+                user_id,
+                data,
+                llm_messages.copy(),
+                stream_emit=_emit_skill_stream,
+            )
+        )
 
         # Real-time drain queue while skill chain is running
         while True:

@@ -479,7 +479,7 @@ async def get_project_activity(
         module_usage = {
             "test_cases": 0,
             "api_testing": 0,
-            "ui_automation": 0,
+            "automation_ui": 0,
             "ai_intelligence": 0,
             "data_factory": 0,
             "reviews": 0
@@ -498,7 +498,7 @@ async def get_project_activity(
         # UI自动化模块 - 使用正确的表名
         ui_query = text("SELECT COUNT(*) FROM ui_executions")
         ui_result = await db.execute(ui_query)
-        module_usage["ui_automation"] = ui_result.scalar() or 0
+        module_usage["automation_ui"] = ui_result.scalar() or 0
         
         # AI智能化模块
         ai_query = text("SELECT COUNT(*) FROM testcase_generation_tasks WHERE enabled_flag = 1")

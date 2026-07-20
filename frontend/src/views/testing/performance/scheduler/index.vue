@@ -1,6 +1,7 @@
 <template>
 	<div class="perf-scheduler-container">
 		<el-card shadow="hover">
+			<div class="page-content-layout">
 			<!-- 工具栏 -->
 			<div class="toolbar">
 				<div class="toolbar-left">
@@ -39,7 +40,8 @@
 			</div>
 
 			<!-- 列表 -->
-			<el-table v-loading="loading" :data="taskList" border stripe style="width: 100%">
+			<div ref="tableWrapRef" class="table-wrap">
+			<el-table v-loading="loading" :data="taskList" border stripe style="width: 100%" :height="tableHeight">
 				<el-table-column prop="id" label="任务ID" width="90" align="center" />
 				<el-table-column prop="name" label="任务名称" min-width="150" show-overflow-tooltip />
 				<el-table-column label="场景编号" width="140" align="center">
@@ -79,7 +81,9 @@
 				</el-table-column>
 				<el-table-column prop="operator_name" label="创建人" width="100" align="center" show-overflow-tooltip />
 				<el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip>
-					<template #default="{ row }">{{ row.remark || '-' }}</template>
+				<template #default="{ row }">
+						<span :style="row.task_status === 4 ? 'color:var(--el-color-danger)' : ''">{{ row.remark || '-' }}</span>
+					</template>
 				</el-table-column>
 				<el-table-column label="操作" width="160" fixed="right" align="center" class-name="operation-col">
 					<template #default="{ row }">
@@ -109,6 +113,7 @@
 					</template>
 				</el-table-column>
 			</el-table>
+			</div><!-- /table-wrap -->
 
 			<!-- 分页 -->
 			<div class="pagination">
@@ -122,6 +127,7 @@
 					@current-change="handleQuery"
 				/>
 			</div>
+			</div><!-- /page-content-layout -->
 		</el-card>
 
 		<!-- 新建 / 编辑 抽屉 -->
@@ -129,7 +135,7 @@
 			v-model="dialogVisible"
 			:title="dialogMode === 'create' ? '新建定时任务' : '编辑定时任务'"
 			direction="rtl"
-			size="580px"
+			:size="drawerSize"
 			:append-to-body="true"
 			class="perf-scheduler-drawer"
 			destroy-on-close
@@ -150,7 +156,7 @@
 					</template>
 					<el-select
 						v-model="form.scenario_id"
-						placeholder="请选择压测场景（排除进行中）"
+						placeholder="请选择压测场景（排除待联调、运行中、耗时未知）"
 						clearable
 						style="width: 100%"
 						filterable
@@ -172,8 +178,6 @@
 					</template>
 					<el-input v-model="form.name" placeholder="请输入任务名称，最多100个字符" maxlength="100" show-word-limit clearable />
 				</el-form-item>
-
-				<el-divider />
 
 				<el-form-item>
 					<template #label>
@@ -210,6 +214,7 @@
 						:disabled-hours="disabledHours"
 						:disabled-minutes="disabledMinutes"
 						:disabled-seconds="disabledSeconds"
+						popper-class="scheduler-dt-popper"
 						style="width: 100%"
 					/>
 				</el-form-item>
@@ -237,23 +242,55 @@
 </template>
 
 <script setup lang="ts" name="PerformanceScheduler">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
 import { usePerformanceApi } from '/@/api/v1/performance';
 import { useDictCache } from '/@/utils/dictCache';
+import { usePerfSchedulerWatcher } from '/@/stores/perfSchedulerWatcher';
 
 const router = useRouter();
 const perfApi = usePerformanceApi();
 const { getDictOptions } = useDictCache();
+const schedWatcher = usePerfSchedulerWatcher();
+
+// 表格包裹层 ref，ResizeObserver 动态更新 height
+const tableWrapRef = ref<HTMLElement | null>(null);
+const tableHeight = ref(500);
+
+// 检测系统滚动条高度（Windows ~17px，Mac overlay 为 0），修正横向滚动条遮挡末行问题
+const SCROLLBAR_SIZE: number = (() => {
+	const div = document.createElement('div');
+	div.style.cssText = 'width:100px;height:100px;overflow:scroll;position:absolute;top:-9999px;visibility:hidden';
+	document.body.appendChild(div);
+	const size = div.offsetHeight - div.clientHeight;
+	document.body.removeChild(div);
+	return size;
+})();
+
+let _resizeObserver: ResizeObserver | null = null;
+// 更新表格高度：取包裹层高度并扣除横向滚动条占用
+const updateTableHeight = () => {
+	if (tableWrapRef.value) {
+		tableHeight.value = tableWrapRef.value.clientHeight - SCROLLBAR_SIZE;
+	}
+};
 
 // ======================== 常量映射 ========================
 const taskStatusOptions = ref<{ label: string; value: number; tagType: string }[]>([]);
 
 const getStatusLabel = (s: number) => taskStatusOptions.value.find(o => o.value === s)?.label ?? String(s);
 
-const getStatusType = (s: number): '' | 'success' | 'warning' | 'danger' | 'info' =>
-	(taskStatusOptions.value.find(o => o.value === s)?.tagType ?? '') as any;
+const getStatusType = (s: number): '' | 'success' | 'warning' | 'danger' | 'info' => {
+	const map: Record<number, '' | 'success' | 'warning' | 'danger' | 'info'> = {
+		0: 'warning',  // 待触发（浅黄）
+		1: '',         // 进行中（primary 蓝）
+		2: 'success',  // 已结束（绿）
+		3: 'info',     // 已取消（灰）
+		4: 'danger',   // 失败（红）
+	};
+	return map[s] ?? 'info';
+};
 
 const formatDt = (val: string | null) => {
 	if (!val) return '-';
@@ -322,6 +359,9 @@ const handleQuery = async () => {
 		const res = await perfApi.getSchedulerList(params);
 		taskList.value = res.data?.items ?? [];
 		total.value = res.data?.total ?? 0;
+		schedWatcher.updateTasks(taskList.value);
+		_schedulePlanTimeouts();
+		_startRunningPollIfNeeded();
 	} catch (e) {
 		ElMessage.error('获取定时任务列表失败');
 	} finally {
@@ -345,11 +385,74 @@ const handleRefreshStatus = async () => {
 	ElMessage.success('任务状态已刷新');
 };
 
+// ======================== 精准状态更新（无轮询）========================
+// 策略：
+//   0→1（待触发→进行中）：在每条待触发任务的 plan_time 精准设 setTimeout，到点后单次刷新
+//   1→2/4（进行中→已结束/失败）：进行中时启动轮询（最长10分钟），任务离开进行中后自动停止
+//   1→2（场景正常结束）：场景页检测到压测结束后，通过 store.notifySchedulerRefresh 触发刷新
+const _planTimeouts: ReturnType<typeof setTimeout>[] = [];
+let _runningPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function _clearPlanTimeouts() {
+	_planTimeouts.forEach(t => clearTimeout(t));
+	_planTimeouts.length = 0;
+}
+
+function _stopRunningPoll() {
+	if (_runningPollTimer) { clearInterval(_runningPollTimer); _runningPollTimer = null; }
+}
+
+// 有任务处于进行中(1)时，每8秒轮询一次，直到全部离开进行中或超时10分钟
+function _startRunningPollIfNeeded() {
+	if (_runningPollTimer) return;
+	if (!taskList.value.some((t: any) => t.task_status === 1)) return;
+	const deadline = Date.now() + 10 * 60 * 1000;
+	_runningPollTimer = setInterval(async () => {
+		await handleQuery();
+		if (!taskList.value.some((t: any) => t.task_status === 1) || Date.now() > deadline) {
+			_stopRunningPoll();
+		}
+	}, 8000);
+}
+
+// 对当前列表中所有待触发+已启用的任务，分别在 plan_time 时刻安排一次刷新
+function _schedulePlanTimeouts() {
+	_clearPlanTimeouts();
+	const now = Date.now();
+	for (const task of taskList.value) {
+		if (task.task_status !== 0 || !task.is_active || !task.plan_time) continue;
+		const planMs = new Date(task.plan_time).getTime();
+		// +3s 给后端 APScheduler 处理留缓冲
+		const delay = Math.max(0, planMs - now + 3000);
+		_planTimeouts.push(setTimeout(async () => {
+			await handleQuery();
+			_startRunningPollIfNeeded();
+		}, delay));
+	}
+}
+
+// 场景页压测结束后通知此页刷新（进行中→已结束/取消/失败）
+watch(() => schedWatcher.pendingRefresh, (val) => {
+	if (val) {
+		handleQuery();
+		schedWatcher.pendingRefresh = false;
+	}
+});
+
+onUnmounted(() => { _clearPlanTimeouts(); _stopRunningPoll(); _resizeObserver?.disconnect(); });
+
 // ======================== 启用状态切换 ========================
 const handleActiveChange = async (row: any) => {
+	// 开启时校验：计划时间不能早于当前时间
+	if (row.is_active === 1 && row.plan_time && new Date(row.plan_time).getTime() <= Date.now()) {
+		row.is_active = 0;
+		ElMessage.warning('计划开始时间已过期，请修改后再启用');
+		return;
+	}
 	try {
 		await perfApi.updateScheduler({ id: row.id, is_active: row.is_active });
 		ElMessage.success(row.is_active ? `「${row.name}」已启用` : `「${row.name}」已禁用`);
+		await handleQuery();
 	} catch (e) {
 		// 回滚开关
 		row.is_active = row.is_active === 1 ? 0 : 1;
@@ -408,9 +511,11 @@ const availableScenes = ref<any[]>([]);
 const loadSceneOptions = async () => {
 	scenarioLoading.value = true;
 	try {
-		// 加载全部场景，排除运行中（status=1）的
+		// 过滤规则：排除待联调(0)、运行中(2)、循环次数耗时未知的场景
 		const res = await perfApi.getScenarioList({ page: 1, page_size: 100 });
-		availableScenes.value = (res.data?.items ?? []).filter((s: any) => s.status !== 1);
+		availableScenes.value = (res.data?.items ?? []).filter((s: any) =>
+			s.status !== 0 && s.status !== 2 && !s.has_unknown_times
+		);
 	} catch (e) {
 		ElMessage.error('加载场景列表失败');
 	} finally {
@@ -428,6 +533,7 @@ const handleSceneChange = (sceneId: number) => {
 };
 
 // ======================== 新建 / 编辑 弹窗 ========================
+const drawerSize = computed(() => Math.max(420, Math.floor(window.innerWidth / 3)) + 'px');
 const dialogVisible = ref(false);
 const dialogMode = ref<'create' | 'edit'>('create');
 const submitLoading = ref(false);
@@ -468,7 +574,9 @@ const openEditDialog = async (row: any) => {
 	form.scenario_id = row.scenario_id;
 	form.is_active   = row.is_active;
 	form.plan_time   = row.plan_time;
-	form.remark      = row.remark ?? '';
+	// 系统自动写入的失败原因不回填到备注输入框，避免用户保存时重复写入
+	const sysPrefix = '[自动触发失败]';
+	form.remark = (row.remark && row.remark.startsWith(sysPrefix)) ? '' : (row.remark ?? '');
 	dialogVisible.value = true;
 	await loadSceneOptions();
 };
@@ -523,15 +631,54 @@ onMounted(async () => {
 		tagType: o.raw?.list_class ?? '',
 	}));
 	handleQuery();
+	// 初始化高度，并注册 ResizeObserver 响应容器尺寸变化
+	updateTableHeight();
+	if (tableWrapRef.value) {
+		_resizeObserver = new ResizeObserver(updateTableHeight);
+		_resizeObserver.observe(tableWrapRef.value);
+	}
 });
 </script>
 
 <style scoped lang="scss">
 .perf-scheduler-container {
+	height: 100%;
+	box-sizing: border-box;
 	padding: 10px 10px 20px 10px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+
+	:deep(.el-card) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
 
 	:deep(.el-card__body) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		padding: 10px 10px 20px 10px;
+	}
+
+	// 内容布局容器：工具栏 + 表格包裹 + 分页 纵向排列
+	.page-content-layout {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	// 表格包裹层：吸收剩余高度，el-table 的 max-height 由此计算
+	.table-wrap {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	:deep(.el-button > span) {
@@ -700,5 +847,14 @@ onMounted(async () => {
 	display: flex;
 	justify-content: flex-end;
 	gap: 12px;
+}
+
+// 修复 datetime picker 时间列滚轮回弹问题：
+// 时间列（小时/分钟/秒）的滚轮事件会冒泡到 body，触发 Popper 重定位导致列重置；
+// overscroll-behavior: contain 阻止冒泡，使滚轮事件在 spinner 内自我消化。
+.scheduler-dt-popper {
+	.el-time-spinner__list {
+		overscroll-behavior: contain;
+	}
 }
 </style>

@@ -587,8 +587,8 @@ class TaskSchedulerService:
             # type==3 → ApiAutomationService.run_api_script()
             if int(task_config.get("type") or 0) == 3:
                 from app.db.sqlalchemy import async_session
-                from app.api.v1.api_automation.service import ApiAutomationService
-                from app.api.v1.api_automation.model import ApiScriptModel
+                from app.api.v1.automation_api.service import ApiAutomationService
+                from app.api.v1.automation_api.model import ApiScriptModel
 
                 script_cfg = task_config.get("script") or {}
                 env_id = int(script_cfg.get("env_id") or 0)
@@ -846,7 +846,7 @@ class TaskSchedulerService:
                 if api_result_id:
                     report_url = f"{frontend_base}/api-automation/report?result_id={api_result_id}"
                     try:
-                        from app.api.v1.api_automation.model import ApiScriptResultListModel
+                        from app.api.v1.automation_api.model import ApiScriptResultListModel
 
                         summary = (
                             await session.execute(

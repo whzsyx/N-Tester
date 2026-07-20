@@ -1,4 +1,4 @@
-<template>
+﻿﻿<<template>
 	<div class="api-detail-container" :class="{'is-embedded': props.embedded}">
 		<el-card class="api-detail-card">
 			<!-- 顶部大 Tab（嵌入模式下隐藏）-->
@@ -21,7 +21,6 @@
 						</el-select>
 						<el-input v-model="req.url" placeholder="请输入请求地址" clearable class="url-input" />
 						<el-button type="primary" @click="sendRequest" class="send-btn">发送</el-button>
-						<el-button type="warning" plain @click="openPerfDialog" class="send-btn">压测</el-button>
 						<el-dropdown @command="handleSaveCommand">
 							<el-button type="success" class="save-btn">保存项 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
 							<template #dropdown>
@@ -31,29 +30,6 @@
 								</el-dropdown-menu>
 							</template>
 						</el-dropdown>
-					</div>
-				</div>
-
-				<!-- 传输协议（企业多协议：WebSocket / TCP / external_bridge 等） -->
-				<div class="protocol-bar">
-					<div class="protocol-bar-inner">
-						<span class="protocol-label">传输协议</span>
-						<el-select v-model="req.protocol" filterable placeholder="选择协议" style="width: 240px" @change="onProtocolChange">
-							<el-option
-								v-for="p in transportProtocols"
-								:key="p.id"
-								:label="p.title"
-								:value="p.id"
-								:disabled="p.status === 'planned'"
-							/>
-						</el-select>
-						<span v-if="currentProtocolMeta?.description" class="protocol-desc">{{ currentProtocolMeta.description }}</span>
-					</div>
-					<div v-if="req.protocol && req.protocol !== 'http'" class="protocol-config-panel">
-						<div v-if="protocolConfigHelpText" class="protocol-config-hint">
-							<el-text tag="div" type="info" style="white-space: pre-wrap; font-size: 12px; line-height: 1.5">{{ protocolConfigHelpText }}</el-text>
-						</div>
-						<JsonEditor v-model:value="req.protocol_config" height="220px" />
 					</div>
 				</div>
 
@@ -723,47 +699,6 @@ mode="assert"
 				</template>
 			</el-dialog>
 
-			<!-- 接口轻量压测（HTTP 并发 + 报告落库） -->
-			<el-dialog v-model="perfDialogVisible" title="接口压测" width="560px" destroy-on-close @close="resetPerfDialog">
-				<el-alert
-					type="warning"
-					show-icon
-					:closable="false"
-					style="margin-bottom: 12px"
-					description="平台内轻量压测：多并发重复当前请求，不执行前置/后置/断言；仅支持 HTTP/HTTPS。大规模压测请使用独立压力机或性能测试 / JMeter 链路。"
-				/>
-				<el-form label-width="120px">
-					<el-form-item label="并发数">
-						<el-input-number v-model="perfForm.concurrent" :min="1" :max="100" />
-					</el-form-item>
-					<el-form-item label="持续时间(秒)">
-						<el-input-number v-model="perfForm.duration_sec" :min="5" :max="600" />
-					</el-form-item>
-					<el-form-item label="最大请求数">
-						<el-input-number v-model="perfForm.max_requests" :min="10" :max="200000" />
-					</el-form-item>
-					<el-form-item label="报告标题">
-						<el-input v-model="perfForm.title" placeholder="可选，默认自动生成" clearable />
-					</el-form-item>
-				</el-form>
-				<div v-if="perfResult" class="perf-result-block">
-					<div class="perf-result-title">报告 ID：{{ perfResult.report_id }}</div>
-					<el-descriptions v-if="perfResult.summary" :column="1" size="small" border>
-						<el-descriptions-item label="总请求">{{ perfResult.summary.total_requests }}</el-descriptions-item>
-						<el-descriptions-item label="成功 / 失败">{{ perfResult.summary.success }} / {{ perfResult.summary.fail }}</el-descriptions-item>
-						<el-descriptions-item label="RPS">{{ perfResult.summary.rps }}</el-descriptions-item>
-						<el-descriptions-item label="P50(ms)">{{ perfResult.summary.latency_ms?.p50 }}</el-descriptions-item>
-						<el-descriptions-item label="P95(ms)">{{ perfResult.summary.latency_ms?.p95 }}</el-descriptions-item>
-						<el-descriptions-item label="P99(ms)">{{ perfResult.summary.latency_ms?.p99 }}</el-descriptions-item>
-					</el-descriptions>
-					<el-button size="small" type="primary" plain style="margin-top: 10px" @click="copyPerfSummary">复制报告 JSON</el-button>
-				</div>
-				<template #footer>
-					<el-button @click="perfDialogVisible = false">关闭</el-button>
-					<el-button type="primary" :loading="perfRunning" :disabled="!canRunPerf" @click="runPerfTest">开始压测</el-button>
-				</template>
-			</el-dialog>
-
 		</el-card>
 	</div>
 </template>
@@ -774,7 +709,7 @@ import VueJsonPretty from 'vue-json-pretty';
 import JsonEditor from '/@/components/code-editor/JsonEditor.vue';
 import 'vue-json-pretty/lib/styles.css';
 import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, Document, InfoFilled, View, Folder } from '@element-plus/icons-vue';
-import { api_send, api_perf_run, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/api_automation';
+import { api_send, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/api_automation';
 import { useFileApi } from '/@/api/v1/common/file';
 import OperationPanel from './components/OperationPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -1044,42 +979,7 @@ const req = ref({
 	cookies: [] as any[],
 	auth_type: 'none', auth_token: '', auth_username: '', auth_password: '',
 	auth_key: '', auth_value: '', auth_in: 'header',
-	protocol: 'http' as string,
-	protocol_config: {} as Record<string, any>,
 });
-
-/** 后端多协议目录（用于下拉与字段说明） */
-const transportProtocols = ref<any[]>([]);
-const loadTransportProtocols = async () => {
-	try {
-		const r: any = await apiAutomationApi.transport_protocols({});
-		const d = r?.data;
-		const list = Array.isArray(d) ? d : (Array.isArray(d?.content) ? d.content : []);
-		transportProtocols.value = list.length ? list : [{ id: 'http', title: 'HTTP / HTTPS', description: '默认' }];
-	} catch {
-		transportProtocols.value = [{ id: 'http', title: 'HTTP / HTTPS' }];
-	}
-};
-
-const normalizeProtocolConfig = (raw: any): Record<string, any> => {
-	if (raw && typeof raw === 'object' && !Array.isArray(raw)) return { ...raw };
-	return {};
-};
-
-const currentProtocolMeta = computed(() => transportProtocols.value.find((p: any) => p.id === req.value.protocol));
-const protocolConfigHelpText = computed(() => {
-	const sch = currentProtocolMeta.value?.protocol_config_schema;
-	if (!sch || typeof sch !== 'object') return '';
-	return Object.entries(sch)
-		.map(([k, v]) => `${k}：${typeof v === 'string' ? v : JSON.stringify(v)}`)
-		.join('\n');
-});
-
-const onProtocolChange = (val: string) => {
-	if (val === 'http') {
-		req.value.protocol_config = {};
-	}
-};
 
 const bodyTypes = [
 	{ label: 'none', value: 1 }, { label: 'form-data', value: 3 },
@@ -1107,7 +1007,7 @@ const tips = ref<any>('路径示例，结果{"code":200,"info":{"username":"admi
 const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900);
 const onResize = () => { viewportH.value = window.innerHeight; };
 const resCollapsed = ref(false);
-onMounted(() => { window.addEventListener('resize', onResize); loadFunctionList(); loadScriptList(); loadLocalDbList(); loadTransportProtocols(); });
+onMounted(() => { window.addEventListener('resize', onResize); loadFunctionList(); loadScriptList(); loadLocalDbList(); });
 watch(() => props.serviceId, (v) => { if (v) loadScriptList(); });
 onBeforeUnmount(() => window.removeEventListener('resize', onResize));
 
@@ -1122,75 +1022,6 @@ const apiId = computed(() => {
 	const d = props.apiData;
 	return d?.api_id ?? d?.api_info?.id ?? d?.id ?? null;
 });
-
-/** 轻量压测（HTTP 并发，报告落库） */
-const perfDialogVisible = ref(false);
-const perfRunning = ref(false);
-const perfResult = ref<{ report_id: number; summary: Record<string, any> } | null>(null);
-const perfForm = ref({ concurrent: 10, duration_sec: 30, max_requests: 5000, title: '' });
-
-const canRunPerf = computed(() => {
-	const p = String(req.value?.protocol || 'http').toLowerCase();
-	if (p !== 'http' && p !== 'https') return false;
-	return !!apiId.value;
-});
-
-const openPerfDialog = () => {
-	if (!apiId.value) {
-		ElMessage.warning('无法获取接口ID');
-		return;
-	}
-	const p = String(req.value?.protocol || 'http').toLowerCase();
-	if (p !== 'http' && p !== 'https') {
-		ElMessage.warning('压测仅支持 HTTP/HTTPS，请将传输协议切回 HTTP 或使用独立压测工具');
-		return;
-	}
-	perfResult.value = null;
-	perfDialogVisible.value = true;
-};
-
-const resetPerfDialog = () => {
-	perfResult.value = null;
-	perfRunning.value = false;
-};
-
-const runPerfTest = async () => {
-	const id = apiId.value;
-	if (!id) {
-		ElMessage.warning('无法获取接口ID');
-		return;
-	}
-	perfRunning.value = true;
-	try {
-		const response: any = await api_perf_run({
-			id: Number(id),
-			env_id: props.envId,
-			url: req.value.url,
-			req: req.value,
-			perf: {
-				concurrent: perfForm.value.concurrent,
-				duration_sec: perfForm.value.duration_sec,
-				max_requests: perfForm.value.max_requests,
-				title: perfForm.value.title || undefined,
-			},
-		});
-		if (response.code === 200) {
-			const data = response.data || {};
-			perfResult.value = { report_id: data.report_id, summary: data.summary || {} };
-			ElMessage.success('压测完成，报告已保存');
-		}
-	} catch (e: any) {
-		ElMessage.error(e?.message || '压测失败');
-	} finally {
-		perfRunning.value = false;
-	}
-};
-
-const copyPerfSummary = () => {
-	if (!perfResult.value) return;
-	const text = JSON.stringify(perfResult.value, null, 2);
-	navigator.clipboard?.writeText(text).then(() => ElMessage.success('已复制到剪贴板')).catch(() => ElMessage.error('复制失败'));
-};
 
 const lastApiId = ref<number | string | null>(null);
 watch(
@@ -1223,8 +1054,6 @@ watch(
 			auth_type: reqSrc.auth_type ?? 'none', auth_token: reqSrc.auth_token ?? '',
 			auth_username: reqSrc.auth_username ?? '', auth_password: reqSrc.auth_password ?? '',
 			auth_key: reqSrc.auth_key ?? '', auth_value: reqSrc.auth_value ?? '', auth_in: reqSrc.auth_in ?? 'header',
-			protocol: (reqSrc.protocol as string) || 'http',
-			protocol_config: normalizeProtocolConfig(reqSrc.protocol_config),
 		};
 		res.value = { body: resSrc.body ?? {}, header: resSrc.header ?? {}, before: Array.isArray(resSrc.before) ? resSrc.before : [], after: Array.isArray(resSrc.after) ? resSrc.after : [], assert: Array.isArray(resSrc.assert) ? resSrc.assert : [], code: resSrc.code ?? 0, size: resSrc.size ?? 0, res_time: resSrc.res_time ?? 0, cookies: Array.isArray(resSrc.cookies) ? resSrc.cookies : [], console: Array.isArray(resSrc.console) ? resSrc.console : [], raw_request: resSrc.raw_request ?? null };
 	},
@@ -1387,38 +1216,6 @@ const confirmSaveAsCase = async () => {
 .url-input { flex: 1; min-width: 0; }
 .url-input :deep(.el-input__inner) { font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; }
 .send-btn, .save-btn { flex-shrink: 0; }
-.protocol-bar {
-	flex: 0 0 auto;
-	background: var(--el-fill-color-light);
-	border: 1px solid var(--el-border-color-lighter);
-	border-radius: 8px;
-	padding: 8px 12px;
-}
-.protocol-bar-inner {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	flex-wrap: wrap;
-}
-.protocol-label {
-	font-size: 12px;
-	color: var(--el-text-color-secondary);
-	flex-shrink: 0;
-}
-.protocol-desc {
-	font-size: 12px;
-	color: var(--el-text-color-regular);
-	flex: 1;
-	min-width: 120px;
-}
-.protocol-config-panel {
-	margin-top: 10px;
-	border-top: 1px dashed var(--el-border-color);
-	padding-top: 10px;
-}
-.protocol-config-hint {
-	margin-bottom: 8px;
-}
 .action-btn { flex-shrink: 0; color: var(--el-text-color-regular); border-color: var(--el-border-color); }
 .action-btn:hover { color: #409eff; border-color: #409eff; }
 .api-detail-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
@@ -1615,6 +1412,4 @@ const confirmSaveAsCase = async () => {
 .res-copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: transparent; border: 1px solid #4a4a4a; border-radius: 3px; color: #aaa; font-size: 11px; cursor: pointer; transition: all .15s; }
 .res-copy-btn:hover { background: #3c3c3c; color: #e0e0e0; border-color: #666; }
 .res-copy-btn.copied { color: #4ec9b0; border-color: #4ec9b0; }
-.perf-result-block { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--el-border-color); }
-.perf-result-title { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
 </style>

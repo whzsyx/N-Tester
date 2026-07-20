@@ -106,17 +106,60 @@ JMETER_NOHUP_START = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 """
-增量读取 jmeter_nohup.out（从第 N 行开始，输出新增行）；
-分隔符 ---PROC_CHECK--- 后附 PID 存活检测结果，二者合并为一次 SSH 调用。
+增量读取 jmeter_nohup.out（从第 N 行开始）与 result.jtl（按字节偏移增量），
+一次 SSH 往返内合并完成，避免为 Top5 Errors / 实时指标单独增加网络往返：
+  1) tail 增量日志行 + PID 存活探测
+  2) result.jtl 增量内容通过 Python csv 模块正确解析（支持引号转义字段），
+     按 sampler(label) 输出：
+       S行 = 本轮样本数增量（累计入 Redis Hash）
+       E行 = 本轮错误数增量（累计入 Redis Hash）
+       D行 = 本轮错误明细增量，格式优先取断言失败消息（failureMessage），
+             无断言失败信息时退回 responseCode/responseMessage（累计入 Redis Hash）
+       M行 = 本轮 per-label 指标（sum_elapsed/count/errors），用于实时 QPS/RT/错误率图表
+       C行 = 本轮实际消费的字节数（仅截止到最后一个完整行），供调用方推进下一轮游标
+     错误 key 优先取 failureMessage（如响应断言失败时的具体原因），为空才退回
+     responseCode/responseMessage；与 JMeter HTML 报告 Top5 Errors 的取值逻辑一致。
+
+     游标推进说明：早期实现用单独一次 `wc -c` 快照文件总字节数作为下一轮游标，
+     与本命令内 `tail -c` 的实际读取并非同一时刻，在压测高吞吐、result.jtl 持续
+     增长时会出现"计数窗口"与"读取窗口"不一致，导致样本/错误被跨轮重复统计，
+     且游标可能落在某行 CSV 数据中间，下一轮从半行处开始读取解析出脏行。现改为
+     由脚本自身按已读字节中最后一个完整换行符截断，只解析完整行，并将实际消费
+     的字节数通过 C 行回传，从根本上消除该竞态。
 {remote_dir}  : JMeter 工作目录，如 '/data/jmeter/'
-{file_offset} : 已读取的行偏移（下一次从该行开始），初始值为 1
+{file_offset} : jmeter_nohup.out 已读取的行偏移，初始值为 1
 {proc_check}  : 存活检测子命令，如 "kill -0 12345 2>/dev/null && echo 12345 || echo ''"
+{jtl_offset}  : result.jtl 已读取的字节偏移（tail -c +N），初始值为 1
 """
-TAIL_LOG_INCREMENTAL = (
+TAIL_LOG_AND_JTL_INCREMENTAL = (
     "cd '{remote_dir}' && "
     "tail -n +{file_offset} ./logs/jmeter_nohup.out 2>/dev/null; "
     "echo '---PROC_CHECK---'; "
-    "{proc_check}"
+    "{proc_check}; "
+    "echo '---JTL_AGG---'; "
+    "tail -c +{jtl_offset} ./results/result.jtl 2>/dev/null | "
+    "python3 -c '"
+    "import sys,csv,collections as C,io\n"
+    "data=sys.stdin.buffer.read()\n"
+    "nl=data.rfind(b\"\\n\")\n"
+    "consumed=nl+1 if nl>=0 else 0\n"
+    "text=data[:consumed].decode(\"utf-8\",\"replace\")\n"
+    "S=C.Counter();E=C.Counter();D=C.Counter();M={{}}\n"
+    "for row in csv.reader(io.StringIO(text)):\n"
+    " if len(row)<9 or not row[0].isdigit():continue\n"
+    " l=row[2];cd=row[3];rm=row[4][:120].replace(chr(9),chr(32));ok=row[7]\n"
+    " fm=row[8][:120].replace(chr(9),chr(32)).strip()\n"
+    " try:el=int(row[1])\n"
+    " except:el=0\n"
+    " S[l]+=1;m=M.setdefault(l,[0,0,0]);m[0]+=el;m[1]+=1\n"
+    " if ok!=\"true\":E[l]+=1;D[(l,fm if fm else cd+\"/\"+rm)]+=1;m[2]+=1\n"
+    "for k,v in S.items():print(\"S\\t\"+k+\"\\t\"+str(v))\n"
+    "for k,v in E.items():print(\"E\\t\"+k+\"\\t\"+str(v))\n"
+    "for k,v in D.items():print(\"D\\t\"+k[0]+\"\\t\"+k[1]+\"\\t\"+str(v))\n"
+    "for k,v in M.items():print(\"M\\t\"+k+\"\\t\"+str(v[0])+\"\\t\"+str(v[1])+\"\\t\"+str(v[2]))\n"
+    "print(\"C\\t\"+str(consumed))\n"
+    "'; "
+    "echo '---END---'"
 )
 
 """
@@ -358,12 +401,12 @@ ZIP_MASTER_LOG = (
 )
 
 """
-在执行机上将 results/ 目录打成 results.zip，输出在工作目录。
+在执行机上将 results/ 目录打成 jmeter-results.zip，输出在工作目录。
 {remote_dir}: JMeter 工作目录
 """
 ZIP_RESULTS_DIR = (
     "cd '{remote_dir}' && "
-    "python3 -c \"import shutil; shutil.make_archive('results','zip','.','results')\""
+    "python3 -c \"import shutil; shutil.make_archive('jmeter-results','zip','.','results')\""
     "; echo ZIP_EXIT:$?"
 )
 
@@ -376,11 +419,13 @@ ZIP_RESULTS_DIR = (
 """
 MINIO_PUT_ZIP = (
     "cd '{remote_dir}' && "
+    # 上传前取本地文件大小（stat 失败则 wc -c 兜底），随结果一并输出，无需上传后再查 MinIO
+    "FILE_SIZE=$(stat -c%s '{zip_name}' 2>/dev/null || wc -c < '{zip_name}' 2>/dev/null || echo 0); "
     "TF=$(mktemp); "
     "HTTP=$(curl -sS -X PUT --data-binary @'{zip_name}' "
     "--max-time 3600 -o \"$TF\" -w '%{{http_code}}' '{url}' 2>&1); "
     "EXIT=$?; "
     "BODY=$(head -c 300 \"$TF\" 2>/dev/null | tr '\\n' ' '); "
     "rm -f \"$TF\"; "
-    "echo \"PUT_EXIT:$EXIT HTTP:$HTTP BODY:$BODY\""
+    "echo \"FILE_SIZE:$FILE_SIZE PUT_EXIT:$EXIT HTTP:$HTTP BODY:$BODY\""
 )

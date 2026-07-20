@@ -130,7 +130,7 @@ async def get_dict_data_detail(
 @router.get("/data/list/all", summary="获取字典数据列表")
 async def get_dict_data_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页数量"),
     dict_label: str = Query(None, description="字典标签"),
     dict_type: str = Query(None, description="字典类型"),
     status: int = Query(None, ge=0, le=1, description="状态"),

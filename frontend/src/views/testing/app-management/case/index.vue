@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="case-layout">
 
     <!-- 左侧脚本树 -->
@@ -95,7 +95,7 @@
             </div>
             <el-table v-loading="loading" :data="table_list" stripe border empty-text="暂无脚本" @selection-change="handleSelectionChange">
               <el-table-column type="selection" width="44" align="center" />
-              <el-table-column type="index" label="序号" width="56" align="center" />
+              <el-table-column label="#" type="index" width="56" align="center" />
               <el-table-column label="脚本名称" prop="name" show-overflow-tooltip />
               <el-table-column label="类型" width="100" align="center">
                 <template #default="{ row }">
@@ -233,14 +233,8 @@
                       <el-cascader v-model="script_info.android.img" :options="img_select_list" filterable style="width:100%" :props="props1" clearable placeholder="请选择图像">
                         <template #default="{ node, data }">
                           <span style="float:left">{{ node.label }}</span>
-                          <span v-if="data.file_path" style="float:right; margin-left:8px">
-                            <el-image
-                              style="width:32px;height:32px;border-radius:4px;vertical-align:middle;"
-                              fit="cover"
-                              :preview-teleported="true"
-                              :preview-src-list="[data.file_path]"
-                              :src="data.file_path"
-                            ><template #error></template></el-image>
+                          <span v-if="data.file_path" style="float:right">
+                            <el-image class="w-200px h-30px" :preview-teleported="true" :preview-src-list="[data.file_path]" :src="data.file_path"><template #error></template></el-image>
                           </span>
                         </template>
                       </el-cascader>
@@ -249,15 +243,9 @@
                       <el-cascader v-model="script_info.android.assert" :options="img_select_list" filterable :props="props1" style="width:100%" clearable placeholder="请选择断言图像">
                         <template #default="{ node, data }">
                           <span style="float:left">{{ node.label }}</span>
-                          <span v-if="data.file_path" style="float:right; margin-left:8px">
-                            <el-image
-                              style="width:32px;height:32px;border-radius:4px;vertical-align:middle;"
-                              fit="cover"
-                              :preview-teleported="true"
-                              :preview-src-list="[data.file_path]"
-                              :src="data.file_path"
-                            >
-                              <template #error><el-icon :size="16"><CircleCloseFilled /></el-icon></template>
+                          <span v-if="data.file_path" style="float:right">
+                            <el-image class="w-200px h-36px" :preview-teleported="true" :preview-src-list="[data.file_path]" :src="data.file_path">
+                              <template #error><el-icon :size="36"><CircleCloseFilled /></el-icon></template>
                             </el-image>
                           </span>
                         </template>
@@ -322,40 +310,17 @@
     <el-dialog v-model="elementPickVisible" title="从页面元素库选择" width="520px" destroy-on-close append-to-body>
       <el-form label-width="60px">
         <el-form-item label="模块">
-          <el-select
-            v-model="pickModuleId"
-            filterable
-            clearable
-            placeholder="请选择页面管理中的模块（文件夹）"
-            style="width:100%"
-            :loading="pageModuleLoading"
-            @update:model-value="onPickModuleChange"
-          >
+          <el-select v-model="pickModuleId" filterable clearable placeholder="选择页面管理中的模块" style="width:100%" :loading="pageModuleLoading" @change="onPickModuleChange">
             <el-option v-for="o in moduleMenuOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="页面">
-          <el-select
-            v-model="pickPageId"
-            filterable
-            clearable
-            :placeholder="pickPagePlaceholder"
-            style="width:100%"
-            :disabled="pickModuleId === null || pickModuleId === undefined"
-            @change="onPickPageChange"
-          >
+          <el-select v-model="pickPageId" filterable clearable placeholder="先选模块" style="width:100%" :disabled="pickModuleId === null || pickModuleId === undefined" @change="onPickPageChange">
             <el-option v-for="o in pickPageOpts" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="元素">
-          <el-select
-            v-model="pickElementId"
-            filterable
-            clearable
-            :placeholder="pickElementPlaceholder"
-            style="width:100%"
-            :disabled="pickPageId === null || pickPageId === undefined"
-          >
+          <el-select v-model="pickElementId" filterable clearable placeholder="先选页面" style="width:100%" :disabled="pickPageId === null || pickPageId === undefined">
             <el-option v-for="o in pickElementOpts" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
@@ -395,13 +360,12 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { ElTree, TabsPaneContext } from "element-plus";
 import { useRoute } from "vue-router";
 import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/koi.ts";
 import { appManagementDeviceApi } from "/@/api/v1/app_management_device";
 import { useAppManagementApi } from "/@/api/v1/app_management";
-import { formatRequestError, parseListPagePayload } from "/@/utils";
 
 const appMgmtApi = useAppManagementApi();
 import {
@@ -638,19 +602,12 @@ const pickElementId = ref<number | null>(null);
 const pickPageOpts = ref<{ label: string; value: number }[]>([]);
 const pickElementOpts = ref<{ label: string; value: number; raw: any }[]>([]);
 
-const pickPagePlaceholder = computed(() =>
-	pickModuleId.value == null ? "请先选择模块" : pickPageOpts.value.length ? "请选择页面" : "该模块下暂无页面",
-);
-const pickElementPlaceholder = computed(() =>
-	pickPageId.value == null ? "请先选择页面" : pickElementOpts.value.length ? "请选择元素" : "该页面下暂无元素",
-);
-
 // 页面管理的模块树（独立加载，与用例树无关）
 const pageModuleTree = ref<any[]>([]);
 const pageModuleLoading = ref(false);
 
-async function loadPageModuleTree(force = false) {
-	if (!force && pageModuleTree.value.length > 0) return;
+async function loadPageModuleTree() {
+	if (pageModuleTree.value.length > 0) return; // 已加载过则跳过
 	pageModuleLoading.value = true;
 	try {
 		const res: any = await appMgmtApi.app_menu({});
@@ -668,11 +625,9 @@ const moduleMenuOptions = computed(() => {
 	const walk = (nodes: any[]) => {
 		for (const n of nodes || []) {
 			if (n.type === 0 || n.type === 1) {
-				const id = Number(n.id);
-				if (!Number.isFinite(id)) continue;
 				out.push({
-					label: n.type === 0 ? `【根】${String(n.name ?? "-")}` : String(n.name ?? "-"),
-					value: id,
+					label: n.type === 0 ? `【根】${n.name}` : String(n.name),
+					value: n.id,
 				});
 			}
 			if (n.children?.length) walk(n.children);
@@ -706,19 +661,17 @@ async function onPickModuleChange() {
 	pickElementOpts.value = [];
 	if (pickModuleId.value === null || pickModuleId.value === undefined) return;
 	try {
-		/** 与后端 PageListBody.pageSize le=200 一致，超出会 422 导致整段失败 */
 		const res: any = await appMgmtApi.pageList({
-			module_menu_id: Number(pickModuleId.value),
+			module_menu_id: pickModuleId.value,
 			currentPage: 1,
-			pageSize: 200,
+			pageSize: 500,
 		});
-		const { list } = parseListPagePayload(res);
-		pickPageOpts.value = list
-			.filter((r: any) => r != null && r.id != null)
-			.map((r: any) => ({ label: String(r.name ?? "-"), value: Number(r.id) }));
-	} catch (error: unknown) {
+		// 兼容多种后端返回结构
+		const payload = res?.data ?? res;
+		const rows: any[] = payload?.data ?? payload?.list ?? (Array.isArray(payload) ? payload : []);
+		pickPageOpts.value = rows.map((r: any) => ({ label: r.name, value: r.id }));
+	} catch {
 		pickPageOpts.value = [];
-		NoticeError(formatRequestError(error, "加载页面列表失败"));
 	}
 }
 
@@ -727,24 +680,20 @@ async function onPickPageChange() {
 	pickElementOpts.value = [];
 	if (pickPageId.value === null || pickPageId.value === undefined) return;
 	try {
-		const res: any = await appMgmtApi.pageElementList({ page_id: Number(pickPageId.value) });
-		/** 后端 success_response(rows) 时 data 即为数组 */
+		const res: any = await appMgmtApi.pageElementList({ page_id: pickPageId.value });
 		const raw = res?.data ?? res;
-		const list: any[] = Array.isArray(raw) ? raw : [];
-		pickElementOpts.value = list
-			.filter((r: any) => r != null && r.id != null)
-			.map((r: any) => ({
-				label: `${String(r.name ?? "-")} (${String(r.locate_type ?? "")})`,
-				value: Number(r.id),
-				raw: r,
-			}));
-	} catch (error: unknown) {
+		const list: any[] = Array.isArray(raw) ? raw : raw?.data ?? raw?.list ?? [];
+		pickElementOpts.value = list.map((r: any) => ({
+			label: `${r.name} (${r.locate_type})`,
+			value: r.id,
+			raw: r,
+		}));
+	} catch {
 		pickElementOpts.value = [];
-		NoticeError(formatRequestError(error, "加载元素列表失败"));
 	}
 }
 
-async function openElementPicker() {
+function openElementPicker() {
 	if (!script_info.value || script_info.value.type === undefined || script_info.value.type === "") {
 		MsgError("请先点击选择一个步骤");
 		return;
@@ -758,9 +707,8 @@ async function openElementPicker() {
 	pickElementId.value = null;
 	pickPageOpts.value = [];
 	pickElementOpts.value = [];
-	await loadPageModuleTree(true);
+	loadPageModuleTree(); // 加载页面管理的模块树
 	elementPickVisible.value = true;
-	await nextTick();
 }
 
 function applyPickedElement() {
@@ -1019,17 +967,20 @@ const get_img_select = async () => {
 };
 
 const del_script_info = async (node: any) => {
+  // 获取当前激活的 tab
   const activeTab = tab_list.value.find((tab: any) => tab.name === tab_active.value);
-  if (!activeTab?.content?.script) return;
-  const list = activeTab.content.script;
-  const index = list.findIndex((item: any) => item.name === node.label);
-  if (index === -1) return;
-  const removed = list.splice(index, 1)[0];
-  try {
-    await save_app_script({ script: list, id: activeTab.id });
-  } catch (error: unknown) {
-    list.splice(index, 0, removed);
-    NoticeError(formatRequestError(error, "删除失败，请重试"));
+  if (activeTab && activeTab.content && activeTab.content.script) {
+    const list = activeTab.content.script;
+    const index = list.findIndex((item: any) => item.name === node.label);
+    if (index !== -1) {
+      list.splice(index, 1);
+      // 自动保存到后端
+      try {
+        await save_app_script(activeTab.id);
+      } catch (error) {
+        NoticeError("删除失败，请重试");
+      }
+    }
   }
 };
 

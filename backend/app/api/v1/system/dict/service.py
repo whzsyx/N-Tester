@@ -5,6 +5,23 @@
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+
+# ================================================================== #
+#  字典缓存 Key 规范
+#  格式：dict:{dict_type}，如 dict:perf_file_type
+#  由 DictDataService 写操作主动失效，_get_allowed_extensions 等缓存读取方使用相同前缀
+# ================================================================== #
+DICT_CACHE_KEY_PREFIX = "dict:"
+
+
+async def _invalidate_dict_cache(dict_type: str) -> None:
+    """删除指定 dict_type 对应的 Redis 缓存，供字典写操作调用。"""
+    from app.db import get_redis_pool
+    from config import config
+    redis_pool = get_redis_pool()
+    if not redis_pool.redis:
+        redis_pool.init_by_config(config=config)
+    await redis_pool.redis.delete(f"{DICT_CACHE_KEY_PREFIX}{dict_type}")
 from app.api.v1.system.dict.crud import DictTypeCRUD, DictDataCRUD
 from app.api.v1.system.dict.schema import (
     DictTypeCreateSchema,
@@ -254,10 +271,10 @@ class DictDataService:
         
         # 获取字典数据
         items = await crud.get_by_type_crud(dict_type)
-        
-        # 只返回启用的数据
+
+        # 只返回启用的数据（此接口供各业务表单下拉框使用，禁用数据不对外展示）
         items = [item for item in items if item.status == 1]
-        
+
         # 转换为输出格式
         dict_data_list = [
             DictDataOutSchema.model_validate(item).model_dump()
@@ -292,7 +309,8 @@ class DictDataService:
         
         # 创建字典数据
         dict_data = await crud.create_crud(dict_data_data)
-        
+
+        await _invalidate_dict_cache(data.dict_type)
         return await cls.get_dict_data_detail_service(dict_data.id, db)
     
     @classmethod
@@ -320,7 +338,8 @@ class DictDataService:
         
         # 更新字典数据
         await crud.update_crud(dict_data_id, update_data)
-        
+
+        await _invalidate_dict_cache(dict_data.dict_type)
         return await cls.get_dict_data_detail_service(dict_data_id, db)
     
     @classmethod
@@ -331,6 +350,16 @@ class DictDataService:
     ) -> None:
         """删除字典数据"""
         crud = DictDataCRUD(db)
-        
+
+        # 删除前收集各记录的 dict_type，用于失效对应缓存
+        affected_types: set[str] = set()
+        for did in dict_data_ids:
+            item = await crud.get_by_id_crud(did)
+            if item:
+                affected_types.add(item.dict_type)
+
         # 删除字典数据
         await crud.delete_crud(dict_data_ids)
+
+        for dict_type in affected_types:
+            await _invalidate_dict_cache(dict_type)

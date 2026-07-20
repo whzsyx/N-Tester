@@ -106,6 +106,36 @@ def _download_url_to_file(url: str, local_path: str) -> None:
                 f.write(chunk)
 
 
+def _minio_stream_to_file(bucket: str, object_key: str, local_path: str) -> None:
+    """通过 MinIO SDK（Authorization 请求头认证）将对象流式写入本地文件。
+
+    与 _download_url_to_file 不同，本函数不使用预签名 URL，因此不会触发
+    Cloudflare WAF 对 X-Amz-Signature 查询参数的拦截规则。适用于平台机自身
+    从 MinIO 下载文件的场景（方案C-单机中转、分割分发）。
+
+    采用分块流式写入，不将完整内容加载到内存，适合任意大小文件。
+    下载过程中文件持续增长，外层轮询 os.path.getsize() 的进度跟踪逻辑
+    与使用 _download_url_to_file 时行为一致。
+
+    Args:
+        bucket:     MinIO bucket 名称
+        object_key: 对象路径（如 performance/files/xxx.csv）
+        local_path: 本地目标文件路径（不存在时自动创建）
+    Raises:
+        minio.error.S3Error: MinIO 服务端返回错误（如对象不存在）
+        Exception:           网络异常或写文件失败
+    """
+    resp = MinioClient.get_client().get_object(bucket, object_key)
+    try:
+        with open(local_path, 'wb') as f:
+            # 以 1MB 分块写入，兼顾内存占用与 I/O 次数
+            for chunk in resp.stream(1024 * 1024):
+                f.write(chunk)
+    finally:
+        resp.close()
+        resp.release_conn()
+
+
 def _parse_mbps(value: str, default: int = 500) -> int:
     """从参数值中提取 Mbps 数字，兼容 '500'、'500Mbps'、'500 mbps'、'1000MB/s' 等格式，单位一律按 Mbps 计算。"""
     m = re.match(r'^\s*(\d+)', str(value))
@@ -758,7 +788,7 @@ class DistributeService:
         - 若节点数 ≤ 20 且单节点传输文件 ≤ 200MB，则全并发（并发数 = 节点数）。
         - 否则限制并发数在 10 ~ 20 之间（取节点数的一半，并限制边界）。
         这样既能保证小规模/小文件任务快速完成，又能避免大文件传输时
-        控制机资源（文件描述符、SSH 连接数）过载。
+        平台机资源（文件描述符、SSH 连接数）过载。
         Args:
             node_count: 分发目标节点数
             transfer_size_bytes: 单节点实际传输的文件大小（字节）
@@ -786,7 +816,7 @@ class DistributeService:
         :return: (可直连, 失败原因)
         """
         from app.common.commands import MINIO_URL_PROBE
-        cmd = MINIO_URL_PROBE.format(url=minio_url, timeout=timeout)
+        cmd = MINIO_URL_PROBE.format(minio_url=minio_url, timeout=timeout)
         _, out, _ = ShellOperationUtils.execute_remote_command(ssh, cmd)
         lines = [l for l in (out or '').splitlines() if l.startswith('R:')]
         if not lines:
@@ -809,7 +839,7 @@ class DistributeService:
         """
         【共享分发 - 方案A】压力机直接从 MinIO 下载完整文件。
         工具降级顺序：curl → wget（含 busybox）→ python3 urllib。
-        全程文件内容不经过控制机，控制机仅发送一条 SSH 命令。
+        全程文件内容不经过平台机，平台机仅发送一条 SSH 命令。
         """
         ssh = None
         try:
@@ -966,7 +996,7 @@ class DistributeService:
     @staticmethod
     def _split_file_locally(source_path: str, parts: int) -> List[str]:
         """
-        【分割分发步骤 1】将控制机本地文件按字节数等分为 parts 份。
+        【分割分发步骤 1】将平台机本地文件按字节数等分为 parts 份。
         :param source_path: 待分割的本地文件完整路径
         :param parts: 分割份数（等于目标压力机数量）
         :return: 分片文件路径列表，长度等于 parts
@@ -1248,7 +1278,7 @@ class DistributeService:
                     probe_ssh.close()
             except (Exception, asyncio.TimeoutError) as e:
                 probe_detail = str(e)
-                logger.warning(f"MinIO 连通性探测失败，回退方案B（Master中转）: {e}")
+                logger.warning(f"Slave({machines[0].ip}) 探测 MinIO 连通性失败，回退方案B: {type(e).__name__}: {e}")
 
             # 若 Slave 无法直连 MinIO，进一步探测 Master 是否能访问 MinIO（方案B）
             if not use_direct and master_ssh_shared:
@@ -1258,7 +1288,7 @@ class DistributeService:
                         timeout=15.0,
                     )
                 except (Exception, asyncio.TimeoutError) as e:
-                    logger.warning(f"Master MinIO 连通性探测失败: {e}")
+                    logger.warning(f"Master({master.ip}) 探测 MinIO 连通性失败: {type(e).__name__}: {e}")
 
             if use_direct:
                 method_label = "方案A：直拉 MinIO" if machine_type == 3 else "方案A：Slave 直拉 MinIO"
@@ -1402,7 +1432,7 @@ class DistributeService:
                     yield evt({"type": "progress", "stage": "minio_connect",
                                "message": f"正在连接 MinIO，准备下载文件（{format_file_size(file_size)}）..."})
                     _dl_task = asyncio.ensure_future(asyncio.to_thread(
-                        _download_url_to_file, minio_url, local_file
+                        _minio_stream_to_file, bucket, object_key, local_file
                     ))
 
                     # ② 阶段2：MinIO 下载进度（每 3 秒轮询本地文件大小计算百分比）
@@ -1508,7 +1538,7 @@ class DistributeService:
           3. 查询 Master 跳板机 + 系统参数
           4. 若有 Master，测试 SSH 连接 → yield master 事件（失败则终止）；保留连接供后续复用
           5. yield node_pending：预推所有节点等待行
-          6. 从 MinIO 下载完整文件到控制机临时目录
+          6. 从 MinIO 下载完整文件到平台机临时目录
           7. 本地等分切割文件为 N 份（N = 压力机数量）
           8. 每台机器上传对应分片，完成立即 yield node_done
           9. 更新数据库 dist_status=2 → yield done
@@ -1615,9 +1645,9 @@ class DistributeService:
             results: List[DistributeNodeResultSchema] = []
             with tempfile.TemporaryDirectory() as tmpdir:
                 local_file = os.path.join(tmpdir, os.path.basename(object_key))
-                yield evt({"type": "progress", "message": f"正在从 MinIO 下载文件到控制机（{format_file_size(file_size)}）..."})
+                yield evt({"type": "progress", "message": f"正在从 MinIO 下载文件到平台机（{format_file_size(file_size)}）..."})
                 _dl_task = asyncio.ensure_future(asyncio.to_thread(
-                    _download_url_to_file, minio_url, local_file
+                    _minio_stream_to_file, bucket, object_key, local_file
                 ))
                 while not _dl_task.done():
                     _done, _ = await asyncio.wait([_dl_task], timeout=15.0)

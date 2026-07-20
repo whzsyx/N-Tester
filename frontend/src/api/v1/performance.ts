@@ -142,7 +142,7 @@ export function usePerformanceApi() {
 		},
 		getReportDownloadUrl: (id: number, types?: string[]) => {
 			const typesParam = types?.length ? `&types=${types.join(',')}` : '';
-			return request({ url: `/v1/performance/reports/download?id=${id}${typesParam}`, method: 'GET' });
+			return request({ url: `/v1/performance/reports/download?id=${id}${typesParam}`, method: 'GET', responseType: 'blob' });
 		},
 		getReportLog: (id: number, logType: 'console' | 'collector', filename?: string) => {
 			const fnParam = filename ? `&filename=${encodeURIComponent(filename)}` : '';

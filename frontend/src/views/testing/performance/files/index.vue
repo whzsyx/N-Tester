@@ -1,6 +1,7 @@
 <template>
 	<div class="perf-files-container">
 		<el-card shadow="hover">
+			<div class="page-content-layout">
 			<!-- 工具栏 -->
 			<div class="toolbar">
 				<div class="toolbar-left">
@@ -54,7 +55,8 @@
 			</div>
 
 			<!-- 表格 -->
-			<el-table v-loading="loading" :data="fileList" border stripe style="width: 100%">
+			<div ref="tableWrapRef" class="table-wrap">
+			<el-table v-loading="loading" :data="fileList" border stripe style="width: 100%" :height="tableHeight">
 				<el-table-column width="60" align="center" fixed="left">
 					<template #header>
 						<span>{{ selectingDownload ? '选择' : 'ID' }}</span>
@@ -286,6 +288,7 @@
 					</template>
 				</el-table-column>
 			</el-table>
+			</div><!-- /table-wrap -->
 
 			<!-- 分页 -->
 			<el-pagination
@@ -299,6 +302,7 @@
 				@size-change="handleQuery"
 				@current-change="handleQuery"
 			/>
+			</div><!-- /page-content-layout -->
 		</el-card>
 
 		<!-- 文件分发抽屉（仅表单配置） -->
@@ -347,25 +351,23 @@
 							</el-radio-group>
 						</el-form-item>
 
-						<!-- 分布式：显示分发方式 -->
-						<template v-if="distributeForm.machineCategory !== '3'">
-							<el-form-item label="分发方式" required>
-								<el-radio-group v-model="distributeForm.type">
-									<el-radio value="shared">共享分发</el-radio>
-									<el-radio value="split">分割分发</el-radio>
-								</el-radio-group>
-							</el-form-item>
-							<el-form-item label=" " class="desc-form-item">
-								<span class="distribute-type-desc">
-									<template v-if="distributeForm.type === 'shared'">
-										将文件完整复制并独立分发到各压力机，各节点持有相同副本。
-									</template>
-									<template v-else>
-										将文件按压力机节点数量等比例分割，各节点分别接收对应分片。
-									</template>
-								</span>
-							</el-form-item>
-						</template>
+						<!-- 分发方式：单机时禁用分割分发并默认共享 -->
+						<el-form-item label="分发方式" required>
+							<el-radio-group v-model="distributeForm.type">
+								<el-radio value="shared">共享分发</el-radio>
+								<el-radio value="split" :disabled="distributeForm.machineCategory === '3'">分割分发</el-radio>
+							</el-radio-group>
+						</el-form-item>
+						<el-form-item label=" " class="desc-form-item">
+							<span class="distribute-type-desc">
+								<template v-if="distributeForm.type === 'shared'">
+									将文件完整复制并独立分发到各压力机，各节点持有相同副本。
+								</template>
+								<template v-else>
+									将文件按压力机节点数量等比例分割，各节点分别接收对应分片。
+								</template>
+							</span>
+						</el-form-item>
 
 						<!-- 分发 Worker -->
 						<el-form-item label="分发 Worker" required>
@@ -684,7 +686,7 @@
 </template>
 
 <script setup lang="ts" name="PerformanceFiles">
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 
 // 将字节数格式化为带单位的字符串，与 report/index.vue 保持一致
@@ -701,6 +703,28 @@ import { useDictCache } from '/@/utils/dictCache';
 const route = useRoute();
 const perfApi = usePerformanceApi();
 const { getDictOptions } = useDictCache();
+
+// 表格包裹层 ref，ResizeObserver 动态更新 height
+const tableWrapRef = ref<HTMLElement | null>(null);
+const tableHeight = ref(500);
+
+// 检测系统滚动条高度（Windows ~17px，Mac overlay 为 0），修正横向滚动条遮挡末行问题
+const SCROLLBAR_SIZE: number = (() => {
+	const div = document.createElement('div');
+	div.style.cssText = 'width:100px;height:100px;overflow:scroll;position:absolute;top:-9999px;visibility:hidden';
+	document.body.appendChild(div);
+	const size = div.offsetHeight - div.clientHeight;
+	document.body.removeChild(div);
+	return size;
+})();
+
+let _resizeObserver: ResizeObserver | null = null;
+// 更新表格高度：取包裹层高度并扣除横向滚动条占用
+const updateTableHeight = () => {
+	if (tableWrapRef.value) {
+		tableHeight.value = tableWrapRef.value.clientHeight - SCROLLBAR_SIZE;
+	}
+};
 
 // 代理上传大小阈值，onMounted 从后端 PROXY_UPLOAD_MAX_BYTES 参数动态获取，默认 100MB
 const proxyUploadMaxBytes = ref(100 * 1024 * 1024);
@@ -1459,15 +1483,58 @@ onMounted(async () => {
 		}
 	} catch { /* 保持默认值 */ }
 	handleQuery();
+	// 初始化高度，并注册 ResizeObserver 响应容器尺寸变化
+	updateTableHeight();
+	if (tableWrapRef.value) {
+		_resizeObserver = new ResizeObserver(updateTableHeight);
+		_resizeObserver.observe(tableWrapRef.value);
+	}
+});
+
+onUnmounted(() => {
+	_resizeObserver?.disconnect();
 });
 </script>
 
 <style scoped lang="scss">
 .perf-files-container {
+	height: 100%;
+	box-sizing: border-box;
 	padding: 10px 10px 20px 10px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+
+	:deep(.el-card) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
 
 	:deep(.el-card__body) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		padding: 10px 10px 20px 10px;
+	}
+
+	// 内容布局容器：工具栏 + 表格包裹 + 分页 纵向排列
+	.page-content-layout {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	// 表格包裹层：吸收剩余高度，el-table 的 max-height 由此计算
+	.table-wrap {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	// ---- 全局控件字体统一 ----

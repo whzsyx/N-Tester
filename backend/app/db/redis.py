@@ -20,12 +20,8 @@ class MyAsyncRedis(aioredis.Redis):
         data = await super(MyAsyncRedis, self).get(name)
         return json.loads(data) if data else None
 
-    async def set(
-            self,
-            name: str,
-            value: typing.Any,
-            ex: typing.Optional[int] = None,
-    ) -> typing.Any:
+    async def set(self, name: str, value: typing.Any, ex: typing.Optional[int] = None,) \
+            -> typing.Any:
         return await super(MyAsyncRedis, self).set(name, json.dumps(value), ex=ex)
 
     async def list_loads(self, key: str, num: int = -1) -> list:

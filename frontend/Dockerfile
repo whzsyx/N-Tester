@@ -1,5 +1,5 @@
 # 构建阶段
-FROM node:20.0-alpine as build-stage
+FROM node:18.15.0-alpine as build-stage
 
 WORKDIR /app
 
@@ -7,16 +7,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # 安装依赖
-RUN yarn install --registry=https://registry.npmmirror.com
+RUN npm install --registry=https://registry.npmmirror.com
 
 # 复制项目文件
 COPY . .
 
-# Vite/Rollup 打包
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-
 # 构建生产版本
-RUN yarn run build
+RUN npm run build
 
 # 生产阶段
 FROM nginx:alpine as production-stage

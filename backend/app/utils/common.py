@@ -251,6 +251,10 @@ def get_next_code(prefix: str, length: int) -> str:
 def fmt_cloudflare_html_resp(e: Exception, hint: str = '请检查地址或网络配置') -> str:
     """格式化可能含 HTML body 的异常信息（Cloudflare / nginx 等错误页），避免长 HTML 刷屏。
 
+    若能在异常内容中识别出 Cloudflare 边缘节点特征（cloudflare 字样 / cf-ray 请求头 /
+    Ray ID 等），会在提示语前加上"经 Cloudflare 代理拦截"说明；识别不到则不加，避免在
+    非 Cloudflare 代理场景下误导用户。
+
     :param e:    原始异常
     :param hint: HTML 被省略时附加的提示语，调用方按场景传入
     :return:     可读的单行错误描述
@@ -259,7 +263,10 @@ def fmt_cloudflare_html_resp(e: Exception, hint: str = '请检查地址或网络
     body_idx = msg.find('Body: <')
     if body_idx != -1:
         head = msg[:body_idx].rstrip('; ')
-        return f"{head} | Body: [HTML 已省略，{hint}]"
+        msg_lower = msg.lower()
+        is_cloudflare = 'cloudflare' in msg_lower or 'cf-ray' in msg_lower or 'ray id' in msg_lower
+        cf_hint = '经 Cloudflare 代理拦截，' if is_cloudflare else ''
+        return f"{head} | Body: [HTML 已省略，{cf_hint}{hint}]"
     if len(msg) > 300:
         return msg[:300] + ' ...[已截断]'
     return msg

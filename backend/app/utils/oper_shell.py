@@ -200,7 +200,7 @@ class ShellOperationUtils:
                     if not password:
                         raise
                     logger.warning(
-                        f"节点 {hostname} 密钥认证失败，降级密码认证。原因: {e}"
+                        f"节点 {hostname} 密钥认证失败：{e}，降级密码认证。"
                     )
                 # 注意：网络级错误（SSHException / OSError）不在此捕获，直接向上传播
 

@@ -43,7 +43,7 @@ async def _task_end_legacy(
     end_time: str,
 ) -> None:
     """对齐 task_end：统计 app_results、追加 script_status、通知 app_report"""
-    from app.api.v1.api_automation.service import ApiAutomationService
+    from app.api.v1.automation_api.service import ApiAutomationService
 
     async with async_session() as db:
         res = await db.execute(

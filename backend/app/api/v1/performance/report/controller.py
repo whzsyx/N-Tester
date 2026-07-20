@@ -56,22 +56,20 @@ async def list_reports(
     return success_response(data=result)
 
 
-@router.get('/download', summary='获取报告下载链接')
+@router.get('/download', summary='下载报告文件')
 async def download_report(
     id:      int          = Query(..., gt=0, description='报告主键 ID'),
     types:   str | None   = Query(None, description='文件类型，逗号分隔：report,log,jtl；缺省=全部'),
     db:      AsyncSession = Depends(get_db),
     user_id: int          = Depends(get_current_user_id),
 ):
-    """返回各文件的 Minio 预签名下载 URL（有效期 30 分钟）。
+    """直接返回报告文件（二进制 zip）。
 
-    - report → jmeter-reports.zip（HTML 报告）
-    - log    → jmeter-logs.zip（JMeter 运行日志）
-    - jtl    → results.zip（JTL 结果文件）
+    - 单文件：直接返回该 zip
+    - 多文件：打包进以报告名命名的目录后返回
     """
     type_list = [t.strip() for t in types.split(',')] if types else None
-    urls = await PerfReportService(db).get_download_url(id, type_list)
-    return success_response(data=urls)
+    return await PerfReportService(db).download_batch(id, type_list)
 
 
 @router.get('/preview/{report_code}/{path:path}', summary='在线报告预览文件代理')

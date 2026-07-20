@@ -31,31 +31,25 @@
 						<div class="stage-track">
 							<div class="stage-fill" :style="{ width: execState.progress + '%' }"></div>
 						</div>
-						<!-- 所有阶段名均匀分布在进度条轨道上，同时可见 -->
+					<!-- 阶段标签与分割线同处一个 flex 流，分割线落在文字实际边界上，不再用固定百分比定位 -->
 						<div class="stage-bar-seg-labels">
-							<span
-								v-for="(s, i) in execState.stages"
-								:key="i"
-								class="stage-seg-label"
-								:class="{ 'seg-done': s.done, 'seg-active': s.active, 'seg-wait': !s.done && !s.active }"
-								:style="{ left: `calc(${i * 3}% + 4px)` }"
-							>{{ s.label }}</span>
+							<!-- 阶段标签与分割线同处一个 flex 流，分割线落在文字实际边界上，不再用固定百分比定位 -->
+						<span v-for="(s, i) in execState.stages" :key="i" style="display:contents">
+								<span
+									class="stage-seg-label"
+									:class="{ 'seg-done': s.done, 'seg-active': s.active, 'seg-wait': !s.done && !s.active }"
+								>{{ s.label }}</span>
+								<el-tooltip
+									v-if="i < execState.stages.length - 1"
+									:content="s.label"
+									placement="top"
+									:show-after="0"
+									:teleported="true"
+								>
+									<div class="stage-pin" :class="{ 'pin-done': s.done, 'pin-active': s.active }"></div>
+								</el-tooltip>
+							</span>
 						</div>
-						<!-- 阶段分割线：N-1 条，悬停显示阶段名称 -->
-						<el-tooltip
-							v-for="(m, i) in stageMarkers"
-							:key="i"
-							:content="m.label"
-							placement="top"
-							:show-after="0"
-							:teleported="true"
-						>
-							<div
-								class="stage-pin"
-								:class="{ 'pin-done': m.done, 'pin-active': m.active }"
-								:style="{ left: m.position + '%' }"
-							></div>
-						</el-tooltip>
 					</div>
 					<span class="monitor-progress-suffix">
 						<template v-if="execState.progress >= 100">
@@ -141,6 +135,7 @@
 							:time-labels="monitorTimeLabels"
 							:dark-mode="monitorDark"
 							:chart-height="220"
+							:area="m.area"
 							@expand="handleChartExpand"
 						/>
 					</template>
@@ -159,7 +154,7 @@
 				</el-tooltip>
 			</div>
 			<div class="errors-table-scroll">
-				<el-table ref="errorsSmallTableRef" :data="top5Errors" size="small" class="errors-table" border :show-header="true">
+				<el-table ref="errorsSmallTableRef" :data="top5Errors" size="small" class="errors-table" border :show-header="true" empty-text="No data">
 					<el-table-column label="Sample（接口）" prop="sampler" min-width="200" header-align="center">
 						<template #default="{ row }">
 							<span class="sampler-name">{{ row.sampler }}</span>
@@ -241,6 +236,7 @@
 				:dark-mode="monitorDark"
 				:expandable="false"
 				:chart-height="480"
+				:area="expandConfig!.area"
 			/>
 		</el-dialog>
 
@@ -256,7 +252,7 @@
 			<template #header>
 				<span class="errors-dialog-header-title">Top 5 Errors by Sampler（详情）</span>
 			</template>
-			<el-table :data="top5Errors" size="small" class="errors-table-full" border :show-header="true" style="width: 100%">
+			<el-table :data="top5Errors" size="small" class="errors-table-full" border :show-header="true" empty-text="No data" style="width: 100%">
 				<el-table-column label="Sample（接口）" prop="sampler" min-width="180" header-align="center">
 					<template #default="{ row }">
 						<span class="sampler-name">{{ row.sampler }}</span>
@@ -325,12 +321,14 @@
 </template>
 
 <script setup lang="ts" name="SceneMonitor">
+/* eslint-disable vue/no-mutating-props */
 import { ref, computed, onUnmounted } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import PerfConsole from '../components/PerfConsole.vue';
 import MetricChart from '../components/MetricChart.vue';
 import draggable from 'vuedraggable';
 import { usePerformanceApi } from '/@/api/v1/performance';
+import { applyStageEvent } from '/@/utils/perfExecState';
 
 const perfApi = usePerformanceApi();
 
@@ -352,19 +350,6 @@ const emit = defineEmits<{
 const currentScene = computed(() => props.scene ?? { name: '--', status: 'pending', progress: 0 });
 
 // ======================== 联调/启动阶段进度条 ========================
-
-// 两个阶段之间的分割线（N 个阶段 → N-1 条线），悬停显示左侧阶段名称
-const stageMarkers = computed(() => {
-	const state = props.execState;
-	if (!state) return [];
-	const { stages } = state;
-	return stages.slice(0, -1).map((stage, i) => ({
-		label: stage.label,
-		position: (i + 1) * 3,   // 每段固定 3%，分割线在 3%、6%
-		done: stage.done,
-		active: stage.active,
-	}));
-});
 
 const statusLabel = (status: string) => {
 	const map: Record<string, string> = {
@@ -394,7 +379,9 @@ const consoleLogs = ref<{ time: string; text: string; level: string }[]>([]);
 // ======================== 实时监控 SSE ========================
 
 let _monitorAbortCtrl: AbortController | null = null;
-let _monitorOffset = 0;
+const _isMonitoring = ref(false);
+// 追踪已接收的 Redis 日志绝对偏移量，断线重连时携带以跳过历史日志，避免重复展示
+const _logOffsetRef = ref(0);
 
 const _addLog = (text: string, level?: string) => {
 	const now = new Date();
@@ -403,7 +390,8 @@ const _addLog = (text: string, level?: string) => {
 	let lv = level;
 	if (!lv) {
 		const t = (text ?? '').toLowerCase();
-		if (/\berror\b/.test(t) || t.includes('exception')) lv = 'error';
+		if ((text ?? '').startsWith('启动命令：')) lv = 'success';
+		else if (/\berror\b/.test(t) || t.includes('exception')) lv = 'error';
 		else if (t.includes('warn')) lv = 'warn';
 		else lv = 'info';
 	}
@@ -413,15 +401,32 @@ const _addLog = (text: string, level?: string) => {
 const _handleMonitorEvent = (evt: any) => {
 	if (evt.type === 'connected') {
 		_addLog(evt.message || '已连接实时监控，等待日志数据...', 'info');
+		// 用后端携带的实际读取起始偏移校准本地计数，防止任何客户端侧误差导致下次重连重放日志
+		if (evt.start_offset !== undefined) {
+			_logOffsetRef.value = evt.start_offset;
+		}
+		// 中途加入监控（如页面刷新重连）：用后端携带的当前阶段状态"补跳" execState，
+		// 避免从 Stage1 重新显示，与手动启动时的连续体验保持一致
+		if (props.execState && evt.stage_state) {
+			const kind = evt.stage_state.kind === 'done' ? 'stage_done' : 'stage_start';
+			applyStageEvent(props.execState, { type: kind, stage: evt.stage_state.stage, message: evt.stage_state.message }, true);
+		}
 	} else if (evt.type === 'log') {
+		_logOffsetRef.value++;
 		_addLog(evt.message ?? '');
 	} else if (evt.type === 'progress') {
 		// 直接修改父组件传入的 scene 对象（与父组件共享同一响应式引用）
 		if (props.scene) props.scene.progress = evt.value ?? 0;
-		// 若 execState 仍处于 Stage 最后阶段（JMeter 运行中），将真实进度映射到整体进度
+		// 仅当 execState 确实处于最后一个阶段（JMeter 已进入后台运行）时，才将真实进度
+		// 映射进整体进度；Stage1/2 执行期间后端恒定推送 value=0，若不加此判断会用固定的
+		// preWeight 覆盖当前阶段本该展示的进度值，导致进度条与阶段勾选状态不同步
 		if (props.execState) {
-			const preWeight = Math.max(0, (props.execState.stages.length - 1) * 3);
-			props.execState.progress = preWeight + Math.round((evt.value ?? 0) * (100 - preWeight) / 100);
+			const stages = props.execState.stages;
+			const lastStage = stages[stages.length - 1];
+			if (lastStage?.active) {
+				const preWeight = Math.max(0, (stages.length - 1) * 3);
+				props.execState.progress = preWeight + Math.round((evt.value ?? 0) * (100 - preWeight) / 100);
+			}
 		}
 	} else if (evt.type === 'done') {
 		if (props.scene) {
@@ -439,13 +444,28 @@ const _handleMonitorEvent = (evt: any) => {
 		}
 		emit('exec-done');
 	} else if (evt.type === 'error') {
-		if (props.scene) props.scene.status = 'failed';
 		_addLog(evt.message || '压测异常', 'error');
-		emit('exec-done');
+		// terminal=true：业务终态错误（场景不存在/未联调），通知父组件刷新；
+		// 否则为瞬时异常（网络抖动等），SSE 将由后端自动重试，不修改场景状态，
+		// 避免父组件以 offset=0 重连导致 Stage1/2/3 日志重复显示。
+		if (evt.terminal) {
+			emit('exec-done');
+		}
 	} else if (evt.type === 'cancelled' || evt.type === 'stopped') {
 		if (props.scene) props.scene.status = 'cancelled';
 		_addLog(evt.message || '压测已停止', 'warning');
 		emit('exec-done');
+	} else if (evt.type === 'stage_start' || evt.type === 'stage_done') {
+		// 定时任务触发的运行由 monitor_sse 补发的结构化阶段事件驱动 execState，
+		// 与手动启动（index.vue 直连 /execute 原始流）复用同一套推进逻辑；
+		// 该事件的 message 与 jobs.py 转发的 log 事件文本重复，此处只更新进度条，不再重复写控制台
+		if (props.execState) {
+			applyStageEvent(props.execState, evt, true);
+		}
+	} else if (evt.type === 'metric') {
+		_pushMetricPoint(evt);
+	} else if (evt.type === 'top_errors') {
+		top5Errors.value = evt.items ?? [];
 	}
 	// type === 'ping'：心跳保活，无需处理
 };
@@ -469,8 +489,10 @@ const handleForceStop = () => {
  */
 const startMonitor = async (scenarioId: number, initOffset = 0) => {
 	stopMonitor();
-	_monitorOffset = initOffset;
+	_logOffsetRef.value = initOffset;
+	_resetMetrics();
 	_monitorAbortCtrl = new AbortController();
+	_isMonitoring.value = true;
 
 	try {
 		const resp = await perfApi.monitorScenarioStream(scenarioId, initOffset, _monitorAbortCtrl.signal);
@@ -496,6 +518,8 @@ const startMonitor = async (scenarioId: number, initOffset = 0) => {
 	} catch (e: any) {
 		if (e?.name === 'AbortError') return;
 		_addLog(`连接异常：${e?.message ?? String(e)}`, 'error');
+	} finally {
+		_isMonitoring.value = false;
 	}
 };
 
@@ -503,6 +527,7 @@ const startMonitor = async (scenarioId: number, initOffset = 0) => {
 const stopMonitor = () => {
 	_monitorAbortCtrl?.abort();
 	_monitorAbortCtrl = null;
+	_isMonitoring.value = false;
 };
 
 onUnmounted(() => { stopMonitor(); });
@@ -511,7 +536,7 @@ onUnmounted(() => { stopMonitor(); });
 
 const monitorDark = ref(true);
 const expandVisible = ref(false);
-const expandConfig = ref<{ title: string; unit: string; series: any[]; timeLabels: string[] } | null>(null);
+const expandConfig = ref<{ title: string; unit: string; series: any[]; timeLabels: string[]; area: boolean } | null>(null);
 const errorsExpandVisible = ref(false);
 const errorsSmallTableRef = ref<any>(null);
 const errorsDrawerSizePx = ref('300px');
@@ -528,43 +553,92 @@ const openErrorsExpand = () => {
 	errorsExpandVisible.value = true;
 };
 
-const handleChartExpand = (cfg: { title: string; unit: string; series: any[]; timeLabels: string[] }) => {
+const handleChartExpand = (cfg: { title: string; unit: string; series: any[]; timeLabels: string[]; area: boolean }) => {
 	expandConfig.value = cfg;
 	expandVisible.value = true;
 };
 
-// 时间轴（16 个时间点，代表最近 15 分钟）
-const _now = new Date();
-const monitorTimeLabels = Array.from({ length: 16 }, (_, i) => {
-	const t = new Date(_now.getTime() - (15 - i) * 60000);
-	return `${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}`;
-});
+// 时间轴：随 metric 事件实时滚动追加，初始为空（无历史数据可回放，见 monitor_sse 说明）
+const monitorTimeLabels = ref<string[]>([]);
 
-// 指标占位数据（当前版本 monitor SSE 仅推送日志行，实时指标图待后续扩展）
+// 滚动窗口大小：按当前默认 5s 推送间隔计算约 5 分钟数据量；实际推送频率与后端
+// JMETER_LOG_POLL_INTERVAL 一致（可配置），窗口仅用于控制图表展示点数，非采集精度
+const _METRIC_WINDOW = 60;
+
+// 图例按 sampler（JMeter label，兼容单机/分布式——分布式时 result.jtl 本就只在 master 上，
+// 已是汇总后的按 sampler 明细）动态生成，不再用笼统的"整体"；QPS 按 success/failure 拆两条线；
+// 并发线程数后端仅解析 summariser 的全局 Active 计数，无法按线程组拆分，保留单曲线但如实标注
 const monitorMetrics = ref([
-	{ title: 'QPS', unit: '次/秒', series: [
-		{ name: 'jmeter-slave-1', data: [235, 248, 261, 243, 278, 312, 328, 341, 319, 302, 287, 295, 315, 338, 351, 344] },
-		{ name: 'jmeter-slave-2', data: [198, 212, 225, 207, 241, 275, 289, 298, 281, 264, 249, 258, 277, 301, 314, 308] },
-	]},
-	{ title: '平均响应时间（RT）', unit: 'ms', series: [
-		{ name: 'jmeter-slave-1', data: [42, 45, 48, 44, 52, 68, 74, 79, 72, 65, 58, 61, 71, 78, 83, 81] },
-		{ name: 'jmeter-slave-2', data: [38, 41, 44, 40, 47, 62, 68, 72, 66, 59, 53, 56, 64, 71, 76, 74] },
-	]},
-	{ title: '并发线程数', unit: '个', series: [
-		{ name: 'jmeter-slave-1', data: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100] },
-		{ name: 'jmeter-slave-2', data: [80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80] },
-	]},
-	{ title: '错误率', unit: '%', series: [
-		{ name: 'jmeter-slave-1', data: [0, 0, 0.1, 0, 0.2, 1.8, 2.1, 2.4, 2.0, 1.5, 0.9, 1.1, 1.8, 2.2, 2.5, 2.3] },
-		{ name: 'jmeter-slave-2', data: [0, 0, 0, 0, 0.1, 1.5, 1.8, 2.1, 1.7, 1.2, 0.7, 0.9, 1.5, 1.9, 2.2, 2.0] },
-	]},
+	{ title: 'QPS', unit: '次/秒', series: [] as { name: string; data: number[] }[], area: false },
+	{ title: '平均响应时间（RT）', unit: 'ms', series: [] as { name: string; data: number[] }[], area: false },
+	// 活跃线程组图表用面积图（折线下方填充），其余样式与其他图表保持一致
+	{ title: '并发线程数', unit: '个', series: [{ name: '全部线程组', data: [] as number[] }], area: true },
+	{ title: '错误率', unit: '%', series: [] as { name: string; data: number[] }[], area: false },
 ]);
+
+/** 取或创建指定名称的序列，新建时用 0 补齐此前已推送的时间点，保持与 timeLabels 等长。*/
+const _ensureSeries = (chart: { series: { name: string; data: number[] }[] }, name: string) => {
+	let s = chart.series.find(x => x.name === name);
+	if (!s) {
+		const priorLen = Math.max(0, monitorTimeLabels.value.length - 1);
+		s = { name, data: new Array(priorLen).fill(0) };
+		chart.series.push(s);
+	}
+	return s;
+};
+
+/** 将实时指标快照按 sampler 动态追加进各图表，并裁剪到滚动窗口大小。*/
+const _pushMetricPoint = (evt: any) => {
+	monitorTimeLabels.value.push(evt.time ?? '');
+
+	const [qpsChart, rtChart, threadsChart, errChart] = monitorMetrics.value;
+	threadsChart.series[0].data.push(evt.threads ?? 0);
+
+	const labels = evt.labels ?? {};
+	const touched = new Set<string>();
+	Object.keys(labels).forEach(label => {
+		const m = labels[label] ?? {};
+		const okSeries  = _ensureSeries(qpsChart, `${label}-success`);
+		const errSeries = _ensureSeries(qpsChart, `${label}-failure`);
+		okSeries.data.push(m.qps_ok ?? 0);
+		errSeries.data.push(m.qps_err ?? 0);
+		touched.add(okSeries.name);
+		touched.add(errSeries.name);
+
+		const rtSeries = _ensureSeries(rtChart, label);
+		rtSeries.data.push(m.avg_rt ?? 0);
+		touched.add(rtSeries.name);
+
+		const errRateSeries = _ensureSeries(errChart, label);
+		errRateSeries.data.push(m.err_rate ?? 0);
+		touched.add(errRateSeries.name);
+	});
+	// 本轮未出现的既有 sampler 序列补 0，保持所有序列长度与 timeLabels 一致
+	[qpsChart, rtChart, errChart].forEach(chart => {
+		chart.series.forEach(s => { if (!touched.has(s.name)) s.data.push(0); });
+	});
+
+	if (monitorTimeLabels.value.length > _METRIC_WINDOW) {
+		monitorTimeLabels.value.shift();
+		monitorMetrics.value.forEach(m => m.series.forEach(s => s.data.shift()));
+	}
+};
+
+/** 重置 4 个指标图表与 Top5 Errors，避免残留上一个场景的展示数据。*/
+const _resetMetrics = () => {
+	monitorTimeLabels.value = [];
+	monitorMetrics.value[0].series = [];
+	monitorMetrics.value[1].series = [];
+	monitorMetrics.value[2].series = [{ name: '全部线程组', data: [] }];
+	monitorMetrics.value[3].series = [];
+	top5Errors.value = [];
+};
 
 const top5Errors = ref<any[]>([]);
 
-const clearLogs = () => { consoleLogs.value = []; };
+const clearLogs = () => { consoleLogs.value = []; _logOffsetRef.value = 0; };
 
-defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
+defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs, isMonitoring: _isMonitoring, logOffset: _logOffsetRef });
 </script>
 
 <style scoped lang="scss">
@@ -628,7 +702,9 @@ defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
 					}
 				}
 
-				// 所有阶段名均匀分布在进度条轨道上
+				// 阶段标签行：前两个 stage 由文字内容撑开宽度，最后一个 stage 占剩余空间居中；
+				// 分割线（.stage-pin）作为该 flex 行内的普通子项与标签交替排列，天然落在
+				// 文字实际渲染的边界处，不再需要按固定百分比单独定位，避免与文字重叠
 				.stage-bar-seg-labels {
 					position: absolute;
 					top: 0;
@@ -637,13 +713,25 @@ defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
 					height: 14px;
 					pointer-events: none;
 					z-index: 2;
+					display: flex;
+					align-items: center;
 
 					.stage-seg-label {
-						position: absolute;
 						font-size: 11px;
 						font-weight: 600;
 						white-space: nowrap;
 						line-height: 14px;
+						padding: 0 5px;
+						flex-shrink: 0; // 前面的 stage 标签不压缩，宽度由文字撑开
+
+						// 最后一个 stage 占剩余空间，文字居中
+						&:last-child {
+							flex: 1 1 0;
+							text-align: center;
+							flex-shrink: 1;
+							overflow: hidden;
+							text-overflow: ellipsis;
+						}
 
 						&.seg-done {
 							color: rgba(255, 255, 255, 0.92);
@@ -658,32 +746,32 @@ defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
 							text-shadow: 0 0 3px rgba(255, 255, 255, 0.7);
 						}
 					}
-				}
 
-				// 阶段分割线：绝对定位，垂直方向略超出轨道
-				.stage-pin {
-					position: absolute;
-					top: -4px;
-					height: 22px;
-					width: 18px;
-					transform: translateX(-50%);
-					cursor: default;
-					display: flex;
-					justify-content: center;
-					align-items: stretch;
+					// 阶段分割线：与标签同处 flex 流，靠 height 22px > 容器 14px 自然
+					// 上下各溢出 4px，不再依赖绝对定位百分比坐标
+					.stage-pin {
+						flex-shrink: 0;
+						height: 22px;
+						width: 18px;
+						cursor: default;
+						display: flex;
+						justify-content: center;
+						align-items: stretch;
+						pointer-events: auto; // 覆盖父级 pointer-events:none，恢复 hover 提示交互
 
-					&::after {
-						content: '';
-						width: 2px;
-						background: #c8ccd4;
-						transition: background 0.3s;
-					}
+						&::after {
+							content: '';
+							width: 2px;
+							background: #c8ccd4;
+							transition: background 0.3s;
+						}
 
-					&.pin-done::after { background: rgba(255, 255, 255, 0.88); }
+						&.pin-done::after { background: rgba(255, 255, 255, 0.88); }
 
-					&.pin-active::after {
-						background: #f0a020;
-						animation: pin-pulse 1.2s ease-in-out infinite;
+						&.pin-active::after {
+							background: #f0a020;
+							animation: pin-pulse 1.2s ease-in-out infinite;
+						}
 					}
 				}
 			}
@@ -729,9 +817,10 @@ defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
 			}
 
 			.metrics-header {
+				position: relative;
 				display: flex;
 				align-items: center;
-				justify-content: space-between;
+				justify-content: center;
 				padding: 8px 14px;
 				font-size: 13.5px;
 				font-weight: 600;
@@ -748,6 +837,10 @@ defineExpose({ startMonitor, stopMonitor, addExternalLog: _addLog, clearLogs });
 				}
 
 				.theme-toggle-btn {
+					position: absolute;
+					right: 8px;
+					top: 50%;
+					transform: translateY(-50%);
 					color: var(--el-text-color-secondary);
 					:deep(.el-icon) {
 						font-size: 17px !important;

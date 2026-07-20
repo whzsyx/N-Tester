@@ -81,8 +81,8 @@ const captchaCode = ref('');
 const state = reactive({
   isShowPassword: false,
   ruleForm: {
-    userName: 'admin',
-    password: '123456',
+    userName: '',
+    password: '',
     code: '',
   },
   rules: {
@@ -141,7 +141,6 @@ const onSignIn = async () => {
     state.loading.signIn = true;
     useUserApi().signIn({username: state.ruleForm.userName, password: state.ruleForm.password})
         .then(async res => {
-
           const token = res.data.access_token || res.data.token;
           Session.set('token', token);
           // 如果有refresh_token，也保存

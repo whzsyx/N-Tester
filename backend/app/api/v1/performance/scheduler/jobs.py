@@ -22,7 +22,7 @@ from app.corelibs.logger import logger
 任务状态流转（由本模块 + perf_log_collector 共同驱动）：
   待触发(0) --[plan_time 到达]--> 进行中(1) --[JMeter 进程结束]--> 已结束(2)
   待触发(0) --[用户禁用/取消]--> 移除 APScheduler 任务
-  进行中(1) --[execute_sse error]--> 回退待触发(0)，remark 记录原因
+  进行中(1) --[execute_sse error/exception]--> 失败(4)，is_active=0，remark 记录原因
 """
 
 def _job_id(scheduler_id: int) -> str:
@@ -105,7 +105,7 @@ async def run_perf_scheduler_job(scheduler_id: int) -> None:
       2. 更新 task_status=1（进行中）
       3. 消费 execute_sse 生成器，驱动 Stage1~3（注入参数 → 上传 JMX → nohup 启动）
       4. 成功（done 事件）：task_status 保持 1，由 perf_log_collector 在 JMeter 进程结束后更新为 2
-      5. 失败（error 事件或异常）：task_status 回退至 0，remark 记录失败原因供用户排查
+      5. 失败（error 事件或异常）：task_status → 4（失败），is_active=0，remark 记录失败原因
 
     Args:
         scheduler_id: 定时任务主键 ID
@@ -138,13 +138,77 @@ async def run_perf_scheduler_job(scheduler_id: int) -> None:
         await db.commit()
         scenario_id = obj.scenario_id
 
-    # ── 2. 驱动压测启动（消费 execute_sse 生成器）────────────────────────
+    # ── 1.5. 预检关联场景状态，避免 execute_sse 内静默失败 ────────────────
+    # 场景必须已完成联调（status >= 1）才能正式启动压测
+    _SCENARIO_STATUS_LABELS = {0: '待联调', 1: '待开始', 2: '进行中', 3: '已完成', 4: '已取消', 5: '失败'}
+    preflight_error: str | None = None
+    try:
+        from app.api.v1.performance.scenario.model import PerfScenarioModel
+        async with async_session_factory() as db:
+            scene_crud = BaseCRUD(PerfScenarioModel, db)
+            scene = await scene_crud.get_by_id_crud(scenario_id)
+        if not scene or not scene.enabled_flag:
+            preflight_error = f'关联压测场景 (id={scenario_id}) 不存在或已被删除，请重新编辑定时任务'
+        elif scene.status == 0:
+            preflight_error = (
+                f'关联压测场景「{scene.name}」尚未完成联调（当前状态：待联调），'
+                f'请先进入压测场景页面完成联调，再重新启用定时任务'
+            )
+        elif scene.status == 2:
+            preflight_error = f'关联压测场景「{scene.name}」正在压测中，不可重复启动'
+        else:
+            label = _SCENARIO_STATUS_LABELS.get(scene.status, str(scene.status))
+            logger.info(
+                f"[PerfScheduler] 预检通过 scheduler_id={scheduler_id}"
+                f" scenario_id={scenario_id} scenario_status={scene.status}({label})"
+            )
+    except Exception as _pe:
+        logger.warning(f"[PerfScheduler] 预检查询异常，跳过预检继续执行 scheduler_id={scheduler_id}: {_pe}")
+
+    if preflight_error:
+        logger.error(f"[PerfScheduler] 预检失败 scheduler_id={scheduler_id}: {preflight_error}")
+        try:
+            async with async_session_factory() as db:
+                crud = BaseCRUD(PerfSchedulerModel, db)
+                await crud.update_crud(scheduler_id, {
+                    'task_status': 4,
+                    'is_active':   0,
+                    'remark': f'[自动触发失败] {preflight_error[:400]}',
+                })
+                await db.commit()
+        except Exception:
+            logger.exception(f"[PerfScheduler] 预检失败后更新状态异常 scheduler_id={scheduler_id}")
+        return
+
+    # ── 2. 驱动压测启动（消费 execute_sse 生成器，同步写 Redis 供 monitor_sse 展示）──
     error_msg: str | None = None
     try:
-        from app.api.v1.performance.scenario.service import PerfScenarioService
+        from app.api.v1.performance.scenario.service import ScenarioExecuteService
+        from app.db import get_redis_pool
+        from app.common.rediskeys import _log_key, _stage_key
+
+        _redis = get_redis_pool().get_redis()
+
+        async def _write_stage_log(msg: str) -> None:
+            """将启动阶段进度写入 Redis，让 monitor_sse 实时展示定时任务启动过程。"""
+            try:
+                if msg:
+                    await _redis.rpush(_log_key(scenario_id), msg)
+                    await _redis.expire(_log_key(scenario_id), 86400)
+            except Exception:
+                pass
+
+        async def _write_stage_state(stage, stage_name: str, kind: str, message: str) -> None:
+            """将结构化阶段状态写入 Redis，供 monitor_sse 补发 stage_start/stage_done 事件驱动前端 execState 进度条。"""
+            try:
+                await _redis.set(_stage_key(scenario_id), json.dumps({
+                    'stage': stage, 'stage_name': stage_name, 'kind': kind, 'message': message,
+                }), ex=86400)
+            except Exception:
+                pass
 
         async with async_session_factory() as db:
-            svc = PerfScenarioService(db)
+            svc = ScenarioExecuteService(db)
             async for raw_event in svc.execute_sse(scenario_id, 'execute'):
                 # SSE 格式："data: {...}\n\n"，逐行解析 data 字段
                 for line in raw_event.split("\n"):
@@ -155,11 +219,27 @@ async def run_perf_scheduler_job(scheduler_id: int) -> None:
                         evt_type = evt.get('type')
                         if evt_type == 'error':
                             error_msg = evt.get('message') or '执行失败'
+                            await _write_stage_log(f'[定时启动 ✗] {error_msg}')
                         elif evt_type == 'done':
                             logger.info(
                                 f"[PerfScheduler] JMeter 已后台启动"
                                 f" scheduler_id={scheduler_id} scenario_id={scenario_id}"
                             )
+                        elif evt_type == 'stage_start':
+                            stage = evt.get('stage', '')
+                            sname = evt.get('stage_name', '')
+                            message = evt.get('message', '')
+                            await _write_stage_log(f'[定时启动 Stage{stage}]{sname}：{message}')
+                            await _write_stage_state(stage, sname, 'start', message)
+                        elif evt_type == 'stage_done':
+                            stage = evt.get('stage', '')
+                            sname = evt.get('stage_name', '')
+                            message = evt.get('message', '')
+                            display = 'skipped' if evt.get('skipped') else 'completed'
+                            await _write_stage_log(f'[定时启动 Stage{stage}]{sname}：{display}')
+                            await _write_stage_state(stage, sname, 'done', message)
+                        elif evt_type == 'log':
+                            await _write_stage_log(evt.get('message', ''))
                     except Exception:
                         pass
     except Exception as e:
@@ -169,14 +249,17 @@ async def run_perf_scheduler_job(scheduler_id: int) -> None:
     # ── 3. 失败：task_status=4，is_active=0，remark 记录原因 ─────────────
     if error_msg:
         logger.error(f"[PerfScheduler] 压测启动失败 scheduler_id={scheduler_id}: {error_msg}")
-        async with async_session_factory() as db:
-            crud = BaseCRUD(PerfSchedulerModel, db)
-            await crud.update_crud(scheduler_id, {
-                'task_status': 4,
-                'is_active':   0,
-                'remark': f'[自动触发失败] {error_msg[:400]}',
-            })
-            await db.commit()
+        try:
+            async with async_session_factory() as db:
+                crud = BaseCRUD(PerfSchedulerModel, db)
+                await crud.update_crud(scheduler_id, {
+                    'task_status': 4,
+                    'is_active':   0,
+                    'remark': f'[自动触发失败] {error_msg[:400]}',
+                })
+                await db.commit()
+        except Exception:
+            logger.exception(f"[PerfScheduler] 更新失败状态异常 scheduler_id={scheduler_id}")
 
 
 async def load_perf_pending_jobs() -> None:

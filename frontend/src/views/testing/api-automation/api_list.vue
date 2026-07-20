@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<div class="api-list-container">
 		<el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
 			<el-form :inline="true" :model="searchParams">
@@ -94,10 +94,9 @@
 						{{ row.manager_name || '-' }}
 					</template>
 				</el-table-column>
-				<el-table-column label="操作" width="360" align="center" fixed="right">
+				<el-table-column label="操作" width="280" align="center" fixed="right">
 					<template #default="{ row }">
 						<span class="action-cell">
-							<el-button type="info" size="small" @click.stop="openServiceDetail(row)">详情</el-button>
 							<el-button
 								v-if="row.source_addr"
 								type="primary"
@@ -387,11 +386,6 @@ const resetSearch = () => {
 	searchParams.manager = null;
 	currentPage.value = 1;
 	loadList();
-};
-
-// ---- 进入服务详情（接口管理 / 调试面板）----
-const openServiceDetail = (row: any) => {
-	emit('select-service', { id: row.id, name: row.name });
 };
 
 // ---- 双击行进入详情 ----

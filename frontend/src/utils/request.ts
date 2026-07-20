@@ -1,12 +1,9 @@
-import axios, {AxiosInstance, AxiosRequestConfig} from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import {Session} from '/@/utils/storage';
 import qs from 'qs';
 import {getApiBaseUrl} from "/@/utils/config";
 import {handlerRedirectUrl} from "/@/utils/urlHandler";
-
-const cancelToken = axios.CancelToken
-const source = cancelToken.source()
 
 // 防止重复弹窗
 let isShowingAuthDialog = false;
@@ -25,13 +22,18 @@ const service: AxiosInstance = axios.create({
 
 // 添加请求拦截器
 service.interceptors.request.use(
-	(config: AxiosRequestConfig) => {
+	(config: InternalAxiosRequestConfig) => {
 		// 在发送请求之前做些什么 token
 		if (Session.get('token')) {
 			// 新API使用Authorization: Bearer token格式
 			config.headers!['Authorization'] = `Bearer ${Session.get('token')}`;
 			// API的token header
 			config.headers!['token'] = `${Session.get('token')}`;
+		}
+		// FormData 上传：删除 Content-Type，让浏览器自动附加含 boundary 的 multipart/form-data
+		// 若手动设置 Content-Type 会缺少 boundary，导致后端解析失败
+		if (config.data instanceof FormData) {
+			delete (config.headers as any)['Content-Type'];
 		}
 		return config;
 	},

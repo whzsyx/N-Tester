@@ -560,16 +560,38 @@ DB_USER=root
 DB_PASSWORD=123456
 DB_NAME=ntester
 ```
-# 创建虚拟环境
-python -m venv .venv
 
-# 激活虚拟环境
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
+使用 pip 时需手动创建虚拟环境；使用 uv 时 `uv sync` 会自动创建 `backend/.venv`：
+
+```bash
+# pip 方式：创建并激活虚拟环境
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# Linux/Mac: source .venv/bin/activate
+```
 
 ##### 4. 安装依赖
+
+**方式 A：使用 uv（强烈推荐，更快）**
+
+```bash
+cd backend
+
+# 若未安装 uv（Linux/macOS）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 若未安装 uv（Windows PowerShell）
+# irm https://astral.sh/uv/install.ps1 | iex
+
+# 同步依赖（自动创建 .venv 虚拟环境）
+uv sync --group dev
+
+# 或使用项目根目录脚本一键安装后端+前端
+# Linux/macOS:  bash scripts/install-deps.sh
+# Windows:      powershell -ExecutionPolicy Bypass -File scripts/install-deps.ps1
+```
+
+**方式 B：使用 pip（传统方式-备选方案）**
 
 ```bash
 # 安装依赖(linux&mac)
@@ -578,11 +600,15 @@ pip install -r requirements
 pip install -r requirements-windows.txt
 ```
 
+> 依赖定义以 `backend/pyproject.toml` 为准；`requirements` 文件保留用于 Docker / pip 兼容。
+
 ##### 5. 初始化数据库
 
 ```bash
 # 一键初始化（推荐）
 python cli.py init-db
+#或者
+uv run python cli.py init-db
 
 
 # 或手动使用 Alembic
@@ -593,7 +619,10 @@ python cli.py init-data
 ##### 6. 启动后端服务
 
 ```bash
-# 开发模式
+# 开发模式（uv，无需手动激活虚拟环境）
+uv run python main.py
+
+# 或激活虚拟环境后
 python main.py
 
 # 生产模式
@@ -637,6 +666,12 @@ npm install -g yarn
 
 ```bash
 cd frontend
+
+# 方式 A：使用项目根目录脚本（推荐，与后端一并安装）
+# Linux/macOS:  bash scripts/install-deps.sh
+# Windows:      powershell -ExecutionPolicy Bypass -File scripts/install-deps.ps1
+
+# 方式 B：手动安装
 # 新建配置文件.env,添加如下内容到配置文件
 # port 端口号
 VITE_PORT=3000

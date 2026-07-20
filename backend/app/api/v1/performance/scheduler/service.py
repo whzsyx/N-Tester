@@ -113,7 +113,7 @@ class PerfSchedulerService:
             user_id: 当前操作人 ID
         Raises:
             HTTPException 404: 任务不存在
-            HTTPException 400: 任务状态不允许修改
+            HTTPException 400: 任务状态不允许修改 / 启用时计划时间已过期
         """
         obj = await self._get_or_404(data.id)
         if obj.task_status not in _EDITABLE_STATUSES:
@@ -121,7 +121,25 @@ class PerfSchedulerService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f'当前任务状态（{obj.task_status}）不允许修改，仅 待触发/已取消 状态可编辑',
             )
+
+        # 启用时校验计划时间：plan_time 不能早于当前时间
         update_data = data.model_dump(exclude={'id'}, exclude_unset=True)
+        effective_is_active = update_data.get('is_active', obj.is_active)
+        effective_plan_time = update_data.get('plan_time', obj.plan_time)
+        if effective_is_active == 1 and effective_plan_time <= datetime.now():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='计划开始时间已过期，请修改后再启用',
+            )
+
+        # 已取消/失败任务重新启用时，状态重置为待触发；系统写入的失败备注同步清除
+        if effective_is_active == 1 and obj.task_status in (3, 4):
+            update_data['task_status'] = 0
+            # 仅清除系统自动写入的失败原因，用户手动填写的备注不受影响
+            pending_remark = update_data.get('remark', obj.remark or '')
+            if pending_remark.startswith('[自动触发失败]'):
+                update_data['remark'] = None
+
         update_data['updated_by'] = user_id
         await self.crud.update_crud(data.id, update_data)
         await self.db.flush()
