@@ -1,5 +1,5 @@
-<template>
-	<div class="koi-card">
+﻿<template>
+	<div class="ntesterc-card">
 		<div class="p-b-5px">
 			<slot name="header"></slot>
 		</div>
@@ -13,7 +13,7 @@
 <script setup lang="ts"></script>
 
 <style scoped>
-.koi-card {
+.ntesterc-card {
 	border-radius: 6px;
 	border: 1px solid #e4e7ed;
 	background-color: #fff;

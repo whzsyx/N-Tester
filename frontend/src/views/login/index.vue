@@ -1,25 +1,8 @@
 <template>
-  <div class="login-page">
-    <div class="login-brand">
-      <ParticleCanvas />
-      <div class="brand-logo">
-        <img :src="logos.white" alt="Logo" class="brand-logo-img" />
-        <span class="brand-name">N-Tester</span>
-      </div>
-      <div class="brand-inner">
-        <div class="brand-hero">
-          <div class="brand-tag">AI FULL-STACK TESTING PLATFORM</div>
-          <h1 class="brand-title">欢迎使用 {{ getThemeConfig.globalTitle }}</h1>
-          <p class="brand-desc">面向企业级的全栈自动化测试平台，集接口自动化、UI自动化、APP自动化于一体，让测试更高效、让业务更卓越。</p>
-          <div class="brand-dots">
-            <span class="dot dot-active"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="login-form-area">
+  <div class="login">
+    <LoginLeftView />
+
+    <div class="right-wrap">
       <div class="login-toolbar">
         <div class="theme-colors">
           <span
@@ -42,33 +25,30 @@
           />
         </div>
         <el-tooltip :content="getThemeConfig.isIsDark ? '切换浅色' : '切换深色'" placement="bottom">
-          <button class="dark-toggle" @click="toggleDark($event)">
+          <button type="button" class="dark-toggle" @click="toggleDark($event)">
             <el-icon v-if="getThemeConfig.isIsDark"><ele-Sunny /></el-icon>
             <el-icon v-else><ele-Moon /></el-icon>
           </button>
         </el-tooltip>
       </div>
-      <div class="login-form-card">
-        <div class="login-form-header">
-          <h2 class="login-form-title">欢迎回来</h2>
-          <p class="login-form-sub">输入您的账号和密码登录系统</p>
-        </div>
-        <div class="login-form-body">
-          <div v-if="!state.isScan">
-            <el-tabs v-model="state.tabsActiveName" class="login-tabs">
-              <el-tab-pane label="账号密码登录" name="account">
-                <Account />
-              </el-tab-pane>
-            </el-tabs>
+
+      <div class="login-wrap">
+        <div class="form">
+          <h3 class="title">欢迎回来 <span class="wave" aria-hidden="true">👋</span></h3>
+          <p class="sub-title">输入您的账号和密码登录系统</p>
+
+          <div v-if="!state.isScan" class="form-body">
+            <Account />
             <OAuth />
           </div>
-          <Scan v-if="state.isScan" />
+          <Scan v-else />
         </div>
       </div>
+
       <div class="login-copyright">
         <span>N-Tester平台</span>
         <span class="sep">|</span>
-        <a href="https://beian.miit.gov.cn/" target="_blank">贵ICP备202698015号</a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">贵ICP备202698015号</a>
       </div>
     </div>
   </div>
@@ -79,19 +59,19 @@ import { computed, defineAsyncComponent, onMounted, reactive } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useThemeConfig } from '/@/stores/themeConfig';
 import { NextLoading } from '/@/utils/loading';
-import { logos } from '/@/config/assets';
-import { onColorPickerChange, onAddDarkChange } from '/@/layout/navBars/topBar/settings/index';
+import { onAddDarkChange, onColorPickerChange } from '/@/layout/navBars/topBar/settings/index';
 import { getHexColor } from '/@/utils/theme';
 
 const Account = defineAsyncComponent(() => import('/@/views/login/component/account.vue'));
-const Mobile = defineAsyncComponent(() => import('/@/views/login/component/mobile.vue'));
 const Scan = defineAsyncComponent(() => import('/@/views/login/component/scan.vue'));
 const OAuth = defineAsyncComponent(() => import('/@/views/login/component/oauth.vue'));
-const ParticleCanvas = defineAsyncComponent(() => import('/@/views/login/component/ParticleCanvas.vue'));
+const LoginLeftView = defineAsyncComponent(() => import('/@/views/login/component/LoginLeftView.vue'));
+
 const storesThemeConfig = useThemeConfig();
 const { themeConfig } = storeToRefs(storesThemeConfig);
-const state = reactive({ tabsActiveName: 'account', isScan: false });
+const state = reactive({ isScan: false });
 const getThemeConfig = computed(() => themeConfig.value);
+
 const themePresets = [
   { color: '#409eff', name: '默认蓝' },
   { color: 'hsl(245 82% 67%)', name: '紫罗兰' },
@@ -107,10 +87,13 @@ const switchTheme = (preset: { color: string }) => {
   onColorPickerChange(preset.color);
 };
 
+const isActiveTheme = (color: string) => {
+  return getHexColor(color) === getThemeConfig.value.primary;
+};
+
 const toggleDark = (e: MouseEvent) => {
   const isDark = getThemeConfig.value.isIsDark;
   const nextTheme = isDark ? 'light' : 'dark';
-
 
   if (!document.startViewTransition) {
     onAddDarkChange(nextTheme);
@@ -143,308 +126,44 @@ const toggleDark = (e: MouseEvent) => {
   });
 };
 
-const isActiveTheme = (color: string) => {
-  return getHexColor(color) === getThemeConfig.value.primary;
-};
-
-onMounted(() => { NextLoading.done(); });
+onMounted(() => {
+  NextLoading.done();
+});
 </script>
 
 <style scoped lang="scss">
-.login-page {
+.login {
+  box-sizing: border-box;
   display: flex;
+  width: 100%;
   height: 100vh;
-  width: 100vw;
   overflow: hidden;
-  background: var(--el-bg-color-page);
-}
-
-
-.login-brand {
-  flex: 1;
-  position: relative;
-  background: linear-gradient(145deg, #f0f4ff 0%, #e8f0fe 40%, #dbeafe 70%, #bfdbfe 100%);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.3s ease;
-
-  &::before {
-    content: '';
-    position: absolute;
-    bottom: -120px;
-    left: -80px;
-    width: 420px;
-    height: 420px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(99,102,241,.18) 0%, rgba(59,130,246,.08) 60%, transparent 100%);
-    transition: background 0.3s ease;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: -60px;
-    right: -60px;
-    width: 280px;
-    height: 280px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(14,165,233,.12) 0%, transparent 70%);
-    transition: background 0.3s ease;
-  }
-}
-
-
-[data-theme="dark"] .login-brand {
-  background: linear-gradient(145deg, #1a1d2e 0%, #16213e 40%, #0f1729 70%, #0a0e1a 100%);
-
-  &::before {
-    background: radial-gradient(circle, rgba(99,102,241,.25) 0%, rgba(59,130,246,.15) 60%, transparent 100%);
-  }
-
-  &::after {
-    background: radial-gradient(circle, rgba(14,165,233,.2) 0%, transparent 70%);
-  }
-
-  .brand-name {
-    color: #93c5fd;
-    text-shadow:
-      1px 1px 0 #1e3a8a,
-      2px 2px 0 #1d4ed8,
-      3px 3px 0 #2563eb,
-      4px 4px 0 #1e40af,
-      5px 5px 0 #172554,
-      2px 2px 8px rgba(147, 197, 253, 0.4);
-  }
-
-  .brand-tag {
-    color: #818cf8;
-  }
-
-  .brand-title {
-    color: #e2e8f0;
-    text-shadow:
-      1px 1px 0 #312e81,
-      2px 2px 0 #3730a3,
-      3px 3px 0 #4338ca,
-      4px 4px 0 #312e81,
-      5px 5px 0 #1e1b4b,
-      6px 6px 0 #0f0e1a,
-      3px 3px 12px rgba(99, 102, 241, 0.5);
-  }
-
-  .brand-desc {
-    color: #94a3b8;
-  }
-
-  .dot {
-    background: #475569;
-  }
-
-  .dot-active {
-    background: #818cf8;
-  }
-}
-
-.brand-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 48px 56px;
-  width: 100%;
-}
-.brand-logo {
-  position: absolute;
-  top: 32px;
-  left: 40px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 1;
-}
-
-.brand-logo-img {
-  width: 56px;
-  height: 56px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(99,102,241,.35));
-}
-
-.brand-name {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #fff;
-  text-shadow:
-    1px 1px 0 #0a5abf,
-    2px 2px 0 #0848a0,
-    3px 3px 0 #063880,
-    4px 4px 0 #042a60,
-    5px 5px 0 #021840,
-    2px 2px 8px rgba(0, 0, 0, 0.45);
-  transform: perspective(200px) rotateX(5deg);
-  display: inline-block;
-}
-
-.brand-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.brand-tag {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: #6366f1;
-  margin-bottom: 16px;
-}
-
-.brand-title {
-  font-size: 38px;
-  font-weight: 800;
-  line-height: 1.25;
-  margin: 0 0 18px;
-  color: #fff;
-  text-shadow:
-    1px 1px 0 #1e3a8a,
-    2px 2px 0 #1e40af,
-    3px 3px 0 #1d4ed8,
-    4px 4px 0 #1e3a8a,
-    5px 5px 0 #172554,
-    6px 6px 0 #0f172a,
-    3px 3px 12px rgba(30, 58, 138, 0.5);
-  transform: perspective(300px) rotateX(4deg);
-  display: inline-block;
-}
-
-.brand-desc {
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.8;
-  max-width: 380px;
-  margin: 0 0 28px;
-}
-
-.brand-dots {
-  display: flex;
-  gap: 8px;
-}
-
-.dot {
-  width: 24px;
-  height: 4px;
-  border-radius: 2px;
-  background: #cbd5e1;
-  transition: all .3s;
-}
-
-.dot-active {
-  width: 40px;
-  background: #6366f1;
-}
-
-.brand-deco { display: none; }
-
-
-.login-form-area {
-  width: 680px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 80px;
   background: var(--el-bg-color);
-  border-left: 1px solid var(--el-border-color-light);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.right-wrap {
   position: relative;
+  flex: 1;
+  height: 100%;
+  background: var(--el-bg-color);
 }
-
-.login-form-card {
-  width: 100%;
-  max-width: 520px;
-}
-
-.login-form-header {
-  margin-bottom: 28px;
-}
-
-.login-form-title {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  margin: 0 0 6px;
-}
-
-.login-form-sub {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
-  margin: 0;
-}
-
-.login-form-body {
-  :deep(.el-tabs__header) { margin-bottom: 20px; }
-  :deep(.el-tabs__nav-wrap::after) { display: none; }
-  :deep(.el-tabs) { --el-tabs-header-height: 36px; }
-  :deep(.el-tabs__content) { overflow: visible; border: none; }
-  :deep(.el-tab-pane) { border: none; }
-  :deep(.login-content-form) { border: none; }
-  :deep(.el-tabs__item) {
-    font-size: 14px; color: #94a3b8; padding: 0 4px; height: 36px; line-height: 36px;
-    &.is-active { color: var(--el-color-primary); font-weight: 600; }
-  }
-  :deep(.el-tabs__active-bar) { background: var(--el-color-primary); height: 2px; border-radius: 1px; }
-  :deep(.el-input__wrapper) {
-    border-radius: 8px;
-    box-shadow: none !important;
-    border: 1px solid var(--el-border-color);
-    transition: border-color .2s;
-    &:hover { border-color: var(--el-color-primary-light-3); }
-    &.is-focus { border-color: var(--el-color-primary); border-width: 2px; }
-  }
-  :deep(.el-form-item) { margin-bottom: 22px; overflow: visible; }
-  :deep(.el-form-item__content) { overflow: visible; }
-  :deep(.el-form-item__error) { padding-top: 4px; font-size: 12px; }
-  :deep(.login-content-submit) {
-    width: 100%; height: 44px; border-radius: 8px;
-    background: var(--el-color-primary);
-    border: none; font-size: 15px; font-weight: 600; letter-spacing: .5px; transition: all .2s; margin-top: 8px;
-    &:hover { background: var(--el-color-primary-dark-2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
-  }
-  
-  :deep(.oauth-login) { margin-top: 0; }
-}
-
-.login-copyright {
-  position: absolute;
-  bottom: 20px;
-  font-size: 12px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  a { color: #94a3b8; text-decoration: none; &:hover { color: var(--el-color-primary); } }
-  .sep { color: #cbd5e1; }
-}
-
 
 .login-toolbar {
-  position: absolute;
+  position: fixed;
   top: 20px;
   right: 24px;
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--el-bg-color);
+  padding: 6px 12px;
   border: 1px solid var(--el-border-color-light);
   border-radius: 24px;
-  padding: 6px 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  background: var(--el-bg-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .theme-colors {
@@ -461,18 +180,20 @@ onMounted(() => { NextLoading.done(); });
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform .15s, box-shadow .15s;
   flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
 
-  &:hover { transform: scale(1.15); }
+  &:hover {
+    transform: scale(1.12);
+  }
 
   &.active {
-    box-shadow: 0 0 0 2px #fff, 0 0 0 3px currentColor;
+    box-shadow: 0 0 0 2px var(--el-bg-color), 0 0 0 3.5px currentColor;
   }
 
   .theme-dot-check {
     color: #fff;
-    font-size: 13px;
+    font-size: 12px;
   }
 }
 
@@ -480,82 +201,187 @@ onMounted(() => { NextLoading.done(); });
   :deep(.el-color-picker__trigger) {
     width: 22px;
     height: 22px;
-    border-radius: 50%;
-    border: none;
     padding: 0;
-  }
-  :deep(.el-color-picker__color) {
-    border-radius: 50%;
     border: none;
+    border-radius: 50%;
   }
-  :deep(.el-color-picker__icon) { display: none; }
+
+  :deep(.el-color-picker__color) {
+    border: none;
+    border-radius: 50%;
+  }
+
+  :deep(.el-color-picker__icon) {
+    display: none;
+  }
 }
 
 .dark-toggle {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  padding: 0;
   border: none;
+  border-radius: 50%;
   background: transparent;
+  color: var(--el-text-color-regular);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--el-text-color-regular);
   font-size: 16px;
-  transition: color .2s, background .2s;
-  padding: 0;
+  transition: color 0.2s, background 0.2s;
 
   &:hover {
-    background: var(--el-fill-color-light);
     color: var(--el-color-primary);
+    background: var(--el-fill-color-light);
   }
 }
 
+.login-wrap {
+  position: absolute;
+  top: 49%;
+  right: 0;
+  left: 0;
+  width: 440px;
+  margin: 0 auto;
+  padding: 0 5px;
+  opacity: 0;
+  transform: translateY(-50%) translateX(24px);
+  animation: slideInRight 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
 
-@media (max-width: 768px) {
-  .login-page {
-    flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-    overflow-y: auto;
+.form {
+  box-sizing: border-box;
+  padding: 24px 0 40px;
+
+  .title {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--el-text-color-primary);
+    letter-spacing: -0.02em;
+
+    .wave {
+      display: inline-block;
+      margin-left: 2px;
+      font-size: 30px;
+      line-height: 1;
+      transform-origin: 70% 70%;
+      animation: wave-hand 2.4s ease-in-out infinite;
+    }
   }
 
-  
-  .login-brand {
-    flex: none;
-    height: 140px;
-    width: 100%;
-    justify-content: flex-start;
-    padding: 0 24px;
+  .sub-title {
+    margin: 10px 0 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--el-text-color-regular);
+  }
 
-    .brand-inner { display: none; }
+  .form-body {
+    margin-top: 28px;
+  }
 
-    .brand-logo {
-      position: static;
-      padding: 0;
+  :deep(.login-content-form) {
+    margin-top: 0;
+  }
+
+  :deep(.el-input__wrapper) {
+    border-radius: 8px;
+    box-shadow: none !important;
+    border: 1px solid var(--el-border-color);
+    transition: border-color 0.2s;
+
+    &:hover {
+      border-color: var(--el-color-primary-light-3);
     }
 
-    .brand-logo-img { width: 36px; height: 36px; }
-    .brand-name { font-size: 20px; }
+    &.is-focus {
+      border-color: var(--el-color-primary);
+    }
   }
 
-  
-  .login-form-area {
+  :deep(.el-form-item) {
+    margin-bottom: 20px;
+  }
+
+  :deep(.el-input) {
+    --el-input-height: 40px;
+  }
+
+  :deep(.login-content-submit) {
     width: 100%;
-    flex-shrink: unset;
-    border-left: none;
-    border-top: 1px solid var(--el-border-color-light);
-    padding: 32px 24px 80px;
-    min-height: calc(100vh - 140px);
-    justify-content: flex-start;
+    height: 40px;
+    margin-top: 8px;
+    border: 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 2px;
   }
 
-  .login-form-card {
-    max-width: 100%;
+  :deep(.oauth-login) {
+    margin-top: 8px;
+  }
+}
+
+.login-copyright {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+
+  a {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
   }
 
-  
+  .sep {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 1024px) {
+  .login {
+    .login-wrap {
+      position: relative;
+      top: auto;
+      width: min(440px, 100%);
+      margin: 12vh auto 0;
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+
+    .login-copyright {
+      position: static;
+      margin: 32px 0 24px;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .right-wrap {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0 24px;
+  }
+
+  .login-wrap {
+    width: 100%;
+  }
+
   .login-toolbar {
     top: 12px;
     right: 12px;
@@ -581,15 +407,43 @@ onMounted(() => { NextLoading.done(); });
     font-size: 14px;
   }
 
-  .login-form-title { font-size: 22px; }
-
-  .login-copyright {
-    position: static;
-    margin-top: 24px;
-    justify-content: center;
+  .form .title {
+    font-size: 28px;
   }
 }
 
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@keyframes wave-hand {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10%,
+  30% {
+    transform: rotate(14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(-8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form .title .wave {
+    animation: none;
+  }
+}
 
 :global(::view-transition-new(root)),
 :global(::view-transition-old(root)) {
@@ -603,4 +457,3 @@ onMounted(() => { NextLoading.done(); });
   z-index: 1;
 }
 </style>
-

@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { app_result, app_result_detail, get_result_list } from "@/api/api_app/app.ts";
 import { TabsPaneContext } from "element-plus";
-import { MsgError, MsgSuccess } from "@/utils/koi";
+import { MsgError, MsgSuccess } from "@/utils/ntesterc";
 import * as echarts from "echarts";
 import { ElLoading } from 'element-plus';
 
@@ -47,7 +47,7 @@ const reset_search = async () => {
 };
 
 // 旧版实时页/图表相关变量（后续继续完整迁移）
-const run_koiDialogRef = ref();
+const run_ntestercDialogRef = ref();
 const run_device_list = ref<any>([]);
 const device_active = ref<any>("");
 const title = ref<any>("");
@@ -79,7 +79,7 @@ onMounted(() => {
 
 <template>
   <div style="padding: 10px">
-    <KoiCard>
+    <NtestercCard>
       <el-form v-show="showSearch" :inline="true">
         <el-form-item label="任务名称">
           <el-input placeholder="请输入任务名称" v-model="searchParams.search.task_name__icontaints" clearable style="width: 240px" />
@@ -115,7 +115,7 @@ onMounted(() => {
         @size-change="result_list"
         @current-change="result_list"
       />
-    </KoiCard>
+    </NtestercCard>
   </div>
 </template>
 

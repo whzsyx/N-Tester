@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="system-user-container app-container">
     <el-card>
       <div class="system-user-search mb15">
@@ -9,7 +9,7 @@
           新增
         </el-button>
       </div>
-      <z-table
+      <n-table
           :columns="state.columns"
           :data="state.listData"
           ref="tableRef"

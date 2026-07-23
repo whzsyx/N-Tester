@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="element-manager-container">
     <div style="display: flex; gap: 8px; align-items: flex-start">
         <!-- 左侧元素菜单树 -->
@@ -178,12 +178,12 @@
       </div>
 
     <!-- 菜单新增 / 编辑弹窗 -->
-      <KoiDialog
-        ref="add_koiDialogRef"
+      <NtestercDialog
+        ref="add_ntestercDialogRef"
         :title="title"
         :height="100"
-        @koi-confirm="add_menu_confirm"
-        @koi-cancel="add_menu_cancel"
+        @ntesterc-confirm="add_menu_confirm"
+        @ntesterc-cancel="add_menu_cancel"
       >
         <template #content>
           <el-form :model="add_menu_form" label-width="80px">
@@ -192,14 +192,14 @@
             </el-form-item>
           </el-form>
         </template>
-      </KoiDialog>
+      </NtestercDialog>
 
-      <KoiDialog
-        ref="edit_koiDialogRef"
+      <NtestercDialog
+        ref="edit_ntestercDialogRef"
         :title="title"
         :height="100"
-        @koi-confirm="edit_menu_confirm"
-        @koi-cancel="edit_menu_cancel"
+        @ntesterc-confirm="edit_menu_confirm"
+        @ntesterc-cancel="edit_menu_cancel"
       >
         <template #content>
           <el-form :model="add_menu_form" label-width="80px">
@@ -208,16 +208,16 @@
             </el-form-item>
           </el-form>
         </template>
-      </KoiDialog>
+      </NtestercDialog>
 
       <!-- 元素新增 / 编辑弹窗 -->
-      <KoiDialog
+      <NtestercDialog
         ref="add_element_dialogRef"
         :title="title"
         :height="350"
         width="35%"
-        @koi-confirm="add_element_confirm"
-        @koi-cancel="add_element_cancel"
+        @ntesterc-confirm="add_element_confirm"
+        @ntesterc-cancel="add_element_cancel"
       >
         <template #content>
           <el-form :model="add_element_form" label-width="100px">
@@ -303,15 +303,15 @@
             </el-form-item>
           </el-form>
         </template>
-      </KoiDialog>
+      </NtestercDialog>
 
-      <KoiDialog
+      <NtestercDialog
         ref="edit_element_dialogRef"
         :title="title"
         :height="350"
         width="35%"
-        @koi-confirm="edit_element_confirm"
-        @koi-cancel="edit_element_cancel"
+        @ntesterc-confirm="edit_element_confirm"
+        @ntesterc-cancel="edit_element_cancel"
       >
         <template #content>
           <el-form :model="add_element_form" label-width="100px">
@@ -397,7 +397,7 @@
             </el-form-item>
           </el-form>
         </template>
-      </KoiDialog>
+      </NtestercDialog>
   </div>
 </template>
 
@@ -405,8 +405,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { HomeFilled, Folder, MoreFilled, CirclePlus, Edit, Delete } from '@element-plus/icons-vue'
-import KoiCard from '/@/components/koi/KoiCard.vue'
-import KoiDialog from '/@/components/koi/KoiDialog.vue'
+import NtestercCard from '/@/components/ntesterc/NtestercCard.vue'
+import NtestercDialog from '/@/components/ntesterc/NtestercDialog.vue'
 import { useWebManagementApi } from '/@/api/v1/web_management'
 
 const {
@@ -427,8 +427,8 @@ const defaultProps = {
 }
 const filterText = ref('')
 const title = ref('')
-const add_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const edit_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const add_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
+const edit_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
 const add_menu_form = ref<any>({})
 
 const get_tree = async () => {
@@ -448,17 +448,17 @@ const Add_menu = (data: any) => {
     type: 1,
   }
   title.value = '新建菜单'
-  add_koiDialogRef.value?.koiOpen()
+  add_ntestercDialogRef.value?.ntestercOpen()
 }
 
 const add_menu_confirm = async () => {
   const res: any = await add_element_menu(add_menu_form.value)
-  add_koiDialogRef.value?.koiQuickClose(res.message)
+  add_ntestercDialogRef.value?.ntestercQuickClose(res.message)
   await get_tree()
 }
 
 const add_menu_cancel = () => {
-  add_koiDialogRef.value?.koiClose()
+  add_ntestercDialogRef.value?.ntestercClose()
 }
 
 const Edit_menu = (data: any) => {
@@ -467,17 +467,17 @@ const Edit_menu = (data: any) => {
     name: data.name,
   }
   title.value = '重命名'
-  edit_koiDialogRef.value?.koiOpen()
+  edit_ntestercDialogRef.value?.ntestercOpen()
 }
 
 const edit_menu_confirm = async () => {
   const res: any = await edit_element_menu(add_menu_form.value)
-  edit_koiDialogRef.value?.koiQuickClose(res.message)
+  edit_ntestercDialogRef.value?.ntestercQuickClose(res.message)
   await get_tree()
 }
 
 const edit_menu_cancel = () => {
-  edit_koiDialogRef.value?.koiClose()
+  edit_ntestercDialogRef.value?.ntestercClose()
 }
 
 const Del_menu = (data: any) => {
@@ -586,8 +586,8 @@ const element_list = async () => {
   }
 }
 
-const add_element_dialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const edit_element_dialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const add_element_dialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
+const edit_element_dialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
 const add_element_form = ref<any>({})
 
 const element_type_list = ref([
@@ -648,34 +648,34 @@ const Add_element = (tab: any, menu_id: any) => {
     },
   }
   title.value = '新建元素'
-  add_element_dialogRef.value?.koiOpen()
+  add_element_dialogRef.value?.ntestercOpen()
 }
 
 const Edit_element = (tab: any, data: any) => {
   refresh_tab.value = tab
   add_element_form.value = data
   title.value = `编辑元素：${data.name}`
-  edit_element_dialogRef.value?.koiOpen()
+  edit_element_dialogRef.value?.ntestercOpen()
 }
 
 const add_element_confirm = async () => {
   const res: any = await add_element(add_element_form.value)
-  add_element_dialogRef.value?.koiQuickClose(res.message)
+  add_element_dialogRef.value?.ntestercQuickClose(res.message)
   await element_list()
 }
 
 const edit_element_confirm = async () => {
   const res: any = await edit_element(add_element_form.value)
-  edit_element_dialogRef.value?.koiQuickClose(res.message)
+  edit_element_dialogRef.value?.ntestercQuickClose(res.message)
   await element_list()
 }
 
 const add_element_cancel = () => {
-  add_element_dialogRef.value?.koiClose()
+  add_element_dialogRef.value?.ntestercClose()
 }
 
 const edit_element_cancel = () => {
-  edit_element_dialogRef.value?.koiClose()
+  edit_element_dialogRef.value?.ntestercClose()
 }
 
 const Del_element = (tab: any, data: any) => {

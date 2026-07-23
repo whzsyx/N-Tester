@@ -578,8 +578,8 @@ const submitScriptForm = async () => {
   } catch (e: any) { ElMessage.error(e?.message || '操作失败') }
 }
 
-const add_koiDialogRef = ref<any>(null)
-const edit_koiDialogRef = ref<any>(null)
+const add_ntestercDialogRef = ref<any>(null)
+const edit_ntestercDialogRef = ref<any>(null)
 
 const add_form = ref<any>({
   name: '',
@@ -679,7 +679,7 @@ const run_script = (row: any) => {
   runDialogVisible.value = true
 }
 
-const run_koiDialogRef = ref<any>(null)
+const run_ntestercDialogRef = ref<any>(null)
 
 const run_script_confirm = async () => {
   if (!run_script_form.value.script.length) {

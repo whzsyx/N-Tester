@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<div class="upload-box">
 		<el-upload
 			v-model:file-list="_fileList"
@@ -47,7 +47,7 @@ import { computed, inject, ref, watch } from 'vue';
 import { ElLoading } from 'element-plus';
 import type { UploadProps, UploadFile, UploadUserFile, UploadRequestOptions } from 'element-plus';
 import { formContextKey, formItemContextKey } from 'element-plus';
-import { NoticeError, NoticeSuccess, koiNoticeWarning } from '/@/utils/koi';
+import { NoticeError, NoticeSuccess, ntestercNoticeWarning } from '/@/utils/ntesterc';
 import { useFileApi } from '/@/api/v1/common/file';
 import request from '/@/utils/request';
 
@@ -96,8 +96,8 @@ watch(
 const beforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
 	const okSize = rawFile.size / 1024 / 1024 < props.fileSize;
 	const okType = props.fileType.includes(rawFile.type);
-	if (!okType) koiNoticeWarning('上传图片不符合所需的格式');
-	if (!okSize) koiNoticeWarning(`上传图片大小不能超过 ${props.fileSize}M！`);
+	if (!okType) ntestercNoticeWarning('上传图片不符合所需的格式');
+	if (!okSize) ntestercNoticeWarning(`上传图片大小不能超过 ${props.fileSize}M！`);
 	return okType && okSize;
 };
 
@@ -182,7 +182,7 @@ const handleRemove = (file: UploadFile) => {
 };
 
 const uploadError = () => NoticeError('图片上传失败，请您重新上传');
-const handleExceed = () => koiNoticeWarning(`当前最多只能上传 ${props.limit} 张图片，请移除后上传！`);
+const handleExceed = () => ntestercNoticeWarning(`当前最多只能上传 ${props.limit} 张图片，请移除后上传！`);
 
 const viewImageUrl = ref('');
 const imgViewVisible = ref(false);

@@ -1,9 +1,9 @@
-<template>
+﻿<template>
   <div class="personal layout-pd">
     <el-row>
       <!-- 个人信息 -->
       <el-col :xs="24" :sm="8" style="padding: 0 10px">
-        <z-card>
+        <ntesterc-z-card>
           <div class="personal-user">
             <div class="personal-user-avatar" @click="onCropperDialogOpen">
 
@@ -101,12 +101,12 @@
               </el-row>
             </div>
           </div>
-        </z-card>
+        </ntesterc-z-card>
       </el-col>
 
       <!-- 消息通知 -->
       <el-col :xs="24" :sm="16" class="pl15 personal-info">
-        <z-card shadow="hover">
+        <ntesterc-z-card shadow="hover">
           <template #header>
             <span>消息通知</span>
           </template>
@@ -117,7 +117,7 @@
               </li>
             </ul>
           </div>
-        </z-card>
+        </ntesterc-z-card>
       </el-col>
 
 
@@ -128,7 +128,7 @@
                v-model="state.showEditPage">
       <el-row>
         <el-col :span="24" style="padding: 0 10px">
-          <z-card class="personal-edit">
+          <ntesterc-z-card class="personal-edit">
             <div class="personal-edit-title">基本信息</div>
             <el-form 
               ref="profileFormRef" 
@@ -203,7 +203,7 @@
                 </el-col>
               </el-row>
             </el-form>
-          </z-card>
+          </ntesterc-z-card>
         </el-col>
       </el-row>
       <template #footer>

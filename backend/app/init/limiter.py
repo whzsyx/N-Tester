@@ -71,11 +71,11 @@ async def init_limiter(app: FastAPI):
             http_callback=rate_limit_callback
         )
         
-        print("✓ API 限流器初始化成功")
+        print("[OK] API limiter initialized")
         
     except Exception as e:
-        print(f"✗ API 限流器初始化失败: {str(e)}")
-        print("  限流功能将不可用，但不影响系统运行")
+        print(f"[WARN] API limiter init failed: {str(e)}")
+        print("  Rate limiting disabled; system will continue")
 
 
 # 导出 RateLimiter 供路由使用

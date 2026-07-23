@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-automation-wrapper">
     <div class="app-automation-page">
     <!-- 顶部标题栏 -->
@@ -346,7 +346,7 @@
     </div>
 
       <!-- 新增菜单对话框 -->
-      <el-dialog v-model="dialogVisible" :title="title" width="400px" ref="add_koiDialogRef">
+      <el-dialog v-model="dialogVisible" :title="title" width="400px" ref="add_ntestercDialogRef">
         <el-form :model="add_menu_form" label-width="80px">
           <el-form-item label="菜单名称">
             <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
@@ -365,7 +365,7 @@
       </el-dialog>
 
       <!-- 重命名对话框 -->
-      <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" ref="rename_koiDialogRef">
+      <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" ref="rename_ntestercDialogRef">
         <el-form :model="add_menu_form" label-width="80px">
           <el-form-item label="菜单名称">
             <el-input v-model="add_menu_form.name" placeholder="请输入菜单名称" />
@@ -382,7 +382,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { ElTree, TabsPaneContext } from "element-plus";
 import { useRoute } from "vue-router";
-import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/koi.ts";
+import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
 import {
   add_app_menu,
   app_menu,
@@ -590,10 +590,10 @@ const title = ref<string>("");
 const device = ref<string>("");
 const dialogVisible = ref(false);
 const renameDialogVisible = ref(false);
-const add_koiDialogRef = ref();
-const rename_koiDialogRef = ref();
-const device_koiDialogRef = ref();
-const run_koiDialogRef = ref();
+const add_ntestercDialogRef = ref();
+const rename_ntestercDialogRef = ref();
+const device_ntestercDialogRef = ref();
+const run_ntestercDialogRef = ref();
 const user = JSON.parse(LocalStorage.get("user"));
 const script_id = ref<number>();
 const menu_form = ref<any>({

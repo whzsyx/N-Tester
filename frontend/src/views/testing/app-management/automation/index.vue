@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { ElTree, TabsPaneContext } from "element-plus";
 import { useRoute } from "vue-router";
-import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/koi.ts";
+import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
 import {
   add_app_menu,
   app_menu,
@@ -193,10 +193,10 @@ const run_device_list = ref<any>([]);
 const device_active = ref<any>("");
 const title = ref<string>("");
 const device = ref<string>("");
-const add_koiDialogRef = ref();
-const rename_koiDialogRef = ref();
-const device_koiDialogRef = ref();
-const run_koiDialogRef = ref();
+const add_ntestercDialogRef = ref();
+const rename_ntestercDialogRef = ref();
+const device_ntestercDialogRef = ref();
+const run_ntestercDialogRef = ref();
 const user = JSON.parse(LocalStorage.get("user"));
 const script_id = ref<number>();
 const menu_form = ref<any>({
@@ -208,7 +208,7 @@ const run_pid = ref<any>(null);
 
 const add_menu = async (data: any) => {
   title.value = "新增子菜单";
-  add_koiDialogRef.value.koiOpen();
+  add_ntestercDialogRef.value.ntestercOpen();
   menu_form.value = data;
 };
 
@@ -226,19 +226,19 @@ const add_menu_confirm = async () => {
     add_menu_form.value.pid = menu_form.value.id;
     const res: any = await add_app_menu(add_menu_form.value);
     await check_children(menu_form.value, res.data);
-    add_koiDialogRef.value.koiQuickClose(res.message);
+    add_ntestercDialogRef.value.ntestercQuickClose(res.message);
   } catch {
     NoticeError("保存失败，请重试🌻");
   }
 };
 
 const add_menu_cancel = async () => {
-  add_koiDialogRef.value.koiClose();
+  add_ntestercDialogRef.value.ntestercClose();
 };
 
 const rename_menu = async (data: any) => {
   title.value = "重命名";
-  rename_koiDialogRef.value.koiOpen();
+  rename_ntestercDialogRef.value.ntestercOpen();
   menu_form.value = data;
 };
 
@@ -246,7 +246,7 @@ const edit_menu_confirm = async () => {
   try {
     add_menu_form.value.id = menu_form.value.id;
     const res: any = await rename_app_menu(add_menu_form.value);
-    rename_koiDialogRef.value.koiQuickClose(res.message);
+    rename_ntestercDialogRef.value.ntestercQuickClose(res.message);
     menu_form.value.name = add_menu_form.value.name;
   } catch {
     NoticeError("保存失败，请重试🌻");
@@ -256,7 +256,7 @@ const edit_menu_confirm = async () => {
 };
 
 const edit_menu_cancel = async () => {
-  rename_koiDialogRef.value.koiClose();
+  rename_ntestercDialogRef.value.ntestercClose();
 };
 
 const del_menu = async (data: any) => {
@@ -350,7 +350,7 @@ const run_script = async (id: number) => {
   run_form.value.run_type = 1;
   script_id.value = id;
   await get_device();
-  device_koiDialogRef.value.koiOpen();
+  device_ntestercDialogRef.value.ntestercOpen();
 };
 
 const get_run_device = async () => {
@@ -376,7 +376,7 @@ const run_script_list = async () => {
   title.value = "执行脚本";
   run_form.value.run_type = 1;
   await get_device();
-  script_list_koiDialogRef.value.koiOpen();
+  script_list_ntestercDialogRef.value.ntestercOpen();
 };
 
 const run_script_confirm = async () => {
@@ -411,7 +411,7 @@ const run_script_confirm = async () => {
   loadingInstance.close();
   device_active.value = run_device_list.value[0].name;
   title.value = "设备执行过程";
-  run_koiDialogRef.value.koiOpen();
+  run_ntestercDialogRef.value.ntestercOpen();
   result_id.value = id_result;
   await device_pid();
   run_pid.value = pid_list.value[0]["pid"];
@@ -420,9 +420,9 @@ const run_script_confirm = async () => {
   await getEcharts();
 };
 
-const script_list_koiDialogRef = ref();
+const script_list_ntestercDialogRef = ref();
 const run_list_cancel = async () => {
-  script_list_koiDialogRef.value.koiClose();
+  script_list_ntestercDialogRef.value.ntestercClose();
 };
 
 const run_confirm = async () => {
@@ -451,7 +451,7 @@ const run_confirm = async () => {
   loadingInstance.close();
   device_active.value = run_device_list.value[0].name;
   title.value = "设备执行过程";
-  run_koiDialogRef.value.koiOpen();
+  run_ntestercDialogRef.value.ntestercOpen();
   result_id.value = id_result;
   await device_pid();
   run_pid.value = pid_list.value[0]["pid"];
@@ -520,7 +520,7 @@ const stop_run = async (pid: any) => {
   if (res?.message == "执行结束") {
     run_type.value = "执行结束";
     run_close();
-    run_koiDialogRef.value?.koiQuickClose("停止成功");
+    run_ntestercDialogRef.value?.ntestercQuickClose("停止成功");
     return;
   }
 
@@ -530,13 +530,13 @@ const stop_run = async (pid: any) => {
 };
 
 const device_url = ref<any>("");
-const device_koiDrawerRef = ref();
+const device_ntestercDrawerRef = ref();
 const view_phone = async () => {
   const res: any = await app_view_device({
     device_id: device.value
   });
   device_url.value = res.data.device_url;
-  device_koiDrawerRef.value.koiOpen();
+  device_ntestercDrawerRef.value.ntestercOpen();
 };
 
 const run_app_correction = async () => {
@@ -793,7 +793,7 @@ const get_colors = (status: any) => {
 };
 
 const run_cancel = async () => {
-  device_koiDialogRef.value.koiClose();
+  device_ntestercDialogRef.value.ntestercClose();
 };
 
 const pre_video = ref<any>("");
@@ -896,7 +896,7 @@ const openRealtimeFromQuery = async () => {
     await get_pid_status();
     startPolling();
 
-    run_koiDialogRef.value?.koiOpen?.();
+    run_ntestercDialogRef.value?.ntestercOpen?.();
   } catch (e: any) {
     MsgError(e?.message || "打开实时监控失败");
   }
@@ -911,10 +911,10 @@ onMounted(() => {
 
 <template>
   <div>
-    <KoiCard>
+    <NtestercCard>
       <div style="width: 100%">
         <!-- 右侧：tab 页 -->
-        <KoiCard style="width: 75%; height: 780px; float: right; padding: 5px">
+        <NtestercCard style="width: 75%; height: 780px; float: right; padding: 5px">
           <div>
             <el-tabs v-model="tab_active" type="card" closable class="demo-tabs" @tab-remove="removeTab"
               @tab-click="tab_click">
@@ -922,7 +922,7 @@ onMounted(() => {
                 :name="item.name">
                 <div v-if="item.type == 1">
                   <div>
-                    <KoiCard style="height: 700px">
+                    <NtestercCard style="height: 700px">
                       <div>
                         <div style="float: right; padding-left: 10px; padding-right: 10px; padding-block-end: 10px">
                           <el-button type="primary" @click="run_script_list()">立即调试</el-button>
@@ -954,12 +954,12 @@ onMounted(() => {
                           </el-table-column>
                         </el-table>
                       </div>
-                    </KoiCard>
+                    </NtestercCard>
                   </div>
                 </div>
                 <div v-if="item.type == 2" style="padding: 5px; height: 100%">
                   <div style="padding-block-end: 5px">
-                    <KoiCard style="height: 20%">
+                    <NtestercCard style="height: 20%">
                       <div>
                         <el-descriptions title="脚本信息：" column="4">
                           <el-descriptions-item label="类型：">APP自动化</el-descriptions-item>
@@ -970,10 +970,10 @@ onMounted(() => {
                           </el-descriptions-item>
                         </el-descriptions>
                       </div>
-                    </KoiCard>
+                    </NtestercCard>
                   </div>
                   <div style="height: 79%">
-                    <KoiCard>
+                    <NtestercCard>
                       <div style="padding-block-end: 5px">
                         <div style="float: right">
                           <el-button type="success" @click="save_script(item.id)">保存</el-button>
@@ -1133,15 +1133,15 @@ onMounted(() => {
                           </div>
                         </div>
                       </div>
-                    </KoiCard>
+                    </NtestercCard>
                   </div>
                 </div>
               </el-tab-pane>
             </el-tabs>
           </div>
-        </KoiCard>
+        </NtestercCard>
 
-        <KoiCard style="width: 22%; height: 780px; float: left;">
+        <NtestercCard style="width: 22%; height: 780px; float: left;">
           <div style="width: 100%; overflow: auto;">
             <div>
               <el-input v-model="filterText" style="margin-bottom: 5px; width: 90%; padding-right: 10px"
@@ -1217,11 +1217,11 @@ onMounted(() => {
               </template>
             </el-tree>
           </div>
-        </KoiCard>
+        </NtestercCard>
       </div>
 
       <div>
-        <KoiDialog ref="add_koiDialogRef" :title="title" @koi-confirm="add_menu_confirm" @koi-cancel="add_menu_cancel"
+        <NtestercDialog ref="add_ntestercDialogRef" :title="title" @ntesterc-confirm="add_menu_confirm" @ntesterc-cancel="add_menu_cancel"
           :height="100">
           <template #content>
             <el-form ref="formRef" :model="add_menu_form" label-width="80px" status-icon>
@@ -1236,10 +1236,10 @@ onMounted(() => {
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
       </div>
       <div>
-        <KoiDialog ref="rename_koiDialogRef" :title="title" @koi-confirm="edit_menu_confirm" @koi-cancel="edit_menu_cancel"
+        <NtestercDialog ref="rename_ntestercDialogRef" :title="title" @ntesterc-confirm="edit_menu_confirm" @ntesterc-cancel="edit_menu_cancel"
           :height="100">
           <template #content>
             <el-form ref="formRef" :model="add_menu_form" label-width="80px" status-icon>
@@ -1248,10 +1248,10 @@ onMounted(() => {
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
       </div>
       <div>
-        <KoiDialog ref="device_koiDialogRef" :title="title" @koi-confirm="run_confirm" @koi-cancel="run_cancel"
+        <NtestercDialog ref="device_ntestercDialogRef" :title="title" @ntesterc-confirm="run_confirm" @ntesterc-cancel="run_cancel"
           confirmText="立即启动" :height="dialog_height" :width="1000">
           <template #content>
             <el-form ref="formRef" :model="run_form" label-width="80px" status-icon>
@@ -1278,7 +1278,7 @@ onMounted(() => {
                       <el-button @click="add_app_list" plain type="primary">添加安装配置</el-button>
                     </el-form-item>
                     <el-form-item v-for="(app, index) in run_form.app_list" :key="index">
-                      <koiCard style="margin-top: 5px;">
+                      <ntestercCard style="margin-top: 5px;">
                         <div>
                           <el-input v-model="app.path" style="width: 400px; padding-right: 10px;" placeholder="请输入路径" />
                           <el-button @click="search_package(app.path)" type="primary">搜索</el-button>
@@ -1300,7 +1300,7 @@ onMounted(() => {
                           <el-button @click="del_config(config_index, app.config)" type="text" style="float: right;"
                             :icon="Delete"></el-button>
                         </div>
-                      </koiCard>
+                      </ntestercCard>
                       <el-button @click="del_app_list(index)" type="text" :icon="Delete"></el-button>
                     </el-form-item>
                   </el-form>
@@ -1313,11 +1313,11 @@ onMounted(() => {
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
       </div>
       <div>
-        <KoiDialog ref="script_list_koiDialogRef" :title="title" @koi-confirm="run_script_confirm"
-          @koi-cancel="run_list_cancel" :width="1000" :height="dialog_height" confirmText="立即启动">
+        <NtestercDialog ref="script_list_ntestercDialogRef" :title="title" @ntesterc-confirm="run_script_confirm"
+          @ntesterc-cancel="run_list_cancel" :width="1000" :height="dialog_height" confirmText="立即启动">
           <template #content>
             <el-form ref="formRef" :model="run_form" label-width="80px" status-icon>
               <el-form-item label="任务名称：" prop="roleName">
@@ -1343,7 +1343,7 @@ onMounted(() => {
                       <el-button @click="add_app_list" plain type="primary">添加安装配置</el-button>
                     </el-form-item>
                     <el-form-item v-for="(app, index) in run_form.app_list" :key="index">
-                      <koiCard style="margin-top: 5px;">
+                      <ntestercCard style="margin-top: 5px;">
                         <div>
                           <el-input v-model="app.path" style="width: 400px; padding-right: 10px;" placeholder="请输入路径" />
                           <el-button @click="search_package(app.path)" type="primary">搜索</el-button>
@@ -1365,7 +1365,7 @@ onMounted(() => {
                           <el-button @click="del_config(config_index, app.config)" type="text" style="float: right;"
                             :icon="Delete"></el-button>
                         </div>
-                      </koiCard>
+                      </ntestercCard>
                       <el-button @click="del_app_list(index)" type="text" :icon="Delete"></el-button>
                     </el-form-item>
                   </el-form>
@@ -1378,19 +1378,19 @@ onMounted(() => {
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
       </div>
       <div>
-        <KoiDialog ref="run_koiDialogRef" :title="title" :height="680" width="93%" :footer-hidden="true"
+        <NtestercDialog ref="run_ntestercDialogRef" :title="title" :height="680" width="93%" :footer-hidden="true"
           :before-close="run_close" :beforeCloseCheck="false">
           <template #content>
-            <div class="run-koi-layout">
-              <div class="run-koi-left">
+            <div class="run-ntesterc-layout">
+              <div class="run-ntesterc-left">
                 <el-tabs tab-position="left" class="demo-tabs" v-model="device_active" @tab-click="change_device">
                   <el-tab-pane v-loading="loading" v-for="(item, index) in run_device_list" :key="index" :label="item.name"
                     :name="item.name" :lazy="true">
                     <div>
-                      <KoiCard>
+                      <NtestercCard>
                         <div>
                           <el-descriptions column="4">
                             <el-descriptions-item label="任务名称：">{{ run_form.task_name }}</el-descriptions-item>
@@ -1409,18 +1409,18 @@ onMounted(() => {
                             </el-descriptions-item>
                           </el-descriptions>
                         </div>
-                      </KoiCard>
+                      </NtestercCard>
                     </div>
                     <div style="padding-top: 5px">
-                      <KoiCard style="height: 560px">
+                      <NtestercCard style="height: 560px">
                         <div style="width: 100%">
                           <div>
-                            <KoiCard style="width: 45%; float: left; height: 530px; overflow: auto">
+                            <NtestercCard style="width: 45%; float: left; height: 530px; overflow: auto">
                               <el-timeline style="width: 85%">
                                 <el-timeline-item center v-for="(res, index) in run_result" :key="index" :icon="getIcon(res.status)"
                                   type="primary" :color="colors(res.status)" size="large" :timestamp="'执行时间：' + res.create_time"
                                   placement="top">
-                                  <KoiCard :style="get_colors(res.status)">
+                                  <NtestercCard :style="get_colors(res.status)">
                                     <span>{{ res.name }}</span>
                                     <span>{{ "结果：" + res.log }}</span>
                                     <span>
@@ -1484,13 +1484,13 @@ onMounted(() => {
                                     <div class="img-viewer-box">
                                       <el-image-viewer v-if="img_show" :url-list="pre_img" @close="close_img" />
                                     </div>
-                                  </KoiCard>
+                                  </NtestercCard>
                                 </el-timeline-item>
                               </el-timeline>
-                            </KoiCard>
+                            </NtestercCard>
                           </div>
                           <div>
-                            <KoiCard style="width: 46%; float: left; height: 530px; overflow: auto">
+                            <NtestercCard style="width: 46%; float: left; height: 530px; overflow: auto">
                               <div style="padding-left: 35%">
                                 <el-progress type="dashboard" :percentage="percentage" status="success">
                                   <template #default="{ percentage }">
@@ -1529,51 +1529,51 @@ onMounted(() => {
                                   </el-descriptions-item>
                                 </el-descriptions>
                               </div>
-                            </KoiCard>
+                            </NtestercCard>
                           </div>
                         </div>
-                      </KoiCard>
+                      </NtestercCard>
                     </div>
                   </el-tab-pane>
                 </el-tabs>
               </div>
-              <div class="run-koi-right">
-                <KoiCard style="width: 100%; height: 660px; overflow: auto">
+              <div class="run-ntesterc-right">
+                <NtestercCard style="width: 100%; height: 660px; overflow: auto">
                   <p>{{ device_active }}：性能情况：</p>
                   <div id="chart" class="echarts" style="width: 100%; height: 600px"></div>
-                </KoiCard>
+                </NtestercCard>
               </div>
             </div>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
       </div>
       <div>
-        <KoiDrawer ref="device_koiDrawerRef" :title="device_active" :footerHidden="true" :size="830"
+        <NtestercDrawer ref="device_ntestercDrawerRef" :title="device_active" :footerHidden="true" :size="830"
           :beforeCloseCheck="false">
           <template #content>
             <div>
               <iframe :src="device_url" style="width: 98%; height: 730px" />
             </div>
           </template>
-        </KoiDrawer>
+        </NtestercDrawer>
       </div>
-    </KoiCard>
+    </NtestercCard>
   </div>
 </template>
 
 <style scoped lang="scss">
-.run-koi-layout {
+.run-ntesterc-layout {
   display: flex;
   width: 100%;
   height: 660px;
 }
 
-.run-koi-left {
+.run-ntesterc-left {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.run-koi-right {
+.run-ntesterc-right {
   flex: 0 0 33%;
   min-width: 260px;
   padding-left: 5px;

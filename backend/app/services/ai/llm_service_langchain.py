@@ -4,6 +4,8 @@
 """
 LLM 服务封装 - 使用 LangChain，支持所有 OpenAI 兼容的 API
 """
+from __future__ import annotations
+
 import logging
 from typing import List, Dict, Any, Optional, Union, AsyncGenerator
 from enum import Enum
@@ -18,7 +20,10 @@ try:
     from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
     LANGCHAIN_AVAILABLE = True
 except ImportError:
+    # Nuitka/缺失依赖时导入失败：必须给符号占位，避免类注解 NameError 导致整个后端起不来
     LANGCHAIN_AVAILABLE = False
+    ChatOpenAI = None  # type: ignore[misc, assignment]
+    HumanMessage = AIMessage = SystemMessage = BaseMessage = Any  # type: ignore[misc, assignment]
 
 logger = logging.getLogger(__name__)
 

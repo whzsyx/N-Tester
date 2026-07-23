@@ -45,7 +45,7 @@
       </el-col>
     </el-form-item>
     <el-form-item class="login-animation4">
-      <el-button type="primary" class="login-content-submit" round v-waves @click="onSignIn"
+      <el-button type="primary" class="login-content-submit" v-waves @click="onSignIn"
                  :loading="state.loading.signIn">
         <span>登 录</span>
       </el-button>
@@ -191,23 +191,8 @@ const signInSuccess = (isNoPower: boolean) => {
 
 <style scoped lang="scss">
 .login-content-form {
-  margin-top: 20px;
+  margin-top: 0;
   border: none;
-
-  // 给所有输入框添加圆角
-  :deep(.el-input__wrapper) {
-    border-radius: 10px;
-  }
-
-  // 给验证码按钮添加圆角
-  .login-content-code {
-    border-radius: 10px;
-  }
-
-  // 给登录按钮添加圆角
-  .login-content-submit {
-    border-radius: 25px;
-  }
 
   @for $i from 1 through 4 {
     .login-animation#{$i} {
@@ -215,7 +200,7 @@ const signInSuccess = (isNoPower: boolean) => {
       animation-name: error-num;
       animation-duration: 0.5s;
       animation-fill-mode: forwards;
-      animation-delay: calc($i/10) + s;
+      animation-delay: calc($i / 10) + s;
     }
   }
 
@@ -225,26 +210,30 @@ const signInSuccess = (isNoPower: boolean) => {
     cursor: pointer;
 
     &:hover {
-      color: #909399;
+      color: var(--el-text-color-secondary);
     }
   }
 
   .login-content-code {
     width: 100%;
     padding: 0;
-    font-weight: bold;
+    font-weight: 600;
     letter-spacing: 5px;
+    border-radius: 8px;
   }
 
   .login-content-submit {
     width: 100%;
+    height: 40px;
+    margin-top: 8px;
+    border-radius: 8px;
+    font-weight: 500;
     letter-spacing: 2px;
-    font-weight: 300;
-    margin-top: 15px;
   }
 
-  // 登录按钮所在的 form-item 去掉底部间距
   .login-animation4 {
+    margin-bottom: 0;
+
     :deep(.el-form-item__content) {
       border-bottom: none !important;
     }

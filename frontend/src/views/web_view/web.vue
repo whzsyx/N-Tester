@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="web-automation-page">
     <el-container class="wa-container" direction="vertical">
       <el-header class="wa-page-header">
@@ -873,7 +873,7 @@
                                 （已上传成功：{{ script_info.action.input }}）
                               </span>
                               <div style="width: 100%; display: flex; justify-content: center; height: 220px">
-                                <KoiUploadFiles
+                                <NtestercUploadFiles
                                   v-model="script_info.action.input"
                                   :file-name="script_info.action.input"
                                   @file-success="call_back_1"
@@ -1033,12 +1033,12 @@
         </div>
 
 
-        <KoiDialog
-          ref="add_koiDialogRef"
+        <NtestercDialog
+          ref="add_ntestercDialogRef"
           :title="title"
           :height="100"
-          @koi-confirm="add_menu_confirm"
-          @koi-cancel="add_menu_cancel"
+          @ntesterc-confirm="add_menu_confirm"
+          @ntesterc-cancel="add_menu_cancel"
         >
           <template #content>
             <el-form :model="add_menu_form" label-width="80px">
@@ -1053,14 +1053,14 @@
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
 
-        <KoiDialog
-          ref="rename_koiDialogRef"
+        <NtestercDialog
+          ref="rename_ntestercDialogRef"
           :title="title"
           :height="100"
-          @koi-confirm="edit_menu_confirm"
-          @koi-cancel="edit_menu_cancel"
+          @ntesterc-confirm="edit_menu_confirm"
+          @ntesterc-cancel="edit_menu_cancel"
         >
           <template #content>
             <el-form :model="add_menu_form" label-width="80px">
@@ -1069,18 +1069,18 @@
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
 
-        <KoiDialog
-          ref="upload_koiDialogRef"
+        <NtestercDialog
+          ref="upload_ntestercDialogRef"
           :title="title"
           :height="250"
-          @koi-confirm="upload_file_confirm"
-          @koi-cancel="upload_file_cancel"
+          @ntesterc-confirm="upload_file_confirm"
+          @ntesterc-cancel="upload_file_cancel"
         >
           <template #content>
             <div style="width: 100%; display: flex; justify-content: center">
-              <KoiUploadFiles
+              <NtestercUploadFiles
                 v-model="file_name"
                 :accept-type="'.json'"
                 :accept-types="'.json'"
@@ -1089,14 +1089,14 @@
               />
             </div>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
 
-        <KoiDialog
-          ref="run_koiDialogRef"
+        <NtestercDialog
+          ref="run_ntestercDialogRef"
           :title="title"
           :height="200"
-          @koi-confirm="run_script_confirm"
-          @koi-cancel="run_script_cancel"
+          @ntesterc-confirm="run_script_confirm"
+          @ntesterc-cancel="run_script_cancel"
         >
           <template #content>
             <el-form>
@@ -1138,7 +1138,7 @@
               </el-form-item>
             </el-form>
           </template>
-        </KoiDialog>
+        </NtestercDialog>
 
         <el-drawer
           v-model="runMonitorDrawerVisible"
@@ -1421,8 +1421,8 @@ import {
   ArrowLeft,
   Monitor,
 } from '@element-plus/icons-vue'
-import KoiDialog from '/@/components/koi/KoiDialog.vue'
-import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue'
+import NtestercDialog from '/@/components/ntesterc/NtestercDialog.vue'
+import NtestercUploadFiles from '/@/components/ntesterc/NtestercUploadFiles.vue'
 import { useWebManagementApi } from '/@/api/v1/web_management'
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
 
@@ -1892,12 +1892,12 @@ const menu_form = ref<any>({
   id: null,
 })
 const title = ref<string>('')
-const add_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
-const rename_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const add_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
+const rename_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
 
 const add_menu = (data: any) => {
   title.value = '新增子菜单'
-  add_koiDialogRef.value?.koiOpen()
+  add_ntestercDialogRef.value?.ntestercOpen()
   menu_form.value = data
 }
 
@@ -1915,7 +1915,7 @@ const add_menu_confirm = async () => {
     add_menu_form.value.pid = menu_form.value.id
     const res: any = await add_web_menu(add_menu_form.value)
     await check_children(menu_form.value, res.data)
-    add_koiDialogRef.value?.koiQuickClose(res.message)
+    add_ntestercDialogRef.value?.ntestercQuickClose(res.message)
   } catch {
     ElMessage.error('保存失败，请重试')
   } finally {
@@ -1924,12 +1924,12 @@ const add_menu_confirm = async () => {
 }
 
 const add_menu_cancel = () => {
-  add_koiDialogRef.value?.koiClose()
+  add_ntestercDialogRef.value?.ntestercClose()
 }
 
 const rename_menu = (data: any) => {
   title.value = '重命名'
-  rename_koiDialogRef.value?.koiOpen()
+  rename_ntestercDialogRef.value?.ntestercOpen()
   menu_form.value = data
 }
 
@@ -1937,7 +1937,7 @@ const edit_menu_confirm = async () => {
   try {
     add_menu_form.value.id = menu_form.value.id
     const res: any = await rename_web_menu(add_menu_form.value)
-    rename_koiDialogRef.value?.koiQuickClose(res.message)
+    rename_ntestercDialogRef.value?.ntestercQuickClose(res.message)
     menu_form.value.name = add_menu_form.value.name
   } catch {
     ElMessage.error('保存失败，请重试')
@@ -1947,7 +1947,7 @@ const edit_menu_confirm = async () => {
 }
 
 const edit_menu_cancel = () => {
-  rename_koiDialogRef.value?.koiClose()
+  rename_ntestercDialogRef.value?.ntestercClose()
 }
 
 const on_menu_allowDrop = (moveNode: any, inNode: any, type: any) => {
@@ -2162,7 +2162,7 @@ const element_select = async () => {
 
 const file_name = ref<any>(null)
 const file_url = ref<any>(null)
-const upload_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const upload_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
 
 const call_back = (fileMap: any) => {
   ElMessage.success('上传文件成功（占位实现）')
@@ -2182,7 +2182,7 @@ const add_file = (action: any) => {
 const pid = ref<any>(null)
 const upload_file = (data: any) => {
   pid.value = data.id
-  upload_koiDialogRef.value?.koiOpen()
+  upload_ntestercDialogRef.value?.ntestercOpen()
   title.value = '上传文件'
 }
 
@@ -2193,7 +2193,7 @@ const upload_file_confirm = async () => {
     pid: pid.value,
   })
   if (res.code === 200) {
-    upload_koiDialogRef.value?.koiQuickClose(res.message || '上传成功')
+    upload_ntestercDialogRef.value?.ntestercQuickClose(res.message || '上传成功')
     await get_web_menu()
   } else {
     ElMessage.error('上传失败，请重试')
@@ -2201,7 +2201,7 @@ const upload_file_confirm = async () => {
 }
 
 const upload_file_cancel = () => {
-  upload_koiDialogRef.value?.koiQuickClose('取消上传')
+  upload_ntestercDialogRef.value?.ntestercQuickClose('取消上传')
 }
 
 const run_script_form = ref<any>({
@@ -2212,12 +2212,12 @@ const run_script_form = ref<any>({
   height: 1080,
   browser_type: 1,
 })
-const run_koiDialogRef = ref<InstanceType<typeof KoiDialog> | null>(null)
+const run_ntestercDialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
 const result_id = ref<any>('')
 
 const run_script = (item: any) => {
   run_script_form.value.script = []
-  run_koiDialogRef.value?.koiOpen()
+  run_ntestercDialogRef.value?.ntestercOpen()
   title.value = '请配置调试信息'
   const script = {
     id: item.id,
@@ -2390,12 +2390,12 @@ const view_video = () => {
 }
 
 const run_script_cancel = () => {
-  run_koiDialogRef.value?.koiQuickClose('取消调试')
+  run_ntestercDialogRef.value?.ntestercQuickClose('取消调试')
 }
 
 const batch_run_script = () => {
   run_script_form.value.script = []
-  run_koiDialogRef.value?.koiOpen()
+  run_ntestercDialogRef.value?.ntestercOpen()
   title.value = '请配置调试信息'
   run_script_form.value.script = select_list.value
 }

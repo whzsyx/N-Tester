@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="monitor-online-container app-container">
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="mb20">
@@ -74,7 +74,7 @@
         </div>
       </template>
 
-      <z-table
+      <n-table
         :columns="state.columns"
         :data="state.listData"
         ref="tableRef"

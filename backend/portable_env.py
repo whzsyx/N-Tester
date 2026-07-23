@@ -52,6 +52,19 @@ def _as_abs(root: Path, value: str) -> str:
     return str((root / p).resolve())
 
 
+def _celery_redis_default(redis_uri: str) -> str:
+    """Derive Celery broker URL from REDIS_URI when celery block is omitted."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(redis_uri)
+    path = parts.path or ""
+    if path in {"", "/"}:
+        path = "/5"
+    else:
+        path = "/5"
+    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
+
+
 def _apply_mapping(root: Path, data: Dict[str, Any]) -> None:
     """将 YAML 嵌套结构映射为现有环境变量名。"""
     server = data.get("server") or {}
@@ -85,7 +98,13 @@ def _apply_mapping(root: Path, data: Dict[str, Any]) -> None:
 
     redis = data.get("redis") or {}
     if isinstance(redis, dict) and redis.get("uri"):
-        os.environ["REDIS_URI"] = str(redis["uri"]).strip()
+        redis_uri = str(redis["uri"]).strip()
+        os.environ["REDIS_URI"] = redis_uri
+        # Portable installs often omit celery; default to same Redis host, db 5.
+        if not os.environ.get("CELERY_BROKER_URL"):
+            os.environ["CELERY_BROKER_URL"] = _celery_redis_default(redis_uri)
+        if not os.environ.get("CELERY_RESULT_BACKEND"):
+            os.environ["CELERY_RESULT_BACKEND"] = os.environ["CELERY_BROKER_URL"]
 
     celery = data.get("celery") or {}
     if isinstance(celery, dict):
@@ -119,7 +138,6 @@ def _apply_mapping(root: Path, data: Dict[str, Any]) -> None:
             os.environ["APP_PROJECT_ROOT"] = _as_abs(root, str(paths["app_project_root"]))
         if paths.get("project_path"):
             os.environ["PROJECT_PATH"] = _as_abs(root, str(paths["project_path"]))
-
 
 def load_portable_yaml_into_environ() -> bool:
     """

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="images-page">
     <!-- 顶部标题栏 -->
     <el-card class="box-card">
@@ -115,14 +115,14 @@
     </el-card>
 
     <!-- 上传对话框 -->
-    <KoiDialog
-      ref="koiDialogRef"
+    <NtestercDialog
+      ref="ntestercDialogRef"
       title="图像库上传"
       :destroy-on-close="true"
       :before-close-check="false"
       :loading="confirmLoading"
-      @koi-confirm="add_Confirm"
-      @koi-cancel="add_Cancel"
+      @ntesterc-confirm="add_Confirm"
+      @ntesterc-cancel="add_Cancel"
     >
       <template #content>
         <el-form ref="formRef" :model="add_form" label-width="100px" status-icon>
@@ -135,7 +135,7 @@
             />
           </el-form-item>
           <el-form-item label="图像文件" prop="avatar">
-            <KoiUploadImages
+            <NtestercUploadImages
               :key="drawerUploadKey"
               v-model:file-list="add_form.file_list"
               :app_menu_id="drawerMenuId"
@@ -146,17 +146,17 @@
                 <span>选择图片</span>
               </template>
               <template #tip>选择后仅预览，点下方「确定」后统一上传并写入当前项目；单张不超过 30M，最多 9 张。</template>
-            </KoiUploadImages>
+            </NtestercUploadImages>
           </el-form-item>
         </el-form>
       </template>
-    </KoiDialog>
+    </NtestercDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { MsgBox, MsgSuccess, NoticeError } from "@/utils/koi.ts";
+import { MsgBox, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
 import { delete_img, img_list } from "@/api/api_app/img.ts";
 import { app_menu_select } from "@/api/api_app/app";
 import { formatDateTime } from "@/utils/formatTime";
@@ -185,7 +185,7 @@ const add_form = ref<{ file_list: any[]; type: string; id?: number; file_name?: 
 });
 
 /** 添加 / 编辑弹窗 */
-const koiDialogRef = ref();
+const ntestercDialogRef = ref();
 
 /** 上传归属的项目 ID：打开抽屉时从当前筛选快照，避免与列表「项目」下拉联动导致重复/错项目写入 */
 const drawerMenuId = ref<number | string | "">("");
@@ -269,7 +269,7 @@ const Add = () => {
   drawerUploadKey.value += 1;
   resetForm();
   add_form.value.type = "add";
-  koiDialogRef.value.koiOpen();
+  ntestercDialogRef.value.ntestercOpen();
 };
 
 /** 清空表单数据 */
@@ -327,7 +327,7 @@ const add_Confirm = async () => {
     confirmLoading.value = false;
     resetForm();
     drawerUploadKey.value += 1;
-    koiDialogRef.value.koiQuickClose(committed ? "上传成功" : undefined);
+    ntestercDialogRef.value.ntestercQuickClose(committed ? "上传成功" : undefined);
   }
 };
 
@@ -336,7 +336,7 @@ const add_Cancel = () => {
   revokeBlobUrls(add_form.value.file_list || []);
   resetForm();
   drawerUploadKey.value += 1;
-  koiDialogRef.value.koiQuickClose(undefined);
+  ntestercDialogRef.value.ntestercQuickClose(undefined);
 };
 
 // 编辑用户（仅展示当前图，新增替换走 defer 提交）
@@ -354,7 +354,7 @@ const Edit = async (row: any) => {
       ? [{ name: row.file_name, url: row.file_path, status: "success" as const }]
       : []
   };
-  koiDialogRef.value.koiOpen();
+  ntestercDialogRef.value.ntestercOpen();
 };
 
 const handleSelectionChange = (selection: any) => {

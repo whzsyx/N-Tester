@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="package-page">
     <!-- 顶部标题栏 -->
     <el-card class="box-card">
@@ -210,7 +210,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { MsgSuccess, NoticeError } from "@/utils/koi";
+import { MsgSuccess, NoticeError } from "@/utils/ntesterc";
 import { file_list } from "@/api/api_file/file";
 import { Plus, Delete, Search, Refresh, Download, Upload } from "@element-plus/icons-vue";
 

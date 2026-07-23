@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="system-permission-container app-container">
     <el-card>
       <div class="system-permission-search mb15">
@@ -13,7 +13,7 @@
         <el-button v-auth="'system:permission:add'" type="success" class="ml10" @click="onOpenEdit('add', null)">新增权限</el-button>
       </div>
 
-      <z-table
+      <n-table
           :columns="state.columns"
           :data="state.permissionList"
           ref="tableRef"

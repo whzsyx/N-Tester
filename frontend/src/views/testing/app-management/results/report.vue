@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { app_result, get_app_result_detail, get_result_log } from "@/api/api_app/app.ts";
@@ -304,24 +304,24 @@ onMounted(() => {
 
 <template>
   <div style="padding: 10px; padding-left: 50px; padding-right: 50px" :loading="loading">
-    <koiCard>
+    <ntestercCard>
       <div style="height: 890px">
         <div style="padding-block-end: 10px">
           <div style="height: 190px">
             <div style="width: 100%">
               <div>
-                <koiCard style="width: 33%; float: left; height: 190px">
+                <ntestercCard style="width: 33%; float: left; height: 190px">
                   <el-descriptions border :column="1" size="mini">
                     <el-descriptions-item label="任务名称">{{ res_form.task_name }}</el-descriptions-item>
                     <el-descriptions-item label="执行人">{{ res_form.username }}</el-descriptions-item>
                     <el-descriptions-item label="开始时间">{{ formatDateTime(res_form.start_time) }}</el-descriptions-item>
                     <el-descriptions-item label="结束时间">{{ formatDateTime(res_form.end_time) }}</el-descriptions-item>
                   </el-descriptions>
-                </koiCard>
+                </ntestercCard>
               </div>
               <div class="width-10px"></div>
               <div style="padding-right: 10px">
-                <koiCard style="width: 33%; float: left; height: 190px">
+                <ntestercCard style="width: 33%; float: left; height: 190px">
                   <div style="display: flex; justify-content: center">
                     <el-card style="width: 270px" shadow="never">
                       脚本总数：
@@ -342,10 +342,10 @@ onMounted(() => {
                       <span style="font-size: 26px">{{ res_form.fail }}</span>
                     </el-card>
                   </div>
-                </koiCard>
+                </ntestercCard>
               </div>
               <div>
-                <koiCard style="width: 30%; float: left; padding-right: 10px; height: 190px">
+                <ntestercCard style="width: 30%; float: left; padding-right: 10px; height: 190px">
                   <div style="justify-content: center; padding-left: 34%">
                     <el-progress type="dashboard" :percentage="res_form.percent" status="success">
                       <template #default="{ percentage }">
@@ -354,15 +354,15 @@ onMounted(() => {
                       </template>
                     </el-progress>
                   </div>
-                </koiCard>
+                </ntestercCard>
               </div>
             </div>
           </div>
         </div>
         <div>
-          <koiCard style="height: 680px">
+          <ntestercCard style="height: 680px">
             <div style="width: 100%">
-              <koiCard style="width: 15%; float: left">
+              <ntestercCard style="width: 15%; float: left">
                 <div>
                   <el-tabs v-model="device_active" @tab-click="handleTabClick">
                     <el-tab-pane label="全部" name="all">
@@ -414,14 +414,14 @@ onMounted(() => {
                     </el-tab-pane>
                   </el-tabs>
                 </div>
-              </koiCard>
-              <koiCard style="width: 82%; float: right">
+              </ntestercCard>
+              <ntestercCard style="width: 82%; float: right">
                 <div>
                   <div style="width: 66%; float: left">
                     <el-tabs v-model="log_active" @tab-click="handle_script">
                       <el-tab-pane label="结果总览" name="first">
                         <div>
-                          <KoiCard>
+                          <NtestercCard>
                             <div>
                               <el-descriptions column="4">
                                 <el-descriptions-item label="设备：">{{ device_form.name }}</el-descriptions-item>
@@ -430,18 +430,18 @@ onMounted(() => {
                                 <el-descriptions-item label="进程id： ">{{ device_form.pid }}</el-descriptions-item>
                               </el-descriptions>
                             </div>
-                          </KoiCard>
+                          </NtestercCard>
                         </div>
                         <div style="padding-top: 5px">
-                          <KoiCard style="height: 510px">
+                          <NtestercCard style="height: 510px">
                             <div style="width: 100%">
                               <div>
-                                <KoiCard style="width: 45%; float: left; height: 487px; overflow: auto">
+                                <NtestercCard style="width: 45%; float: left; height: 487px; overflow: auto">
                                   <el-timeline style="width: 90%">
                                     <el-timeline-item center v-for="(res, index) in run_result" :key="index"
                                       :icon="getIcon(res.status)" type="primary" :color="colors(res.status)"
                                       size="large" :timestamp="'执行时间：' + formatDateTime(res.create_time)" placement="top">
-                                      <KoiCard :style="get_colors(res.status)">
+                                      <NtestercCard :style="get_colors(res.status)">
                                         <span>{{ "步骤：" + res.name }}</span>
                                         <span>{{ res.log }}</span>
                                         <span>
@@ -470,13 +470,13 @@ onMounted(() => {
                                         <div class="img-viewer-box">
                                           <el-image-viewer v-if="img_show" :url-list="pre_img" @close="close_img" />
                                         </div>
-                                      </KoiCard>
+                                      </NtestercCard>
                                     </el-timeline-item>
                                   </el-timeline>
-                                </KoiCard>
+                                </NtestercCard>
                               </div>
                               <div>
-                                <KoiCard style="width: 50%; float: left; height: 487px; overflow: auto">
+                                <NtestercCard style="width: 50%; float: left; height: 487px; overflow: auto">
                                   <div style="padding-left: 35%">
                                     <el-progress type="dashboard" :percentage="result_form.percent" status="success">
                                       <template #default="{ percentage }">
@@ -504,27 +504,27 @@ onMounted(() => {
                                       </el-descriptions-item>
                                     </el-descriptions>
                                   </div>
-                                </KoiCard>
+                                </NtestercCard>
                               </div>
                             </div>
-                          </KoiCard>
+                          </NtestercCard>
                         </div>
                       </el-tab-pane>
                     </el-tabs>
                   </div>
                   <div style="width: 33%; float: left; padding-left: 5px">
-                    <KoiCard style="width: 100%; float: left; height: 660px; overflow: auto">
+                    <NtestercCard style="width: 100%; float: left; height: 660px; overflow: auto">
                       <p>{{ device_form.name }}：性能情况：</p>
                       <div id="chart" class="echarts" style="width: 100%; height: 600px"></div>
-                    </KoiCard>
+                    </NtestercCard>
                   </div>
                 </div>
-              </koiCard>
+              </ntestercCard>
             </div>
-          </koiCard>
+          </ntestercCard>
         </div>
       </div>
-    </koiCard>
+    </ntestercCard>
   </div>
 </template>
 

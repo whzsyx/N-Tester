@@ -363,7 +363,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { ElTree, TabsPaneContext } from "element-plus";
 import { useRoute } from "vue-router";
-import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/koi.ts";
+import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
 import { appManagementDeviceApi } from "/@/api/v1/app_management_device";
 import { useAppManagementApi } from "/@/api/v1/app_management";
 
@@ -587,10 +587,10 @@ const title = ref<string>("");
 const device = ref<string>("");
 const dialogVisible = ref(false);
 const renameDialogVisible = ref(false);
-const add_koiDialogRef = ref();
-const rename_koiDialogRef = ref();
-const device_koiDialogRef = ref();
-const run_koiDialogRef = ref();
+const add_ntestercDialogRef = ref();
+const rename_ntestercDialogRef = ref();
+const device_ntestercDialogRef = ref();
+const run_ntestercDialogRef = ref();
 const user = JSON.parse(LocalStorage.get("user"));
 const script_id = ref<number>();
 

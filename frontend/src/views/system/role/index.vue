@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="system-role-container app-container">
     <el-card>
       <div class="system-user-search mb15">
@@ -8,7 +8,7 @@
         <el-button v-auth="'system:role:add'" type="success" class="ml10" @click="onOpenSaveOrUpdate('save', null)">新增
         </el-button>
       </div>
-      <z-table
+      <n-table
           :columns="state.columns"
           :data="state.listData"
           ref="tableRef"

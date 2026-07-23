@@ -1,4 +1,4 @@
-import { ElNotification, ElMessageBox, ElMessage } from 'element-plus';
+﻿import { ElNotification, ElMessageBox, ElMessage } from 'element-plus';
 
 type MessageType = 'info' | 'success' | 'error' | 'warning';
 
@@ -19,7 +19,7 @@ export function MsgWarning(message: any, duration = 2000, type: MessageType = 'w
 	ElMessage({ message, type, duration, showClose: true, dangerouslyUseHTMLString: parseHtml });
 }
 
-export function koiNotice(message: any, title = '温馨提示', duration = 2000, type: MessageType = 'info', parseHtml = false) {
+export function ntestercNotice(message: any, title = '温馨提示', duration = 2000, type: MessageType = 'info', parseHtml = false) {
 	ElNotification.closeAll();
 	ElNotification({ message, title, type, duration, showClose: true, dangerouslyUseHTMLString: parseHtml });
 }
@@ -45,7 +45,7 @@ export function MsgBox(
 }
 
 
-export const NoticeError = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'error');
-export const NoticeSuccess = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'success');
-export const koiNoticeWarning = (message: any, duration = 2000) => koiNotice(message, '温馨提示', duration, 'warning');
+export const NoticeError = (message: any, duration = 2000) => ntestercNotice(message, '温馨提示', duration, 'error');
+export const NoticeSuccess = (message: any, duration = 2000) => ntestercNotice(message, '温馨提示', duration, 'success');
+export const ntestercNoticeWarning = (message: any, duration = 2000) => ntestercNotice(message, '温馨提示', duration, 'warning');
 

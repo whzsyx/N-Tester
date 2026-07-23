@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<el-drawer
 		v-model="visible"
 		:title="title"
@@ -6,15 +6,15 @@
 		:direction="direction"
 		:close-on-click-modal="closeOnClickModel"
 		:destroy-on-close="destroyOnClose"
-		:before-close="koiClose"
+		:before-close="ntestercClose"
 	>
 		<div class="formDrawer">
 			<div class="body">
 				<slot name="content"></slot>
 			</div>
 			<div class="footer" v-if="!footerHidden">
-				<el-button type="primary" :loading="confirmLoading" v-throttle="koiConfirm">{{ confirmText }}</el-button>
-				<el-button type="danger" @click="koiCancel">{{ cancelText }}</el-button>
+				<el-button type="primary" :loading="confirmLoading" v-throttle="ntestercConfirm">{{ confirmText }}</el-button>
+				<el-button type="danger" @click="ntestercCancel">{{ cancelText }}</el-button>
 			</div>
 		</div>
 	</el-drawer>
@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { MsgWarning, MsgBox, MsgSuccess } from '/@/utils/koi';
+import { MsgWarning, MsgBox, MsgSuccess } from '/@/utils/ntesterc';
 
 interface IDrawerProps {
 	title?: string;
@@ -39,7 +39,7 @@ interface IDrawerProps {
 }
 
 const props = withDefaults(defineProps<IDrawerProps>(), {
-	title: 'KoiDrawer',
+	title: 'NtestercDrawer',
 	visible: false,
 	size: '450',
 	closeOnClickModel: false,
@@ -68,10 +68,10 @@ watch(
 	{ immediate: true }
 );
 
-const koiOpen = () => (visible.value = true);
+const ntestercOpen = () => (visible.value = true);
 
 /** el-drawer 规范：before-close 需要 done()，否则 element-plus 可能出现 DOM 清理时序问题 */
-const koiClose = (done?: () => void) => {
+const ntestercClose = (done?: () => void) => {
 	// beforeCloseCheck=false：不弹确认，直接关闭并调用 done（如果有）
 	if (props.beforeCloseCheck === false) {
 		visible.value = false;
@@ -89,16 +89,16 @@ const koiClose = (done?: () => void) => {
 		});
 };
 
-const koiQuickClose = (data: any) => {
+const ntestercQuickClose = (data: any) => {
 	visible.value = false;
 	if (data !== undefined && data !== null && data !== '') MsgSuccess(data);
 };
 
-const emits = defineEmits(['koiConfirm', 'koiCancel']);
-const koiConfirm = () => emits('koiConfirm');
-const koiCancel = () => emits('koiCancel');
+const emits = defineEmits(['ntestercConfirm', 'ntestercCancel']);
+const ntestercConfirm = () => emits('ntestercConfirm');
+const ntestercCancel = () => emits('ntestercCancel');
 
-defineExpose({ koiOpen, koiClose, koiQuickClose });
+defineExpose({ ntestercOpen, ntestercClose, ntestercQuickClose });
 </script>
 
 <style lang="scss" scoped>

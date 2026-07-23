@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="system-login-record-container app-container">
     <el-card>
       <div class="system-login-record-search mb15">
@@ -36,7 +36,7 @@
           清理日志
         </el-button>
       </div>
-      <z-table
+      <n-table
           :columns="state.columns"
           :data="state.listData"
           ref="tableRef"

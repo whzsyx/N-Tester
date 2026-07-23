@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-table
       :data="data"
       :tree-props="treeProps"
@@ -151,7 +151,7 @@
         @current-change="currentPageChange"/>
   </div>
 </template>
-<script setup lang="ts" name="z-table">
+<script setup lang="ts" name="n-table">
 import {computed, defineAsyncComponent, reactive} from 'vue'
 import {formatLookup} from '/@/utils/lookup'
 

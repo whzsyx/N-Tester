@@ -1,5 +1,5 @@
-<template>
-  <div class="koi-upload-files">
+﻿<template>
+  <div class="ntesterc-upload-files">
     <el-upload
       class="upload-area"
       :show-file-list="false"
@@ -57,7 +57,7 @@ const handleBeforeUpload = async (file: File) => {
 </script>
 
 <style scoped>
-.koi-upload-files {
+.ntesterc-upload-files {
   display: inline-flex;
   align-items: center;
   gap: 8px;

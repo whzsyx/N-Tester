@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<el-dialog
 		:model-value="visible"
 		:title="title"
@@ -8,7 +8,7 @@
 		:append-to-body="false"
 		draggable
 		:destroy-on-close="destroyOnClose"
-		:before-close="koiClose"
+		:before-close="ntestercClose"
 		:fullscreen="fullscreen"
 	>
 		<slot name="header"></slot>
@@ -17,8 +17,8 @@
 		</div>
 		<template #footer v-if="!footerHidden">
 			<span class="dialog-footer">
-				<el-button type="primary" :loading="confirmLoading" @click="koiConfirm">{{ confirmText }}</el-button>
-				<el-button type="danger" @click="koiCancel">{{ cancelText }}</el-button>
+				<el-button type="primary" :loading="confirmLoading" @click="ntestercConfirm">{{ confirmText }}</el-button>
+				<el-button type="danger" @click="ntestercCancel">{{ cancelText }}</el-button>
 			</span>
 		</template>
 	</el-dialog>
@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { ref, toRefs, watch } from 'vue';
-import { MsgWarning, MsgBox, MsgSuccess } from '/@/utils/koi';
+import { MsgWarning, MsgBox, MsgSuccess } from '/@/utils/ntesterc';
 
 interface IDialogProps {
 	title?: string;
@@ -76,11 +76,11 @@ watch(
 const { loading } = toRefs(props);
 const confirmLoading = ref(loading);
 
-const koiOpen = () => {
+const ntestercOpen = () => {
 	visible.value = true;
 };
 
-const koiClose = () => {
+const ntestercClose = () => {
 	const runBeforeClose = () => {
 		try {
 			props.beforeClose?.();
@@ -104,19 +104,19 @@ const koiClose = () => {
 	}
 };
 
-const koiQuickClose = (data: any) => {
+const ntestercQuickClose = (data: any) => {
 	visible.value = false;
 	if (data !== undefined && data !== null && data !== '') MsgSuccess(data);
 };
 
-const emits = defineEmits(['koiConfirm', 'koiCancel']);
-const koiConfirm = () => emits('koiConfirm');
-const koiCancel = () => emits('koiCancel');
+const emits = defineEmits(['ntestercConfirm', 'ntestercCancel']);
+const ntestercConfirm = () => emits('ntestercConfirm');
+const ntestercCancel = () => emits('ntestercCancel');
 
 defineExpose({
-	koiOpen,
-	koiClose,
-	koiQuickClose,
+	ntestercOpen,
+	ntestercClose,
+	ntestercQuickClose,
 });
 </script>
 

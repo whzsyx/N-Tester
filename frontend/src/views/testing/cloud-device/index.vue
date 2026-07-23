@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div>
         <el-card class="box-card">
             <div style="margin-bottom: 10px;">
@@ -120,7 +120,7 @@
                         <el-tab-pane label="安装APP" name="install">
                             <div>
                                 <div class="flex justify-center" style="margin-bottom: 10px;">
-                                    <KoiUploadFiles
+                                    <NtestercUploadFiles
                                         v-model="apk_path"
                                         :acceptType="'.apk,.aab'"
                                         :acceptTypes="'.apk, .aab'"
@@ -312,7 +312,7 @@ import { useCloudDeviceApi } from '/@/api/v1/cloud_device';
 import { ElLoading, ElMessage, ElMessageBox, ElNotification } from 'element-plus';
 import { CircleCheck, CircleClose, View, Pointer } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
-import KoiUploadFiles from '/@/components/koi/KoiUploadFiles.vue';
+import NtestercUploadFiles from '/@/components/ntesterc/NtestercUploadFiles.vue';
 import devicePlaceholder from '/@/assets/device-placeholder.svg';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
