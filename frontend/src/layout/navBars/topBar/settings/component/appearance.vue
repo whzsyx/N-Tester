@@ -10,7 +10,7 @@ defineOptions({name: 'appearance'})
 
 const BUILT_IN_THEME_PRESETS = [
   {
-    color: '#409eff',
+    color: '#0741ef',
     type: 'default',
     name: "默认"
   },

@@ -73,7 +73,7 @@ const state = reactive({ isScan: false });
 const getThemeConfig = computed(() => themeConfig.value);
 
 const themePresets = [
-  { color: '#409eff', name: '默认蓝' },
+  { color: '#0741ef', name: '默认蓝' },
   { color: 'hsl(245 82% 67%)', name: '紫罗兰' },
   { color: 'hsl(231 98% 65%)', name: '天蓝色' },
   { color: 'hsl(161 90% 43%)', name: '浅绿色' },
